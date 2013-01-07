@@ -37,10 +37,15 @@ import javax.swing.JFrame;
  */
 public class ClipManager implements FlavorListener, ClipboardOwner, ActionListener, MouseListener, KeyListener{
 
+	private static final String MENU_ITEM_ABOUT 	= "About";
+	private static final String MENU_ITEM_EXIT 		= "Exit";
+	private static final String TOOL_TIP 			= "ClipX";
+	
 	/**
 	 * SyS clipboard
 	 */
-	private Clipboard clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+	private Clipboard clip;
+	
 	
 	/**
 	 * GUI of the application
@@ -50,7 +55,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	// SysTray vars
 	private PopupMenu	popupMenu;
 	private TrayIcon 	trayIcon;
-	private SystemTray 	sysTray = SystemTray.getSystemTray();
+	private SystemTray 	sysTray;
 	
 	// SysTray menu items 
 	MenuItem item01;
@@ -58,13 +63,6 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	MenuItem item03;
 	MenuItem mItemAbout;
 	MenuItem mItemExit;
-	
-	// Text of menus
-	private final String mItemAboutStr 	= "About";
-	private final String mItemExitStr	= "Exit";
-	
-	// ToolTipString
-	private final String toolTipStr = "ClipX";
 	
 	
 	
@@ -75,10 +73,18 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	 * to get the ownership.
 	 */
 	public ClipManager() {
+		
+		this.clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+		
+		this.sysTray = SystemTray.getSystemTray();
+		
 		clip.setContents(clip.getContents(null), this);
 		clip.addFlavorListener(this);
+		
 		gui = new ClipGUI(this);
+		
 		this.iniSysTray();
+		
 		this.gui.addKeyListener(this);
 	}
 
@@ -89,13 +95,14 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	 * initializated system tray icon resources
 	 */
 	private void iniSysTray() {
+		
 		// SysTray menu items
 		item01 		= new MenuItem("item01");
 		item02 		= new MenuItem("item02");
 		item03 		= new MenuItem("item03");
-		mItemAbout 	= new MenuItem(mItemAboutStr);
+		mItemAbout 	= new MenuItem(MENU_ITEM_ABOUT);
 		mItemAbout.setEnabled(false);
-		mItemExit	= new MenuItem(mItemExitStr);
+		mItemExit	= new MenuItem(MENU_ITEM_EXIT);
 		item01.addActionListener(this);
 		item02.addActionListener(this);
 		item03.addActionListener(this);
@@ -118,7 +125,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		trayIcon.addActionListener(this);
 		trayIcon.addMouseListener(this);
 		
-		trayIcon.setToolTip(toolTipStr);
+		trayIcon.setToolTip(TOOL_TIP);
 		
 		// add tray icon
 		try {
@@ -146,7 +153,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		String strClip = null;
 		Transferable tf = null;
 		try {
-			tf = clip.getContents(this);
+			tf = clip.getContents(null);
 			
 			// Check if it's a String
 			if (tf.isDataFlavorSupported(DataFlavor.stringFlavor)) {		
@@ -185,8 +192,8 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		
 		// Get the SyS clipboard and then be his owner by setting the same data
 		try {
-			clip = Toolkit.getDefaultToolkit().getSystemClipboard();
-			clip.setContents(clip.getContents(null), this);
+			//clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+			//clip.setContents(clip.getContents(null), this);
 		}
 		catch (IllegalStateException eISE) {
 			System.out.println("cannot set contents in clipboard");
@@ -197,6 +204,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		
 		// start listening clipboard changes
 		clip.addFlavorListener(this);	
+		
 	}
 	
 	/**
@@ -213,6 +221,13 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		
 		// ... from now one we need clipboard changes notifications
 		clip.addFlavorListener(this);	
+		
+		try {
+			Thread.sleep(100000L);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
 	}
 	
 	
@@ -236,7 +251,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	public void actionPerformed(ActionEvent e) {
 		try {
 			System.out.println(e.getActionCommand());
-			if (e.getActionCommand().equals(mItemExitStr)) {	// EXIT
+			if (e.getActionCommand().equals(MENU_ITEM_EXIT)) {	// EXIT
 				System.exit(0);
 			}	
 		}
@@ -257,7 +272,6 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	@Override
 	public void mouseClicked(MouseEvent e) {
 		if (e.getButton() == MouseEvent.BUTTON1) {
-			System.out.println("main Event");
 			gui.setVisible(true);
 		}
 	}

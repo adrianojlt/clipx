@@ -49,7 +49,7 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 	private ClipList			list;
 	private JScrollPane			listScrollPane;
 	
-	// reference to ClipManager
+	// reference to ClipManager 
 	ClipManager clipManager;
 	
 	
