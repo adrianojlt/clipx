@@ -29,7 +29,6 @@ import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 
 /**
- * novo texto
  * Class that will caught clipboard events, if it is a String, that 
  * String will be stored in a LinkedList
  * @author adriano
@@ -96,20 +95,21 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	 */
 	private void iniSysTray() {
 		
-		// SysTray menu items
 		item01 		= new MenuItem("item01");
 		item02 		= new MenuItem("item02");
 		item03 		= new MenuItem("item03");
 		mItemAbout 	= new MenuItem(MENU_ITEM_ABOUT);
+		
 		mItemAbout.setEnabled(false);
+		
 		mItemExit	= new MenuItem(MENU_ITEM_EXIT);
+		
 		item01.addActionListener(this);
 		item02.addActionListener(this);
 		item03.addActionListener(this);
 		mItemAbout.addActionListener(this);
 		mItemExit.addActionListener(this);
 		
-		// popupmenu
 		popupMenu = new PopupMenu();
 		popupMenu.add(item01);
 		popupMenu.add(item02);
@@ -118,7 +118,6 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		popupMenu.add(mItemExit);
 		popupMenu.addActionListener(this);		
 			
-		// trayicon
 		trayIcon = new TrayIcon(new ImageIcon("img/mainIcon.gif", "ClipX").getImage());
 		trayIcon.setPopupMenu(popupMenu);
 		trayIcon.setImageAutoSize(true);
@@ -127,13 +126,9 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		
 		trayIcon.setToolTip(TOOL_TIP);
 		
-		// add tray icon
-		try {
-			sysTray.add(trayIcon);
-		}
-		catch (AWTException eAWT) {
-			
-		}
+		try { sysTray.add(trayIcon); }
+		catch (AWTException eAWT) { }
+		
 		trayIcon.displayMessage("ClipX", "clipboard Strings will be Saved ...", MessageType.INFO);
 	}
 	
@@ -145,6 +140,43 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 	 */
 	@Override
 	public void flavorsChanged(FlavorEvent e) {
+		
+		//clip.removeFlavorListener(this);
+		
+		Transferable tf = clip.getContents(null);
+		
+		String copyString = null;
+		
+		if (tf.isDataFlavorSupported(DataFlavor.stringFlavor)) {		
+			try {
+				copyString = (String)tf.getTransferData(DataFlavor.stringFlavor);
+				if (copyString != null) {
+					StringSelection ss = new StringSelection(copyString);
+					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(ss, this);
+				}
+				if(!this.gui.getList().getModel().getItems().contains(copyString)) {
+					try {
+						gui.getList().getModel().addElementTo(copyString, 0);
+						this.gui.getEditTA().setText(copyString);
+					}
+					catch (Exception ex) {
+						ex.printStackTrace();
+					}
+				}
+				else {}
+			}
+			catch (IOException ioEx) { }
+			catch (UnsupportedFlavorException unFlvEx) { }
+		}
+		else { }
+		
+		//clip.addFlavorListener(this);
+		
+		//try { Thread.sleep(1000); } 
+		//catch (InterruptedException ex) { ex.printStackTrace(); }
+	}
+	
+	private void flavorChangedFunction() {
 		
 		// We don't need to be notified when we are copying data from clipboard
 		clip.removeFlavorListener(this);
@@ -164,9 +196,14 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 										
 					// If this String is not stored, save it...
 					if(!this.gui.getList().getModel().getItems().contains(strClip)) {
-						gui.getList().getModel().addElementTo(strClip, 0);
-						this.setClipboard(strClip);
-						this.gui.getEditTA().setText(strClip);
+						try {
+							gui.getList().getModel().addElementTo(strClip, 0);
+							this.setClipboard(strClip);
+							this.gui.getEditTA().setText(strClip);
+						}
+						catch (Exception ex) {
+							ex.printStackTrace();
+						}
 					}
 					else {
 						System.out.println("that Clipboard String already exists");
@@ -192,8 +229,8 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		
 		// Get the SyS clipboard and then be his owner by setting the same data
 		try {
-			//clip = Toolkit.getDefaultToolkit().getSystemClipboard();
-			//clip.setContents(clip.getContents(null), this);
+			clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+			clip.setContents(clip.getContents(null), this);
 		}
 		catch (IllegalStateException eISE) {
 			System.out.println("cannot set contents in clipboard");
@@ -203,7 +240,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, ActionListen
 		}
 		
 		// start listening clipboard changes
-		clip.addFlavorListener(this);	
+		clip.addFlavorListener(this);
 		
 	}
 	
