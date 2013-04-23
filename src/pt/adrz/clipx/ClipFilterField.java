@@ -6,6 +6,8 @@ import javax.swing.event.DocumentListener;
 
 public class ClipFilterField extends JTextField implements DocumentListener {
 	
+	private static final long serialVersionUID = 2406618860472659185L;
+	
 	// reference to list
 	private ClipList list;
 	

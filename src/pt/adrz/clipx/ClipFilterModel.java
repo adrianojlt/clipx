@@ -5,7 +5,12 @@ import java.util.LinkedList;
 import javax.swing.AbstractListModel;
 
 
-public class ClipFilterModel extends AbstractListModel {
+public class ClipFilterModel extends AbstractListModel<String> {
+
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 6652151796589168654L;
 
 	/**
 	 * Strings stored
@@ -105,7 +110,11 @@ public class ClipFilterModel extends AbstractListModel {
 	
 	
 	@Override
-	public Object getElementAt(int index) {
+	public String getElementAt(int index) {
+		
+		if ( index == -1)
+			return null;
+		
 		if (index < filterItems.size())
             return filterItems.get (index);
         else

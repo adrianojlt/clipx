@@ -15,7 +15,9 @@ import javax.swing.event.DocumentListener;
 
 
 
-public class ClipboardList extends JList {
+public class ClipboardList extends JList<String> {
+	
+	private static final long serialVersionUID = -8105402572524766204L;
 	
 	// field used to search strings
 	private FilterField filterField;
@@ -31,10 +33,12 @@ public class ClipboardList extends JList {
         filterField = new FilterField (DEFAULT_FIELD_WIDTH);
 	}
 	
-	public void setModel (ListModel m) {
+	public void setModel (ListModel<String> m) {
         if (! (m instanceof FilterModel))
             throw new IllegalArgumentException();
         super.setModel (m);
+        //super.setModel(<String>m);
+        
     }
 	
 	public void addItem (String o) {
@@ -141,6 +145,11 @@ public class ClipboardList extends JList {
 	 */
 	class FilterField extends JTextField implements DocumentListener {
 		
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = -6965310542422098581L;
+
 		public FilterField(int width) {
 			super(width);
 			getDocument().addDocumentListener(this);
