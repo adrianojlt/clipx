@@ -7,9 +7,6 @@ import javax.swing.AbstractListModel;
 
 public class ClipFilterModel extends AbstractListModel<String> {
 
-	/**
-	 * 
-	 */
 	private static final long serialVersionUID = 6652151796589168654L;
 
 	/**

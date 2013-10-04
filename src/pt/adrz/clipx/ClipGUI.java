@@ -9,6 +9,8 @@ import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.PopupMenu;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
@@ -32,9 +34,14 @@ import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-public class ClipGUI extends JFrame implements ListSelectionListener, DocumentListener, KeyListener, MouseListener  {
+public class ClipGUI extends JFrame implements ListSelectionListener, KeyListener, MouseListener  {
 
 	private static final long serialVersionUID = 4285795541593969626L;
+	
+	private static final String TITLE 	= "ClipX";
+	private static final String RIGHT_CLICK_MENU_ITEM1 	= "activate";
+	private static final String RIGHT_CLICK_MENU_ITEM2 	= "edit";
+	private static final String RIGHT_CLICK_MENU_ITEM3 	= "delete";
 
 	private Container 			container;
 	
@@ -58,8 +65,9 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 	private ClipList			list;
 	private JScrollPane			listScrollPane;
 	
-	// reference to ClipManager 
-	ClipManager clipManager;
+	private ClipSysTray 		clipSysTray;
+	
+	ClipManager 				clipManager;
 	
 	
 	
@@ -68,37 +76,160 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 	 */
 	public ClipGUI(final ClipManager clipManager) {
 		
-		super("ClipX");
+		super(TITLE);
+		
+		this.clipSysTray = new ClipSysTray(this);
 		
 		this.clipManager = clipManager;
 		
+		this.createMenu();
+		
+		this.createRightClickMenu();
+		
+		this.createList();
+
+		//this.tmp();
+
 		container = this.getContentPane();
 		container.setLayout(new BorderLayout());
 		
-		this.createMenu();
+		// panels ...
+		panel1 = new JPanel();
+		panel2 = new JPanel();
+		panel1.setLayout(new BorderLayout());
+		panel2.setLayout(new BorderLayout());	
+		panel1.setBackground(Color.green);
+		panel2.setBackground(Color.blue);
 		
-		// right click menu
+		// TextArea ...
+		editTA = new JTextArea();
+		editTA.setEditable(false);
+		//getEditTA().getDocument().addDocumentListener(this);
+		textAreaScrollPane 	= new JScrollPane(getEditTA(),ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+		
+		// add components ...
+		container.add(panel1, BorderLayout.WEST);
+		container.add(panel2, BorderLayout.CENTER);	
+		panel1.add(list.getFilterField(), BorderLayout.NORTH);
+		panel1.add(listScrollPane, BorderLayout.CENTER);
+		panel2.add(textAreaScrollPane, BorderLayout.CENTER);
+		
+		//container.add(new JButton("button"),BorderLayout.SOUTH);
+		
+		this.setSize(xWindowDim, yWindowDim);
+		this.setMinimumSize(new Dimension(xWindowDim, yWindowDim));
+		this.setLocationRelativeTo(null);
+		this.setDefaultCloseOperation(HIDE_ON_CLOSE);
+		this.setVisible(true);
+	}
+	
+	private void tmp() {
+		Clipboard clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+		clip.removeFlavorListener(clipManager);
+	}
+
+	private void createMenu() {
+		
+		menuBar = new JMenuBar();
+		
+		menuFile = new JMenu("File");
+		menuEdit = new JMenu("Edit");
+		menuAbout = new JMenu("About");
+		
+		menu1Item1 = new JMenuItem("item1");
+		menuFile.add(menu1Item1);
+		
+		menuBar.add(menuFile);
+		menuBar.add(menuEdit);
+		menuBar.add(menuAbout);
+		this.setJMenuBar(menuBar);
+	}
+	
+	private void createRightClickMenu() {
+
 		this.rightClickMenu = new JPopupMenu();
-		JMenuItem item1 = new JMenuItem("activate");
-		JMenuItem item2 = new JMenuItem("delete");
+
+		JMenuItem item1 = new JMenuItem(ClipGUI.RIGHT_CLICK_MENU_ITEM1);
+		JMenuItem item2 = new JMenuItem(ClipGUI.RIGHT_CLICK_MENU_ITEM2);
+		JMenuItem item3 = new JMenuItem(ClipGUI.RIGHT_CLICK_MENU_ITEM3);
+
 		this.rightClickMenu.add(item1);
 		this.rightClickMenu.add(item2);
+		this.rightClickMenu.add(item3);
 		
+		// activate action
+		item1.addMouseListener(new MouseAdapter() {
+
+			public void mousePressed(MouseEvent e) { 
+
+				//int index = list.locationToIndex(e.getPoint());
+				int index = list.getSelectedIndex();
+				
+				if ( index == -1 ) return;
+				
+				// get the selected string from the filteredlist
+				String selectedString = (String)list.getModel().getElementAt(index);
+				
+				// get the position from all the the items
+				int pos = list.getModel().getItems().indexOf(selectedString);
+				
+				// set the clipboard
+				clipManager.setClipboard(selectedString);
+				
+				list.getModel().switchVals(pos, selectedString);
+				
+				list.setSelectedIndex(0);
+				list.getFilterField().setText("");
+				getEditTA().setText(selectedString);
+			}
+		});
+
+		// edit action
+		item2.addMouseListener(new MouseAdapter() {
+
+			public void mousePressed(MouseEvent e) { 
+
+				if (editTA.isEditable())
+					editTA.setEditable(false);
+				else
+					editTA.setEditable(true);
+			}
+		});
+
+		// delete action
+		item3.addMouseListener(new MouseAdapter() {
+
+			public void mousePressed(MouseEvent e) { 
+
+				try {
+					
+					int index = list.getSelectedIndex();
+					list.getModel().remove(index);
+					editTA.setText("");
+					
+					if (index == 0) { }
+				}
+				catch (IndexOutOfBoundsException eIndexOutBound) { }
+			}
+		});
+	}
+	
+	private void createList() {
 		
-		// List ...
 		list = new ClipList();
+
 		list.getModel().addElement("first");
 		list.getModel().addElement("secound");
 		list.getModel().addElement("third");
 		
 		listScrollPane = new JScrollPane();
+
 		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		list.setSelectedIndex(0);
 		list.addListSelectionListener(this);
 		list.setVisibleRowCount(visibleListRowCount);
 		listScrollPane = new JScrollPane(list,ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 		list.setPrototypeCellValue("tamanho"); // set horizontal size
-		list.addMouseListener(this);
 		
 		list.addMouseListener(new MouseAdapter() {
 			
@@ -107,6 +238,7 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 				if ( e.getClickCount() == 2 ) {
 					
 					int index = list.locationToIndex(e.getPoint());
+					//int index = list.getSelectedIndex();
 					
 					// ... double click in an empty space
 					if ( index == -1) {
@@ -136,67 +268,15 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 				if ( SwingUtilities.isRightMouseButton(e) ) {
 					
 					list.setSelectedIndex(list.locationToIndex(e.getPoint()));
-					
-					//JPopupMenu menu = new JPopupMenu();
-					//JMenuItem item = new JMenuItem("click me ");
-					//menu.add(item);
-					//menu.show(e.getComponent(),e.getX(),e.getY());
-					
-					// create menu here ...
-					//System.out.println("right click");
 				}
 			}
 		});
 		
 		// listeners ...
+		list.addMouseListener(this);
 		list.addKeyListener(this);
-		
-		// panels ...
-		panel1 = new JPanel();
-		panel2 = new JPanel();
-		panel1.setLayout(new BorderLayout());
-		panel2.setLayout(new BorderLayout());	
-		panel1.setBackground(Color.green);
-		panel2.setBackground(Color.blue);
-		
-		// TextArea ...
-		editTA = new JTextArea();
-		editTA.setEditable(false);
-		getEditTA().getDocument().addDocumentListener(this);
-		textAreaScrollPane 	= new JScrollPane(getEditTA(),ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
-		
-		// add components ...
-		container.add(panel1, BorderLayout.WEST);
-		container.add(panel2, BorderLayout.CENTER);	
-		panel1.add(list.getFilterField(), BorderLayout.NORTH);
-		panel1.add(listScrollPane, BorderLayout.CENTER);
-		panel2.add(textAreaScrollPane, BorderLayout.CENTER);
-		
-		//container.add(new JButton("button"),BorderLayout.SOUTH);
-		
-		this.setSize(xWindowDim, yWindowDim);
-		this.setMinimumSize(new Dimension(xWindowDim, yWindowDim));
-		this.setLocationRelativeTo(null);
-		this.setDefaultCloseOperation(HIDE_ON_CLOSE);
-		this.setVisible(true);
 	}
 
-	private void createMenu() {
-		
-		menuBar = new JMenuBar();
-		
-		menuFile = new JMenu("File");
-		menuEdit = new JMenu("Edit");
-		menuAbout = new JMenu("About");
-		
-		menu1Item1 = new JMenuItem("item1");
-		menuFile.add(menu1Item1);
-		
-		menuBar.add(menuFile);
-		this.setJMenuBar(menuBar);
-	}
-	
-	
 
 	
 	public ClipList getList() {
@@ -217,10 +297,12 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 
 
 	/**
-	 * Detects changes in the list
+	 * Detects changes in the list with clipboard items
 	 */
 	@Override
 	public void valueChanged(ListSelectionEvent e) {	
+		
+		editTA.setEditable(false);
 		
 		// whenever the user makes a selection in the list, the text will be placed in the text area
 		if (e.getValueIsAdjusting()) {
@@ -235,21 +317,7 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 
 
 
-	@Override
-	public void changedUpdate(DocumentEvent e) {
-	}
-
-
-	@Override
-	public void insertUpdate(DocumentEvent e) {
-	}
-
-
-
-	@Override
-	public void removeUpdate(DocumentEvent e) {
-	}
-
+	
 
 
 	
@@ -302,15 +370,15 @@ public class ClipGUI extends JFrame implements ListSelectionListener, DocumentLi
 
 	@Override
 	public void mousePressed(MouseEvent e) {
+
 		if ( SwingUtilities.isRightMouseButton(e) ) {
+
 			list.setSelectedIndex(list.locationToIndex(e.getPoint()));
-			
 			this.rightClickMenu.show(e.getComponent(), e.getX(), e.getY());
 		}
 	}
 
 	@Override
-	public void mouseReleased(MouseEvent arg0) {
-	}
+	public void mouseReleased(MouseEvent arg0) { }
 
 }
