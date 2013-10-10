@@ -8,16 +8,12 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.PopupMenu;
-import java.awt.Toolkit;
-import java.awt.datatransfer.Clipboard;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 
-import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -29,16 +25,14 @@ import javax.swing.JTextArea;
 import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-public class ClipGUI extends JFrame implements ListSelectionListener, KeyListener, MouseListener  {
+public class ClipGUI extends JFrame implements ListSelectionListener, KeyListener, MouseListener, ClipboardListener  {
 
 	private static final long serialVersionUID = 4285795541593969626L;
 	
-	private static final String TITLE 	= "ClipX";
+	private static final String TITLE 					= "ClipX";
 	private static final String RIGHT_CLICK_MENU_ITEM1 	= "activate";
 	private static final String RIGHT_CLICK_MENU_ITEM2 	= "edit";
 	private static final String RIGHT_CLICK_MENU_ITEM3 	= "delete";
@@ -51,7 +45,7 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 	
 	private JPanel				panel1;
 	private JPanel				panel2;
-	final private JTextArea		editTA;
+	private JTextArea		 	editTA;
 	private JScrollPane			textAreaScrollPane;
 	
 	// menus
@@ -74,13 +68,13 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 	/**
 	 * Constructor
 	 */
-	public ClipGUI(final ClipManager clipManager) {
+	public ClipGUI() {
 		
 		super(TITLE);
 		
 		this.clipSysTray = new ClipSysTray(this);
-		
-		this.clipManager = clipManager;
+
+		this.clipManager = new ClipManager(this);
 		
 		this.createMenu();
 		
@@ -88,44 +82,13 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		
 		this.createList();
 
-		//this.tmp();
+		this.createGUI();
 
-		container = this.getContentPane();
-		container.setLayout(new BorderLayout());
-		
-		// panels ...
-		panel1 = new JPanel();
-		panel2 = new JPanel();
-		panel1.setLayout(new BorderLayout());
-		panel2.setLayout(new BorderLayout());	
-		panel1.setBackground(Color.green);
-		panel2.setBackground(Color.blue);
-		
-		// TextArea ...
-		editTA = new JTextArea();
-		editTA.setEditable(false);
-		//getEditTA().getDocument().addDocumentListener(this);
-		textAreaScrollPane 	= new JScrollPane(getEditTA(),ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
-		
-		// add components ...
-		container.add(panel1, BorderLayout.WEST);
-		container.add(panel2, BorderLayout.CENTER);	
-		panel1.add(list.getFilterField(), BorderLayout.NORTH);
-		panel1.add(listScrollPane, BorderLayout.CENTER);
-		panel2.add(textAreaScrollPane, BorderLayout.CENTER);
-		
-		//container.add(new JButton("button"),BorderLayout.SOUTH);
-		
-		this.setSize(xWindowDim, yWindowDim);
-		this.setMinimumSize(new Dimension(xWindowDim, yWindowDim));
-		this.setLocationRelativeTo(null);
-		this.setDefaultCloseOperation(HIDE_ON_CLOSE);
-		this.setVisible(true);
+		//this.tmp();
 	}
 	
 	private void tmp() {
-		Clipboard clip = Toolkit.getDefaultToolkit().getSystemClipboard();
-		clip.removeFlavorListener(clipManager);
+
 	}
 
 	private void createMenu() {
@@ -180,7 +143,7 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 				
 				list.setSelectedIndex(0);
 				list.getFilterField().setText("");
-				getEditTA().setText(selectedString);
+				editTA.setText(selectedString);
 			}
 		});
 
@@ -259,16 +222,14 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 					
 					list.setSelectedIndex(0);
 					list.getFilterField().setText("");
-					getEditTA().setText(selectedString);
+					editTA.setText(selectedString);
 				}
 			}
 			
 			public void mousePressed(MouseEvent e){
 				
-				if ( SwingUtilities.isRightMouseButton(e) ) {
-					
+				if ( SwingUtilities.isRightMouseButton(e) ) 
 					list.setSelectedIndex(list.locationToIndex(e.getPoint()));
-				}
 			}
 		});
 		
@@ -277,25 +238,40 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		list.addKeyListener(this);
 	}
 
+	private void createGUI() {
+		
+		container = this.getContentPane();
 
-	
-	public ClipList getList() {
-		return this.list;
+		container.setLayout(new BorderLayout());
+		
+		// panels ...
+		panel1 = new JPanel();
+		panel2 = new JPanel();
+		panel1.setLayout(new BorderLayout());
+		panel2.setLayout(new BorderLayout());	
+		panel1.setBackground(Color.green);
+		panel2.setBackground(Color.blue);
+		
+		// TextArea ...
+		editTA = new JTextArea();
+		editTA.setEditable(false);
+		//getEditTA().getDocument().addDocumentListener(this);
+		textAreaScrollPane 	= new JScrollPane(this.editTA,ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
+		
+		// add components ...
+		container.add(panel1, BorderLayout.WEST);
+		container.add(panel2, BorderLayout.CENTER);	
+		panel1.add(list.getFilterField(), BorderLayout.NORTH);
+		panel1.add(listScrollPane, BorderLayout.CENTER);
+		panel2.add(textAreaScrollPane, BorderLayout.CENTER);
+		
+		this.setSize(xWindowDim, yWindowDim);
+		this.setMinimumSize(new Dimension(xWindowDim, yWindowDim));
+		this.setLocationRelativeTo(null);
+		this.setDefaultCloseOperation(HIDE_ON_CLOSE);
+		this.setVisible(true);
 	}
 	
-
-	/**
-	 * Get Text Area
-	 * @return the editTA
-	 */
-	public JTextArea getEditTA() {
-		return editTA;
-	}
-
-
-
-
-
 	/**
 	 * Detects changes in the list with clipboard items
 	 */
@@ -309,25 +285,10 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 			return;
 		}	
 		else {
-			getEditTA().setText((String)list.getModel().getElementAt(list.getSelectedIndex()));
+			editTA.setText((String)list.getModel().getElementAt(list.getSelectedIndex()));
 		}
 	}
 
-
-
-
-
-	
-
-
-	
-	
-	
-	
-	
-	
-	
-	
 	/**
 	 * Event when some key is pressed. This listener is only added to the jlist component
 	 * So far, only the delete key is implemented
@@ -361,12 +322,10 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 	public void mouseClicked(MouseEvent arg0) { }
 
 	@Override
-	public void mouseEntered(MouseEvent arg0) {
-	}
+	public void mouseEntered(MouseEvent arg0) { }
 
 	@Override
-	public void mouseExited(MouseEvent arg0) {
-	}
+	public void mouseExited(MouseEvent arg0) { }
 
 	@Override
 	public void mousePressed(MouseEvent e) {
@@ -381,4 +340,13 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 	@Override
 	public void mouseReleased(MouseEvent arg0) { }
 
+	@Override
+	public void newString(String copyString) {
+
+		this.list.getModel().addElementTo(copyString, 0);
+		this.editTA.setText(copyString);
+	}
+
+	@Override
+	public ClipList getList() { return this.list; }
 }

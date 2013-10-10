@@ -1,9 +1,6 @@
 package pt.adrz.clipx;
 
-import java.awt.ItemSelectable;
-import java.util.ArrayList;
 import java.util.LinkedList;
-
 import javax.swing.AbstractListModel;
 import javax.swing.JList;
 import javax.swing.JTextField;
@@ -13,17 +10,15 @@ import javax.swing.event.DocumentListener;
 
 
 
-
-
 public class ClipboardList extends JList<String> {
 	
 	private static final long serialVersionUID = -8105402572524766204L;
 	
 	// field used to search strings
 	private FilterField filterField;
+
     private int DEFAULT_FIELD_WIDTH = 20;
     
-    // model
     FilterModel filtermodel;
 	
 	public ClipboardList() {
@@ -71,17 +66,18 @@ public class ClipboardList extends JList<String> {
     
 	class FilterModel extends AbstractListModel {
 		
-        LinkedList<String> items;
-//        ArrayList filterItems;
+		private static final long serialVersionUID = 1L;
+
+		LinkedList<String> items;
+
         LinkedList<String> filterItems;
         
         
         
         public FilterModel() {
+
             super();
-//            items = new ArrayList();
             items = new LinkedList<String>();
-//            filterItems = new ArrayList();
             filterItems = new LinkedList<String>();
         }
         
@@ -125,12 +121,15 @@ public class ClipboardList extends JList<String> {
         
         
         private void refilter() {
+
             filterItems.clear();
+
             String term = getFilterField().getText();
+
             for (int i=0; i<items.size(); i++)
-                if (items.get(i).toString().indexOf(term, 0) != -1) {
-                    filterItems.add (items.get(i));
-                }
+                if (items.get(i).toString().indexOf(term, 0) != -1) 
+                	filterItems.add (items.get(i));
+                
             fireContentsChanged (this, 0, getSize());  
         }
     }
@@ -145,9 +144,6 @@ public class ClipboardList extends JList<String> {
 	 */
 	class FilterField extends JTextField implements DocumentListener {
 		
-		/**
-		 * 
-		 */
 		private static final long serialVersionUID = -6965310542422098581L;
 
 		public FilterField(int width) {
@@ -169,7 +165,5 @@ public class ClipboardList extends JList<String> {
 		public void removeUpdate(DocumentEvent e) {
 			((FilterModel)getModel()).refilter();
 		}
-		
 	}
-
 }

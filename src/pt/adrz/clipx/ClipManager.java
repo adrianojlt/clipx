@@ -1,11 +1,5 @@
 package pt.adrz.clipx;
-import java.awt.AWTException;
-import java.awt.MenuItem;
-import java.awt.PopupMenu;
-import java.awt.SystemTray;
 import java.awt.Toolkit;
-import java.awt.TrayIcon;
-import java.awt.TrayIcon.MessageType;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.ClipboardOwner;
 import java.awt.datatransfer.DataFlavor;
@@ -14,14 +8,7 @@ import java.awt.datatransfer.FlavorListener;
 import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
 import java.io.IOException;
-import javax.swing.ImageIcon;
 
 /**
  * Class that will caught clipboard events, if it is a String, that 
@@ -37,26 +24,41 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 	private Clipboard clip;
 	
 	/**
-	 * GUI of the application
+	 * Send notification to here ...
 	 */
-	private ClipGUI gui;
-	
-	
+	private ClipboardListener listener;
 	
 	/**
 	 * Constructor - Get and then Set the contents in clipboard in order
 	 * to get the ownership.
 	 */
-	public ClipManager() {
+	public ClipManager(ClipboardListener listener) {
+		
+		this.listener = listener;
 		
 		this.clip = Toolkit.getDefaultToolkit().getSystemClipboard();
 		
 		clip.setContents(clip.getContents(null), this);
+
 		clip.addFlavorListener(this);
-		
-		gui = new ClipGUI(this);
 	}
 
+	/**
+	 * Replace the clipboard with the given string
+	 * @param text String to be stored in the clipboard
+	 */
+	public void setClipboard(String text) {
+		
+		// we don't need to be notified about this change
+		clip.removeFlavorListener(this);
+		
+		// add text to clipboard ...
+		StringSelection ss = new StringSelection(text);
+		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(ss, this);
+		
+		// ... from now one we need clipboard changes notifications
+		clip.addFlavorListener(this);	
+	}
 	
 	
 	/**
@@ -84,12 +86,12 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(ss, this);
 				}
 
-				if(!this.gui.getList().getModel().getItems().contains(copyString)) {
+				if(!this.listener.getList().getModel().getItems().contains(copyString)) {
 
 					try {
-
-						gui.getList().getModel().addElementTo(copyString, 0);
-						this.gui.getEditTA().setText(copyString);
+						listener.newString(copyString);
+						//gui.getList().getModel().addElementTo(copyString, 0);
+						//this.gui.getEditTA().setText(copyString);
 					}
 					catch (Exception ex) { ex.printStackTrace(); }
 				}
@@ -100,25 +102,6 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 			catch (IllegalStateException illEx) { }
 		}
 		else { }
-	}
-	
-	
-	
-	/**
-	 * Replace the clipboard with the given string
-	 * @param text String to be stored in the clipboard
-	 */
-	public void setClipboard(String text) {
-		
-		// we don't need to be notified about this change
-		clip.removeFlavorListener(this);
-		
-		// add text to clipboard ...
-		StringSelection ss = new StringSelection(text);
-		Toolkit.getDefaultToolkit().getSystemClipboard().setContents(ss, this);
-		
-		// ... from now one we need clipboard changes notifications
-		clip.addFlavorListener(this);	
 	}
 	
 	
