@@ -8,6 +8,8 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
@@ -51,7 +53,7 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 	// menus
 	private JMenuBar			menuBar;
 	private JMenu				menuFile, menuEdit, menuAbout;
-	private JMenuItem			menu1Item1, menu1Item2, menu1Item3;
+	private JMenuItem			menu1Item1, menu1Item2, menu1Item3, menuExitItem;
 	
 	private JPopupMenu			rightClickMenu;
 	
@@ -100,7 +102,16 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		menuAbout = new JMenu("About");
 		
 		menu1Item1 = new JMenuItem("item1");
+		menuExitItem = new JMenuItem("Exit");
+		menuExitItem.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				System.exit(0);
+			}
+		});
+
 		menuFile.add(menu1Item1);
+		menuFile.add(menuExitItem);
 		
 		menuBar.add(menuFile);
 		menuBar.add(menuEdit);

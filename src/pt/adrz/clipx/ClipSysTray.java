@@ -1,6 +1,7 @@
 package pt.adrz.clipx;
 
 import java.awt.AWTException;
+import java.awt.CheckboxMenuItem;
 import java.awt.Image;
 import java.awt.MenuItem;
 import java.awt.PopupMenu;
@@ -13,7 +14,10 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.net.URL;
 
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
+import javax.swing.JCheckBoxMenuItem;
+import javax.swing.JPopupMenu;
 
 public class ClipSysTray implements ActionListener, MouseListener {
 	
@@ -31,6 +35,9 @@ public class ClipSysTray implements ActionListener, MouseListener {
 	private PopupMenu mainMenu;
 	private TrayIcon icon;
 	
+	private JPopupMenu jPopUpM = new JPopupMenu();
+	private CheckboxMenuItem mItemCheck;
+
 	private MenuItem mItem01; 
 	private MenuItem mItem02; 
 	private MenuItem mItem03; 
@@ -53,12 +60,15 @@ public class ClipSysTray implements ActionListener, MouseListener {
 	
 	private void iniMenu() {
 		
-		this.mItem01 = new MenuItem(MENU_ITEM_ITEM01);
-		this.mItem02 = new MenuItem(MENU_ITEM_ITEM02);
-		this.mItem03 = new MenuItem(MENU_ITEM_ITEM03);
-		this.mItemActivate = new MenuItem(MENU_ITEM_ACTIVATE);
+		this.mItem01 = new CheckboxMenuItem(MENU_ITEM_ITEM01);
+		this.mItemCheck = new CheckboxMenuItem(MENU_ITEM_ACTIVATE, true);
+		this.mItem02 = new CheckboxMenuItem(MENU_ITEM_ITEM02);
+		this.mItem03 = new CheckboxMenuItem(MENU_ITEM_ITEM03);
+		this.mItemActivate = new CheckboxMenuItem(MENU_ITEM_ACTIVATE);
 		this.mItemAbout = new MenuItem(MENU_ITEM_ABOUT);
 		this.mItemExit = new MenuItem(MENU_ITEM_EXIT);
+		
+		//this.mItem01.setShortcut(swt)
 		
 		this.mItem01.addActionListener(this);
 		this.mItem02.addActionListener(this);
@@ -68,6 +78,7 @@ public class ClipSysTray implements ActionListener, MouseListener {
 		this.mItemExit.addActionListener(this);
 		
 		this.mainMenu = new PopupMenu();
+		this.mainMenu.add(mItemCheck);
 		this.mainMenu.add(mItem01);
 		this.mainMenu.add(mItem02);
 		this.mainMenu.add(mItem03);
@@ -83,6 +94,7 @@ public class ClipSysTray implements ActionListener, MouseListener {
 		Image image = new ImageIcon(imgURL, "ClipX").getImage();
 
 		icon = new TrayIcon(image);
+
 		icon.setPopupMenu(this.mainMenu);
 		icon.setImageAutoSize(true);
 		icon.addActionListener(this);
