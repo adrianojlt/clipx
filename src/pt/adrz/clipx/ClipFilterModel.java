@@ -15,7 +15,7 @@ public class ClipFilterModel extends AbstractListModel<String> {
 	private LinkedList<String> items;
 	
 	/**
-	 * String that are shown in the list
+	 * Strings shown in the list
 	 */
 	private LinkedList<String> filterItems;
 	
