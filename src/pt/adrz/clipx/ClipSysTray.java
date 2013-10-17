@@ -10,6 +10,8 @@ import java.awt.TrayIcon;
 import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.net.URL;
@@ -19,12 +21,12 @@ import javax.swing.ImageIcon;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JPopupMenu;
 
-public class ClipSysTray implements ActionListener, MouseListener {
+public class ClipSysTray implements ActionListener, MouseListener, ItemListener {
 	
 	private static final String MENU_ITEM_ITEM01 	= "Item01";
 	private static final String MENU_ITEM_ITEM02 	= "Item02";
 	private static final String MENU_ITEM_ITEM03 	= "Item03";
-	private static final String MENU_ITEM_ACTIVATE 	= "Active";
+	private static final String MENU_ITEM_ACTIVATE 	= "Enable";
 	private static final String MENU_ITEM_ABOUT 	= "About";
 	private static final String MENU_ITEM_EXIT 		= "Exit";
 	private static final String TOOL_TIP 			= "ClipX";
@@ -36,12 +38,11 @@ public class ClipSysTray implements ActionListener, MouseListener {
 	private TrayIcon icon;
 	
 	private JPopupMenu jPopUpM = new JPopupMenu();
-	private CheckboxMenuItem mItemCheck;
 
 	private MenuItem mItem01; 
 	private MenuItem mItem02; 
 	private MenuItem mItem03; 
-	private MenuItem mItemActivate; 
+	private CheckboxMenuItem mItemActivate; 
 	private MenuItem mItemAbout; 
 	private MenuItem mItemExit; 
 	
@@ -60,28 +61,27 @@ public class ClipSysTray implements ActionListener, MouseListener {
 	
 	private void iniMenu() {
 		
-		this.mItem01 = new CheckboxMenuItem(MENU_ITEM_ITEM01);
-		this.mItemCheck = new CheckboxMenuItem(MENU_ITEM_ACTIVATE, true);
-		this.mItem02 = new CheckboxMenuItem(MENU_ITEM_ITEM02);
-		this.mItem03 = new CheckboxMenuItem(MENU_ITEM_ITEM03);
-		this.mItemActivate = new CheckboxMenuItem(MENU_ITEM_ACTIVATE);
-		this.mItemAbout = new MenuItem(MENU_ITEM_ABOUT);
-		this.mItemExit = new MenuItem(MENU_ITEM_EXIT);
-		
-		//this.mItem01.setShortcut(swt)
+		this.mItem01 		= new CheckboxMenuItem(MENU_ITEM_ITEM01);
+		this.mItem02 		= new CheckboxMenuItem(MENU_ITEM_ITEM02);
+		this.mItem03 		= new CheckboxMenuItem(MENU_ITEM_ITEM03);
+		this.mItemActivate 	= new CheckboxMenuItem(MENU_ITEM_ACTIVATE);
+		this.mItemAbout 	= new MenuItem(MENU_ITEM_ABOUT);
+		this.mItemExit 		= new MenuItem(MENU_ITEM_EXIT);
 		
 		this.mItem01.addActionListener(this);
 		this.mItem02.addActionListener(this);
 		this.mItem03.addActionListener(this);
-		this.mItemActivate.addActionListener(this);
+
+		//this.mItemActivate.addActionListener(this);
+		this.mItemActivate.addItemListener(this);
 		this.mItemAbout.addActionListener(this);
 		this.mItemExit.addActionListener(this);
 		
 		this.mainMenu = new PopupMenu();
-		this.mainMenu.add(mItemCheck);
 		this.mainMenu.add(mItem01);
 		this.mainMenu.add(mItem02);
 		this.mainMenu.add(mItem03);
+		this.mainMenu.addSeparator();
 		this.mainMenu.add(mItemActivate);
 		this.mainMenu.add(mItemAbout);
 		this.mainMenu.add(mItemExit);
@@ -110,8 +110,10 @@ public class ClipSysTray implements ActionListener, MouseListener {
 
 	@Override
 	public void actionPerformed(ActionEvent e) {
-		
-		try { if (e.getActionCommand().equals(MENU_ITEM_EXIT)) { System.exit(0); }	}
+
+		try { 
+			if (e.getActionCommand().equals(MENU_ITEM_EXIT)) { System.exit(0); }	
+		}
 		catch (NullPointerException eNULL) { }
 		catch (Exception eEX) { }	
 		
@@ -140,4 +142,18 @@ public class ClipSysTray implements ActionListener, MouseListener {
 
 	@Override
 	public void mouseReleased(MouseEvent arg0) { }
+
+	@Override
+	public void itemStateChanged(ItemEvent e) {
+
+		if ( e.getItem().equals(MENU_ITEM_ACTIVATE) ) {
+
+			if ( mItemActivate.getState() ) {
+				System.out.println("enabled");
+			}
+			else {
+				System.out.println("disabled");
+			}
+		}
+	}
 }

@@ -9,6 +9,9 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.datatransfer.Transferable;
 import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Class that will caught clipboard events, if it is a String, that 
@@ -17,6 +20,8 @@ import java.io.IOException;
  *
  */
 public class ClipManager implements FlavorListener, ClipboardOwner {
+	
+	private boolean enabled = true;
 
 	/**
 	 * SyS clipboard
@@ -27,6 +32,14 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 	 * Send notification to here ...
 	 */
 	private ClipboardListener listener;
+	
+	private GuiState guiState;
+	
+	private List<ClipboardListener> listeners = new ArrayList<ClipboardListener>();
+	
+	public ClipManager() {
+		this(null);
+	}
 	
 	/**
 	 * Constructor - Get and then Set the contents in clipboard in order
@@ -42,6 +55,29 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 
 		clip.addFlavorListener(this);
 	}
+	
+	public boolean isEnabled() { return this.enabled; }
+	public void enable() { this.enabled = true; }
+	public void disable() { this.enabled = false; }
+	
+	public void setGuiState(GuiState guiState) {
+		this.guiState = guiState;
+	}
+	
+	public synchronized void addClipboardListener(ClipboardListener listener) {
+		this.listeners.add(listener);
+	}
+
+	public synchronized void removeClipboardListener(ClipboardListener listener) {
+		this.listeners.remove(listener);
+	}
+	
+	private synchronized void newString(String copyString) {
+		Iterator<ClipboardListener> i = this.listeners.iterator();
+		while (i.hasNext()) i.next().newString(copyString);
+	}
+	
+	
 
 	/**
 	 * Replace the clipboard with the given string
@@ -74,7 +110,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 		
 		String copyString = null;
 		
-		if (tf.isDataFlavorSupported(DataFlavor.stringFlavor)) {		
+		if ( tf.isDataFlavorSupported(DataFlavor.stringFlavor) && this.enabled ) {		
 
 			try {
 
@@ -86,12 +122,11 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(ss, this);
 				}
 
-				if(!this.listener.getList().getModel().getItems().contains(copyString)) {
+				if(!this.guiState.getList().getModel().getItems().contains(copyString)) {
 
 					try {
-						listener.newString(copyString);
-						//gui.getList().getModel().addElementTo(copyString, 0);
-						//this.gui.getEditTA().setText(copyString);
+						//listener.newString(copyString);
+						this.newString(copyString);
 					}
 					catch (Exception ex) { ex.printStackTrace(); }
 				}

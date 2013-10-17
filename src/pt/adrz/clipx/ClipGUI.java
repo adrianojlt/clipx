@@ -30,7 +30,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-public class ClipGUI extends JFrame implements ListSelectionListener, KeyListener, MouseListener, ClipboardListener  {
+public class ClipGUI extends JFrame implements ListSelectionListener, KeyListener, MouseListener, ClipboardListener, GuiState  {
 
 	private static final long serialVersionUID = 4285795541593969626L;
 	
@@ -76,7 +76,11 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		
 		this.clipSysTray = new ClipSysTray(this);
 
-		this.clipManager = new ClipManager(this);
+		this.clipManager = new ClipManager();
+		
+		this.clipManager.setGuiState(this);
+
+		this.clipManager.addClipboardListener(this);
 		
 		this.createMenu();
 		
