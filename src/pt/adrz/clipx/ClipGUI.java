@@ -10,12 +10,15 @@ import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -30,11 +33,17 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
 
-public class ClipGUI extends JFrame implements ListSelectionListener, KeyListener, MouseListener, ClipboardListener, GuiState  {
+public class ClipGUI extends JFrame implements
+												ListSelectionListener, 
+												KeyListener, 
+												MouseListener, 
+												ClipboardListener, 
+												GuiState  {
 
 	private static final long serialVersionUID = 4285795541593969626L;
 	
 	private static final String TITLE 					= "ClipX";
+
 	private static final String RIGHT_CLICK_MENU_ITEM1 	= "activate";
 	private static final String RIGHT_CLICK_MENU_ITEM2 	= "edit";
 	private static final String RIGHT_CLICK_MENU_ITEM3 	= "delete";
@@ -45,15 +54,16 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 	private int 				yWindowDim = 400;
 	private int 				visibleListRowCount = 10;
 	
-	private JPanel				panel1;
-	private JPanel				panel2;
+	private JPanel				leftPanel;
+	private JPanel				rightPanel;
 	private JTextArea		 	editTA;
 	private JScrollPane			textAreaScrollPane;
 	
 	// menus
 	private JMenuBar			menuBar;
-	private JMenu				menuFile, menuEdit, menuAbout;
+	private JMenu				menuFile, menuEdit, menuOptions, menuAbout;
 	private JMenuItem			menu1Item1, menu1Item2, menu1Item3, menuExitItem;
+	private JCheckBoxMenuItem   menuActivateItem;
 	
 	private JPopupMenu			rightClickMenu;
 	
@@ -81,6 +91,8 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		this.clipManager.setGuiState(this);
 
 		this.clipManager.addClipboardListener(this);
+
+		this.clipSysTray.setState(clipManager);
 		
 		this.createMenu();
 		
@@ -104,6 +116,7 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		menuFile = new JMenu("File");
 		menuEdit = new JMenu("Edit");
 		menuAbout = new JMenu("About");
+		menuOptions = new JMenu("Options");
 		
 		menu1Item1 = new JMenuItem("item1");
 		menuExitItem = new JMenuItem("Exit");
@@ -114,11 +127,23 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 			}
 		});
 
+		menuActivateItem = new JCheckBoxMenuItem("activate");
 		menuFile.add(menu1Item1);
 		menuFile.add(menuExitItem);
+		menuActivateItem.addItemListener(new ItemListener() {
+			
+			@Override
+			public void itemStateChanged(ItemEvent arg0) {
+
+				
+			}
+		});
+		
+		menuOptions.add(menuActivateItem);
 		
 		menuBar.add(menuFile);
 		menuBar.add(menuEdit);
+		menuBar.add(menuOptions);
 		menuBar.add(menuAbout);
 		this.setJMenuBar(menuBar);
 	}
@@ -260,12 +285,12 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		container.setLayout(new BorderLayout());
 		
 		// panels ...
-		panel1 = new JPanel();
-		panel2 = new JPanel();
-		panel1.setLayout(new BorderLayout());
-		panel2.setLayout(new BorderLayout());	
-		panel1.setBackground(Color.green);
-		panel2.setBackground(Color.blue);
+		leftPanel = new JPanel();
+		rightPanel = new JPanel();
+		leftPanel.setLayout(new BorderLayout());
+		rightPanel.setLayout(new BorderLayout());	
+		leftPanel.setBackground(Color.green);
+		rightPanel.setBackground(Color.blue);
 		
 		// TextArea ...
 		editTA = new JTextArea();
@@ -274,11 +299,11 @@ public class ClipGUI extends JFrame implements ListSelectionListener, KeyListene
 		textAreaScrollPane 	= new JScrollPane(this.editTA,ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 		
 		// add components ...
-		container.add(panel1, BorderLayout.WEST);
-		container.add(panel2, BorderLayout.CENTER);	
-		panel1.add(list.getFilterField(), BorderLayout.NORTH);
-		panel1.add(listScrollPane, BorderLayout.CENTER);
-		panel2.add(textAreaScrollPane, BorderLayout.CENTER);
+		container.add(leftPanel, BorderLayout.WEST);
+		container.add(rightPanel, BorderLayout.CENTER);	
+		leftPanel.add(list.getFilterField(), BorderLayout.NORTH);
+		leftPanel.add(listScrollPane, BorderLayout.CENTER);
+		rightPanel.add(textAreaScrollPane, BorderLayout.CENTER);
 		
 		this.setSize(xWindowDim, yWindowDim);
 		this.setMinimumSize(new Dimension(xWindowDim, yWindowDim));

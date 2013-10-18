@@ -48,6 +48,8 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 	
 	private ClipGUI gui;
 	
+	private State state;
+	
 	public ClipSysTray(final ClipGUI gui) {
 		
 		this.gui = gui;
@@ -86,6 +88,8 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 		this.mainMenu.add(mItemAbout);
 		this.mainMenu.add(mItemExit);
 		this.mainMenu.addActionListener(this);
+		
+		mItemActivate.setState(true);
 	}
 	
 	private void iniTrayIcon() {
@@ -106,6 +110,10 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 		icon.displayMessage(TOOL_TIP, DISPLAY_MESSAGE, MessageType.INFO);
 		
 		icon.addMouseListener(this);
+	}
+	
+	public void setState(State state) {
+		this.state = state;
 	}
 
 	@Override
@@ -149,10 +157,10 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 		if ( e.getItem().equals(MENU_ITEM_ACTIVATE) ) {
 
 			if ( mItemActivate.getState() ) {
-				System.out.println("enabled");
+				this.state.enable();
 			}
 			else {
-				System.out.println("disabled");
+				this.state.disable();
 			}
 		}
 	}

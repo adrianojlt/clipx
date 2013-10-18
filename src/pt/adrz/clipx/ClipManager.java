@@ -19,7 +19,7 @@ import java.util.List;
  * @author adriano
  *
  */
-public class ClipManager implements FlavorListener, ClipboardOwner {
+public class ClipManager implements FlavorListener, ClipboardOwner, State{
 	
 	private boolean enabled = true;
 
@@ -51,14 +51,33 @@ public class ClipManager implements FlavorListener, ClipboardOwner {
 		
 		this.clip = Toolkit.getDefaultToolkit().getSystemClipboard();
 		
+		// ... to own the clipboard
 		clip.setContents(clip.getContents(null), this);
 
 		clip.addFlavorListener(this);
 	}
 	
+	@Override
 	public boolean isEnabled() { return this.enabled; }
-	public void enable() { this.enabled = true; }
-	public void disable() { this.enabled = false; }
+
+	@Override
+	public void enable() { 
+
+		this.enabled = true; 
+
+		clip.removeFlavorListener(this);
+		this.clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+		clip.setContents(clip.getContents(null), this);
+		clip.addFlavorListener(this);
+	}
+
+	@Override
+	public void disable() { 
+
+		this.enabled = false; 
+
+		clip.removeFlavorListener(this);
+	}
 	
 	public void setGuiState(GuiState guiState) {
 		this.guiState = guiState;
