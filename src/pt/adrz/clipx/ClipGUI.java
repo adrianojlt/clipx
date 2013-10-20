@@ -32,6 +32,7 @@ import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+import javax.swing.text.html.Option;
 
 public class ClipGUI extends JFrame implements
 												ListSelectionListener, 
@@ -56,24 +57,23 @@ public class ClipGUI extends JFrame implements
 	
 	private JPanel				leftPanel;
 	private JPanel				rightPanel;
+
 	private JTextArea		 	editTA;
 	private JScrollPane			textAreaScrollPane;
 	
-	// menus
-	private JMenuBar			menuBar;
-	private JMenu				menuFile, menuEdit, menuOptions, menuAbout;
-	private JMenuItem			menu1Item1, menu1Item2, menu1Item3, menuExitItem;
-	private JCheckBoxMenuItem   menuActivateItem;
-	
 	private JPopupMenu			rightClickMenu;
 	
-	// List
 	private ClipList			list;
+
 	private JScrollPane			listScrollPane;
 	
 	private ClipSysTray 		clipSysTray;
 	
-	ClipManager 				clipManager;
+	private ClipMenuBar			clipMenuBar;
+	
+	private ClipManager 		clipManager;
+	
+	private ClipOptions opt = new ClipOptions();
 	
 	
 	
@@ -84,17 +84,27 @@ public class ClipGUI extends JFrame implements
 		
 		super(TITLE);
 		
-		this.clipSysTray = new ClipSysTray(this);
-
 		this.clipManager = new ClipManager();
 		
 		this.clipManager.setGuiState(this);
 
 		this.clipManager.addClipboardListener(this);
-
-		this.clipSysTray.setState(clipManager);
 		
-		this.createMenu();
+		this.clipManager.setOptions(this.opt);
+
+		this.clipSysTray = new ClipSysTray(this);
+
+		this.clipSysTray.setOptions(this.opt);
+		
+		this.clipSysTray.setEnableListener(clipManager);
+		
+		this.clipMenuBar = new ClipMenuBar();
+		
+		this.clipMenuBar.setOptions(this.opt);
+		
+		this.clipMenuBar.setEnableListener(clipManager);
+		
+		this.setJMenuBar(this.clipMenuBar);
 		
 		this.createRightClickMenu();
 		
@@ -109,44 +119,6 @@ public class ClipGUI extends JFrame implements
 
 	}
 
-	private void createMenu() {
-		
-		menuBar = new JMenuBar();
-		
-		menuFile = new JMenu("File");
-		menuEdit = new JMenu("Edit");
-		menuAbout = new JMenu("About");
-		menuOptions = new JMenu("Options");
-		
-		menu1Item1 = new JMenuItem("item1");
-		menuExitItem = new JMenuItem("Exit");
-		menuExitItem.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				System.exit(0);
-			}
-		});
-
-		menuActivateItem = new JCheckBoxMenuItem("activate");
-		menuFile.add(menu1Item1);
-		menuFile.add(menuExitItem);
-		menuActivateItem.addItemListener(new ItemListener() {
-			
-			@Override
-			public void itemStateChanged(ItemEvent arg0) {
-
-				
-			}
-		});
-		
-		menuOptions.add(menuActivateItem);
-		
-		menuBar.add(menuFile);
-		menuBar.add(menuEdit);
-		menuBar.add(menuOptions);
-		menuBar.add(menuAbout);
-		this.setJMenuBar(menuBar);
-	}
 	
 	private void createRightClickMenu() {
 

@@ -48,7 +48,9 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 	
 	private ClipGUI gui;
 	
-	private State state;
+	private EnableListener enableListener;
+	
+	private ClipOptions opt;
 	
 	public ClipSysTray(final ClipGUI gui) {
 		
@@ -112,15 +114,21 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 		icon.addMouseListener(this);
 	}
 	
-	public void setState(State state) {
-		this.state = state;
+	public void setEnableListener(EnableListener el) {
+		this.enableListener = el;
 	}
-
+	
+	public void setOptions(ClipOptions opt) {
+		this.opt = opt;
+	}
+	
 	@Override
 	public void actionPerformed(ActionEvent e) {
-
+		
 		try { 
-			if (e.getActionCommand().equals(MENU_ITEM_EXIT)) { System.exit(0); }	
+			if (e.getActionCommand().equals(MENU_ITEM_EXIT)) { 
+				System.exit(0); 
+			}	
 		}
 		catch (NullPointerException eNULL) { }
 		catch (Exception eEX) { }	
@@ -157,10 +165,11 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 		if ( e.getItem().equals(MENU_ITEM_ACTIVATE) ) {
 
 			if ( mItemActivate.getState() ) {
-				this.state.enable();
+				this.opt.enable();
+				this.enableListener.getClipboardOwnership();
 			}
 			else {
-				this.state.disable();
+				this.opt.disable();
 			}
 		}
 	}

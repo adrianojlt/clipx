@@ -19,23 +19,19 @@ import java.util.List;
  * @author adriano
  *
  */
-public class ClipManager implements FlavorListener, ClipboardOwner, State{
+public class ClipManager implements FlavorListener, ClipboardOwner, EnableListener {
 	
 	private boolean enabled = true;
 
-	/**
-	 * SyS clipboard
-	 */
 	private Clipboard clip;
 	
-	/**
-	 * Send notification to here ...
-	 */
 	private ClipboardListener listener;
 	
 	private GuiState guiState;
 	
 	private List<ClipboardListener> listeners = new ArrayList<ClipboardListener>();
+	
+	private ClipOptions opt;
 	
 	public ClipManager() {
 		this(null);
@@ -57,27 +53,6 @@ public class ClipManager implements FlavorListener, ClipboardOwner, State{
 		clip.addFlavorListener(this);
 	}
 	
-	@Override
-	public boolean isEnabled() { return this.enabled; }
-
-	@Override
-	public void enable() { 
-
-		this.enabled = true; 
-
-		clip.removeFlavorListener(this);
-		this.clip = Toolkit.getDefaultToolkit().getSystemClipboard();
-		clip.setContents(clip.getContents(null), this);
-		clip.addFlavorListener(this);
-	}
-
-	@Override
-	public void disable() { 
-
-		this.enabled = false; 
-
-		clip.removeFlavorListener(this);
-	}
 	
 	public void setGuiState(GuiState guiState) {
 		this.guiState = guiState;
@@ -94,6 +69,10 @@ public class ClipManager implements FlavorListener, ClipboardOwner, State{
 	private synchronized void newString(String copyString) {
 		Iterator<ClipboardListener> i = this.listeners.iterator();
 		while (i.hasNext()) i.next().newString(copyString);
+	}
+	
+	public void setOptions(ClipOptions opt) {
+		this.opt = opt;
 	}
 	
 	
@@ -129,7 +108,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, State{
 		
 		String copyString = null;
 		
-		if ( tf.isDataFlavorSupported(DataFlavor.stringFlavor) && this.enabled ) {		
+		if ( tf.isDataFlavorSupported(DataFlavor.stringFlavor) && this.opt.isEnabled() ) {		
 
 			try {
 
@@ -161,5 +140,14 @@ public class ClipManager implements FlavorListener, ClipboardOwner, State{
 	
 	@Override
 	public void lostOwnership(Clipboard arg0, Transferable arg1) { }
+
+	@Override
+	public void getClipboardOwnership() {
+
+		clip.removeFlavorListener(this);
+		this.clip = Toolkit.getDefaultToolkit().getSystemClipboard();
+		clip.setContents(clip.getContents(null), this);
+		clip.addFlavorListener(this);	
+	}
 
 }

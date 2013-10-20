@@ -96,12 +96,15 @@ public class ClipFilterModel extends AbstractListModel<String> {
 	 * would be be shown. 
 	 */
 	public void refilter() {
+
 		filterItems.clear();
+
 		String term = this.filterField.getText();
-		for (int i = 0 ; i < items.size() ; i++) {
-			if (items.get(i).toString().indexOf(term,0)!=-1)
+
+		for (int i = 0 ; i < items.size() ; i++) 
+			if (items.get(i).toString().toLowerCase().indexOf(term.toLowerCase(),0)!=-1)
 				filterItems.add(items.get(i));
-		}
+
 		fireContentsChanged(this, 0, getSize());
 	}
 	
