@@ -29,7 +29,7 @@ public class ClipMenuBar extends JMenuBar implements ItemListener, ActionListene
 	private JMenuItem itemOpen, itemSave, itemSaveAs, itemImpItems, itemExpItems, itemExit, itemPreferences;
 	private JCheckBoxMenuItem itemActivate;
 	
-	private ClipOptions opt;
+	private ClipOptions opt = ClipOptions.getInstance();
 	
 	private EnableListener enableListener;
 	
@@ -72,10 +72,6 @@ public class ClipMenuBar extends JMenuBar implements ItemListener, ActionListene
 	
 	public void setEnableListener(EnableListener el) {
 		this.enableListener = el;
-	}
-	
-	public void setOptions(ClipOptions opt) {
-		this.opt = opt;
 	}
 	
 	@Override

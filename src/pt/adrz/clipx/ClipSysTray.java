@@ -50,7 +50,7 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 	
 	private EnableListener enableListener;
 	
-	private ClipOptions opt;
+	private ClipOptions opt = ClipOptions.getInstance();
 	
 	public ClipSysTray(final ClipGUI gui) {
 		
@@ -116,10 +116,6 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 	
 	public void setEnableListener(EnableListener el) {
 		this.enableListener = el;
-	}
-	
-	public void setOptions(ClipOptions opt) {
-		this.opt = opt;
 	}
 	
 	@Override

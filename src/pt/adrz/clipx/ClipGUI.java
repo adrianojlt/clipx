@@ -8,20 +8,13 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 
-import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFrame;
-import javax.swing.JMenu;
-import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -32,7 +25,6 @@ import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
-import javax.swing.text.html.Option;
 
 public class ClipGUI extends JFrame implements
 												ListSelectionListener, 
@@ -73,7 +65,7 @@ public class ClipGUI extends JFrame implements
 	
 	private ClipManager 		clipManager;
 	
-	private ClipOptions opt = new ClipOptions();
+	//private ClipOptions opt = new ClipOptions();
 	
 	
 	
@@ -90,17 +82,17 @@ public class ClipGUI extends JFrame implements
 
 		this.clipManager.addClipboardListener(this);
 		
-		this.clipManager.setOptions(this.opt);
+		//this.clipManager.setOptions(this.opt);
 
 		this.clipSysTray = new ClipSysTray(this);
 
-		this.clipSysTray.setOptions(this.opt);
+		//this.clipSysTray.setOptions(this.opt);
 		
 		this.clipSysTray.setEnableListener(clipManager);
 		
 		this.clipMenuBar = new ClipMenuBar();
 		
-		this.clipMenuBar.setOptions(this.opt);
+		//this.clipMenuBar.setOptions(this.opt);
 		
 		this.clipMenuBar.setEnableListener(clipManager);
 		

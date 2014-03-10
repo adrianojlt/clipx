@@ -31,7 +31,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, EnableListen
 	
 	private List<ClipboardListener> listeners = new ArrayList<ClipboardListener>();
 	
-	private ClipOptions opt;
+	private ClipOptions opt = ClipOptions.getInstance();
 	
 	public ClipManager() {
 		this(null);
@@ -69,10 +69,6 @@ public class ClipManager implements FlavorListener, ClipboardOwner, EnableListen
 	private synchronized void newString(String copyString) {
 		Iterator<ClipboardListener> i = this.listeners.iterator();
 		while (i.hasNext()) i.next().newString(copyString);
-	}
-	
-	public void setOptions(ClipOptions opt) {
-		this.opt = opt;
 	}
 	
 	
