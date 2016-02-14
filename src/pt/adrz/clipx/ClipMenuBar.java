@@ -1,6 +1,5 @@
 package pt.adrz.clipx;
 
-import java.awt.MenuBar;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
@@ -18,9 +17,9 @@ public class ClipMenuBar extends JMenuBar implements ItemListener, ActionListene
 	private static final String MENU_ITEM_EXIT 			= "Exit";
 	private static final String MENU_ITEM_OPEN 			= "Open";
 	private static final String MENU_ITEM_SAVE 			= "Save";
-	private static final String MENU_ITEM_SAVE_AS 		= "Save As ...";
-	private static final String MENU_ITEM_IMPORT 		= "Import <-";
-	private static final String MENU_ITEM_EXPORT 		= "Export ->";
+	private static final String MENU_ITEM_SAVE_AS 		= "Save As";
+	private static final String MENU_ITEM_IMPORT 		= "Import";
+	private static final String MENU_ITEM_EXPORT 		= "Export";
 	private static final String MENU_ITEM_ACTIVATE 		= "Activate";
 	private static final String MENU_ITEM_PREFERENCES 	= "Preferences";
 
@@ -66,8 +65,8 @@ public class ClipMenuBar extends JMenuBar implements ItemListener, ActionListene
 		
 		this.add(mFile);
 		this.add(mEdit);
-		this.add(mOptions);
-		this.add(mAbout);
+		this.add(mAbout,this.getMenuCount());
+		this.add(mOptions,this.getMenuCount());
 	}
 	
 	public void setEnableListener(EnableListener el) {

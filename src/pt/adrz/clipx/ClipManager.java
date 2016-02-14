@@ -67,8 +67,12 @@ public class ClipManager implements FlavorListener, ClipboardOwner, EnableListen
 	}
 	
 	private synchronized void newString(String copyString) {
+
 		Iterator<ClipboardListener> i = this.listeners.iterator();
-		while (i.hasNext()) i.next().newString(copyString);
+
+		while (i.hasNext()) {
+			i.next().newString(copyString);
+		}
 	}
 	
 	
@@ -99,8 +103,12 @@ public class ClipManager implements FlavorListener, ClipboardOwner, EnableListen
 		
 		Transferable tf = null;
 		
-		try { tf = clip.getContents(null); }
-		catch (IllegalStateException illStateEx) { return;}
+		try { 
+			tf = clip.getContents(null); 
+		}
+		catch (IllegalStateException illStateEx) { 
+			return;
+		}
 		
 		String copyString = null;
 		
@@ -116,15 +124,19 @@ public class ClipManager implements FlavorListener, ClipboardOwner, EnableListen
 					Toolkit.getDefaultToolkit().getSystemClipboard().setContents(ss, this);
 				}
 
-				if(!this.guiState.getList().getModel().getItems().contains(copyString)) {
+				if ( !this.guiState.getList().getModel().getItems().contains(copyString) ) {
 
 					try {
 						//listener.newString(copyString);
 						this.newString(copyString);
 					}
-					catch (Exception ex) { ex.printStackTrace(); }
+					catch (Exception ex) { 
+						ex.printStackTrace(); 
+					}
 				}
-				else {}
+				else {
+					
+				}
 			}
 			catch (IOException ioEx) { }
 			catch (UnsupportedFlavorException unFlvEx) { }

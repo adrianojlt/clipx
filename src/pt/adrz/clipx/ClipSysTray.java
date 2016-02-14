@@ -2,6 +2,7 @@ package pt.adrz.clipx;
 
 import java.awt.AWTException;
 import java.awt.CheckboxMenuItem;
+import java.awt.Font;
 import java.awt.Image;
 import java.awt.MenuItem;
 import java.awt.PopupMenu;
@@ -15,6 +16,7 @@ import java.awt.event.ItemListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.net.URL;
+import java.util.LinkedList;
 
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -77,20 +79,24 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 		this.mItem03.addActionListener(this);
 
 		//this.mItemActivate.addActionListener(this);
+		this.mItem01.addActionListener(this);
 		this.mItemActivate.addItemListener(this);
 		this.mItemAbout.addActionListener(this);
 		this.mItemExit.addActionListener(this);
 		
 		this.mainMenu = new PopupMenu();
+
 		this.mainMenu.add(mItem01);
 		this.mainMenu.add(mItem02);
 		this.mainMenu.add(mItem03);
+
 		this.mainMenu.addSeparator();
+
 		this.mainMenu.add(mItemActivate);
 		this.mainMenu.add(mItemAbout);
 		this.mainMenu.add(mItemExit);
+
 		this.mainMenu.addActionListener(this);
-		
 		mItemActivate.setState(true);
 	}
 	
@@ -118,18 +124,45 @@ public class ClipSysTray implements ActionListener, MouseListener, ItemListener 
 		this.enableListener = el;
 	}
 	
+	public void refreshTrayMenu(LinkedList<String> items, ActionListener listener) {
+		
+		//mItem.setFont(new Font("Serif", Font.BOLD, 12));
+		// mItem should be a custom class that extends MenuComponente
+		// to validate with instanceof ...
+		
+		// clear popup
+		for ( int i = 0; i < this.mainMenu.getItemCount() ; i++ ) {
+			//if ( mItem instanceof )
+		}
+
+		// iterate create custom menu and add before separator 
+	}
+
+	public void addMenuItem(MenuItem mItem,ActionListener listener) {
+
+		mItem.addActionListener(listener);
+
+		this.mainMenu.addActionListener(listener);
+		this.mainMenu.insert(mItem, 0);
+	}
+	
 	@Override
 	public void actionPerformed(ActionEvent e) {
 		
+		System.out.println(e.getActionCommand());
+		
 		try { 
-			if (e.getActionCommand().equals(MENU_ITEM_EXIT)) { 
+			//if (e.getActionCommand().equals(MENU_ITEM_EXIT)) { 
+			if (MENU_ITEM_EXIT.equals(e.getActionCommand())) { 
 				System.exit(0); 
 			}	
 		}
-		catch (NullPointerException eNULL) { }
-		catch (Exception eEX) { }	
-		
-		
+		catch (NullPointerException eNULL) {
+			eNULL.printStackTrace();
+		}
+		catch (Exception eEX) { 
+			eEX.printStackTrace();
+		}	
 	}
 
 	@Override

@@ -5,9 +5,13 @@
 package pt.adrz.clipx;
 
 import java.awt.BorderLayout;
+import java.awt.CheckboxMenuItem;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.MenuItem;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.awt.event.MouseAdapter;
@@ -31,7 +35,8 @@ public class ClipGUI extends JFrame implements
 												KeyListener, 
 												MouseListener, 
 												ClipboardListener, 
-												GuiState  {
+												ActionListener,
+												GuiState {
 
 	private static final long serialVersionUID = 4285795541593969626L;
 	
@@ -189,13 +194,19 @@ public class ClipGUI extends JFrame implements
 		list.getModel().addElement("secound");
 		list.getModel().addElement("third");
 		
+		clipSysTray.addMenuItem(new MenuItem("first"), this);
+		clipSysTray.addMenuItem(new MenuItem("secound"), this);
+		clipSysTray.addMenuItem(new MenuItem("third"), this);
+		
+		clipSysTray.refreshTrayMenu(list.getModel().getItems(), this);
+		
 		listScrollPane = new JScrollPane();
+		listScrollPane = new JScrollPane(list,ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
 		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		list.setSelectedIndex(0);
 		list.addListSelectionListener(this);
 		list.setVisibleRowCount(visibleListRowCount);
-		listScrollPane = new JScrollPane(list,ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 		list.setPrototypeCellValue("tamanho"); // set horizontal size
 		
 		list.addMouseListener(new MouseAdapter() {
@@ -205,7 +216,6 @@ public class ClipGUI extends JFrame implements
 				if ( e.getClickCount() == 2 ) {
 					
 					int index = list.locationToIndex(e.getPoint());
-					//int index = list.getSelectedIndex();
 					
 					// ... double click in an empty space
 					if ( index == -1) {
@@ -223,9 +233,9 @@ public class ClipGUI extends JFrame implements
 					clipManager.setClipboard(selectedString);
 					
 					list.getModel().switchVals(pos, selectedString);
-					
 					list.setSelectedIndex(0);
 					list.getFilterField().setText("");
+
 					editTA.setText(selectedString);
 				}
 			}
@@ -352,5 +362,12 @@ public class ClipGUI extends JFrame implements
 	}
 
 	@Override
-	public ClipList getList() { return this.list; }
+	public ClipList getList() { 
+		return this.list; 
+	}
+
+	@Override
+	public void actionPerformed(ActionEvent e) {
+		System.out.println(e.getActionCommand());
+	}
 }
