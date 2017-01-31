@@ -97,7 +97,7 @@ public class ClipManager implements FlavorListener, ClipboardOwner, EnableListen
 		
 		String copyString = null;
 		
-		if ( tf.isDataFlavorSupported(DataFlavor.stringFlavor) && this.opt.isEnabled() ) {		
+		if ( tf.isDataFlavorSupported(DataFlavor.stringFlavor) && this.opt.state() ) {		
 
 			try {
 

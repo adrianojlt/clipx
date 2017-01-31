@@ -6,6 +6,7 @@ package pt.adrz.clipx;
 
 import java.awt.BorderLayout;
 import java.awt.Container;
+import java.awt.Dimension;
 import java.awt.FlowLayout;
 
 import javax.swing.JFrame;
@@ -28,7 +29,7 @@ public class ClipGUI extends JFrame implements Panels {
 
 	private Container 			container;
 	
-	private LeftPanel				leftPanel;
+	private LeftPanel			leftPanel;
 	private JPanel				centralPanel;
 	private RightPanel			rightPanel;
 
@@ -79,6 +80,7 @@ public class ClipGUI extends JFrame implements Panels {
 		clipManager.setPanels(this);
 
 		editTA = new JTextArea();
+		editTA.setText(leftPanel.getList().getModel().getItems().getFirst());
 		editTA.setEditable(false);
 		textAreaScrollPane 	= new JScrollPane(this.editTA,ScrollPaneConstants.VERTICAL_SCROLLBAR_ALWAYS,ScrollPaneConstants.HORIZONTAL_SCROLLBAR_ALWAYS);
 

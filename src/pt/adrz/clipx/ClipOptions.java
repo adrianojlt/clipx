@@ -18,7 +18,7 @@ public class ClipOptions {
 		return ClipOptions.instance;
 	}
 	
-	public boolean isEnabled() { return enabled; }
+	public boolean state() { return enabled; }
 	public void enable() { this.enabled = true; }
 	public void disable() { this.enabled = false; }
 

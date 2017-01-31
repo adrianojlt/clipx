@@ -10,23 +10,28 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
 
+import pt.adrz.clipx.ClipOptions;
 import pt.adrz.clipx.ClipboardListener;
 import pt.adrz.clipx.gui.list.LeftList;
 
 public class LeftPanel extends ListPanel implements ActionListener, MouseListener, ClipboardListener, KeyListener {
 	private static final long serialVersionUID = 1L;
+
+	private ClipOptions opt = ClipOptions.getInstance();
 	
 	private LeftList list;
 	private JScrollPane scrollPane;
 	private JPanel southPanel;
 	private JTextField inputNewElement;
 	private JButton addButton;
+	private JCheckBox copyClipboardContentCheckBox;
 	
 	private Panels panels;
 
@@ -42,6 +47,8 @@ public class LeftPanel extends ListPanel implements ActionListener, MouseListene
 		list.getModel().addElement("asdf");
 		list.getModel().addElement("qwer");
 		list.getModel().addElement("zxcv");
+		//panels.getTextArea().setText(list.getModel().getItems().getFirst());
+		//System.out.println(list.getModel().getItems().getFirst());
 
 		list.setSelectedIndex(0);
 		list.setVisibleRowCount(10);
@@ -56,12 +63,15 @@ public class LeftPanel extends ListPanel implements ActionListener, MouseListene
 	private void createSouthElements() {
 		inputNewElement = new JTextField(20);
 		addButton = new JButton("ADD");
+		copyClipboardContentCheckBox = new JCheckBox("Enable");
 
 		southPanel = new JPanel();
 		southPanel.setLayout(new FlowLayout());
+		southPanel.add(copyClipboardContentCheckBox);
 		southPanel.add(inputNewElement);
 		southPanel.add(addButton);
 		
+		copyClipboardContentCheckBox.addActionListener(this);
 		addButton.addActionListener(this);
 	}
 	
@@ -109,8 +119,17 @@ public class LeftPanel extends ListPanel implements ActionListener, MouseListene
 
 	@Override
 	public void actionPerformed(ActionEvent e) {
-		// TODO Auto-generated method stub
-		
+		if ( e.getSource() instanceof JCheckBox ) {
+			//System.out.println("actionPerformed");
+			if ( opt.state() ) {
+				copyClipboardContentCheckBox.setSelected(false);
+				opt.disable();
+			}
+			else {
+				copyClipboardContentCheckBox.setSelected(true);
+				opt.enable();
+			}
+		}
 	}
 
 	@Override
