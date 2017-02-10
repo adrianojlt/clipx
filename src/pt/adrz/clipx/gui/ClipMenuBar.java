@@ -1,4 +1,4 @@
-package pt.adrz.clipx;
+package pt.adrz.clipx.gui;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -9,6 +9,8 @@ import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+
+import pt.adrz.clipx.EnableListener;
 
 public class ClipMenuBar extends JMenuBar implements ItemListener, ActionListener{
 	

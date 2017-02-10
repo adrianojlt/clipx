@@ -1,4 +1,4 @@
-package pt.adrz.clipx;
+package pt.adrz.clipx.gui;
 
 /**
  * Singleton ... one and only one type of this object is allowed

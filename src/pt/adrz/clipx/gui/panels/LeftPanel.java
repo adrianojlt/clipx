@@ -17,8 +17,8 @@ import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
 
-import pt.adrz.clipx.ClipOptions;
 import pt.adrz.clipx.ClipboardListener;
+import pt.adrz.clipx.gui.ClipOptions;
 import pt.adrz.clipx.gui.list.LeftList;
 
 public class LeftPanel extends ListPanel implements ActionListener, MouseListener, ClipboardListener, KeyListener {

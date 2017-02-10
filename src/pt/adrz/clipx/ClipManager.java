@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import pt.adrz.clipx.gui.ClipOptions;
 import pt.adrz.clipx.gui.panels.Panels;
 
 /**

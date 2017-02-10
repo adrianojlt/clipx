@@ -1,4 +1,4 @@
-package pt.adrz.clipx;
+package pt.adrz.clipx.gui;
 
 import java.awt.AWTException;
 import java.awt.CheckboxMenuItem;
@@ -22,6 +22,8 @@ import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JPopupMenu;
+
+import pt.adrz.clipx.EnableListener;
 
 public class ClipSysTray implements ActionListener, MouseListener, ItemListener {
 	

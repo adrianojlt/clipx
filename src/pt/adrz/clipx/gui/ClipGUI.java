@@ -2,7 +2,7 @@
  * ClipGui
  */
 
-package pt.adrz.clipx;
+package pt.adrz.clipx.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Container;
@@ -15,6 +15,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.ScrollPaneConstants;
 
+import pt.adrz.clipx.ClipManager;
 import pt.adrz.clipx.gui.panels.CentralPanel;
 import pt.adrz.clipx.gui.panels.LeftPanel;
 import pt.adrz.clipx.gui.panels.Panels;
