@@ -15,7 +15,8 @@
         "title": "Clipboard Manager",
         "width": 400,
         "height": 600,
-        "decorations": true
+        "decorations": false,
+        "visible": false
       }
     ],
     "security": {
