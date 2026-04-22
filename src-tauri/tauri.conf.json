@@ -12,11 +12,23 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Clipboard Manager",
         "width": 400,
         "height": 600,
         "decorations": false,
-        "visible": false
+        "visible": false,
+        "url": "index.html"
+      },
+      {
+        "label": "settings",
+        "title": "Settings",
+        "width": 400,
+        "height": 400,
+        "decorations": true,
+        "visible": false,
+        "center": true,
+        "url": "settings.html"
       }
     ],
     "security": {
