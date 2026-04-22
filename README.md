@@ -1,4 +1,6 @@
-# ClipX
+<p align="center">
+  <img src="screen.png" alt="ClipX screenshot" />
+</p>
 
 A lightweight clipboard manager for desktop. It keeps track of text you copy so you can recall it later without redoing the work.
 
