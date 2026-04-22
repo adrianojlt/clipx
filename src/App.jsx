@@ -11,9 +11,23 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  useEffect(() => {
+    const titleBar = document.querySelector(".title-bar");
+    if (!titleBar) return;
+
+    const onMouseDown = async () => {
+      await getCurrentWindow().startDragging();
+    };
+
+    titleBar.addEventListener("mousedown", onMouseDown);
+    return () => titleBar.removeEventListener("mousedown", onMouseDown);
+  }, []);
+
   return (
     <main className="container">
-      <h1>Clipboard Manager</h1>
+      <div className="title-bar">
+        <h1>Clipboard Manager</h1>
+      </div>
     </main>
   );
 }
