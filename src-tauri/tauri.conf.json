@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Clipboard Manager",
+        "title": "ClipX",
         "width": 400,
         "height": 600,
         "decorations": false,

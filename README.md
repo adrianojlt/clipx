@@ -9,6 +9,7 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Quick dismiss** - Press Escape to hide the popup and get back to work.
 - **Tray menu** - Open the app, change settings, or quit from the tray icon.
 - **Configurable hotkey** - Choose your own keyboard shortcut to summon the popup.
+- **Pin items** - Pin frequently used entries so they stay at the top, and reorder them however you like.
 - **Local only** - All clipboard history stays on your machine.
 
 ## Running in development

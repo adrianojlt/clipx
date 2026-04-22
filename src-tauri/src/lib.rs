@@ -1,17 +1,26 @@
+use arboard::Clipboard;
+use rusqlite::Connection;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use tauri::{
-    menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
-    Manager, State,
-};
+use std::thread;
+use std::time::Duration;
+use tauri::{menu::{Menu, MenuItem}, tray::TrayIconBuilder, AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
 struct AppState {
     current_shortcut: Mutex<String>,
 }
+
+#[derive(serde::Serialize, Clone)]
+struct ClipboardItem {
+    id: i64,
+    content: String,
+    created_at: String,
+}
+
+// --- Settings helpers ---
 
 fn settings_dir() -> PathBuf {
     if cfg!(target_os = "windows") {
@@ -68,6 +77,195 @@ fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: Shortcu
     }
 }
 
+// --- Database helpers ---
+
+fn db_path(app: &AppHandle) -> PathBuf {
+    app.path().app_data_dir().unwrap().join("clipx.db")
+}
+
+fn init_db(conn: &Connection) -> Result<(), String> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS clipboard_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS clipboard_pinned (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content TEXT NOT NULL UNIQUE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            sort_order INTEGER DEFAULT 0
+        )",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Migration: add sort_order if missing
+    let cols: Vec<String> = conn
+        .prepare("PRAGMA table_info(clipboard_pinned)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    if !cols.contains(&"sort_order".to_string()) {
+        conn.execute(
+            "ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")
+            .map_err(|e| e.to_string())?;
+        let ids: Vec<i64> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        drop(stmt);
+        for (index, id) in ids.iter().enumerate() {
+            conn.execute(
+                "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
+                [index as i64, *id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn start_clipboard_monitor(app: AppHandle) {
+    thread::spawn(move || {
+        let db_file = db_path(&app);
+        let mut clipboard = match Clipboard::new() {
+            Ok(c) => c,
+            Err(e) => {
+                eprintln!("Failed to initialize clipboard: {}", e);
+                return;
+            }
+        };
+        let mut last_text = String::new();
+
+        loop {
+
+            thread::sleep(Duration::from_millis(500));
+
+            let text = match clipboard.get_text() {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+
+            if text.is_empty() || text == last_text {
+                continue;
+            }
+
+            last_text = text.clone();
+
+            let conn = match Connection::open(&db_file) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            // Remove duplicate if it exists so the text appears only once
+            let _ = conn.execute("DELETE FROM clipboard_history WHERE content = ?", [&text]);
+            let _ = conn.execute( "INSERT INTO clipboard_history (content) VALUES (?)", [&text]);
+            let _ = conn.execute(
+                "DELETE FROM clipboard_history WHERE id NOT IN (
+                    SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT 10
+                )",
+                [],
+            );
+
+            let _ = app.emit("clipboard-changed", ());
+        }
+    });
+}
+
+// --- Commands ---
+
+#[tauri::command]
+fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
+    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(
+        "SELECT id, content, created_at FROM clipboard_history ORDER BY created_at DESC LIMIT 10"
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(ClipboardItem {
+                id: row.get(0)?,
+                content: row.get(1)?,
+                created_at: row.get(2)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for item in rows {
+        items.push(item.map_err(|e| e.to_string())?);
+    }
+    Ok(items)
+}
+
+#[tauri::command]
+fn get_pinned(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
+    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT id, content, created_at FROM clipboard_pinned ORDER BY sort_order ASC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(ClipboardItem {
+                id: row.get(0)?,
+                content: row.get(1)?,
+                created_at: row.get(2)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    let mut items = Vec::new();
+    for item in rows {
+        items.push(item.map_err(|e| e.to_string())?);
+    }
+    Ok(items)
+}
+
+#[tauri::command]
+fn pin_item(content: String, app: AppHandle) -> Result<(), String> {
+
+    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+
+    conn.execute( "UPDATE clipboard_pinned SET sort_order = sort_order + 1", [],).map_err(|e| e.to_string())?;
+    conn.execute( "INSERT OR IGNORE INTO clipboard_pinned (content, sort_order) VALUES (?, 0)", [&content],).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), String> {
+
+    let mut conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    for (index, id) in items.iter().enumerate() {
+        tx.execute( "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?", [index as i64, *id],).map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn unpin_item(id: i64, app: AppHandle) -> Result<(), String> {
+    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM clipboard_pinned WHERE id = ?", [id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[tauri::command]
 fn get_setting(key: String) -> Result<String, String> {
     let settings = load_settings();
@@ -90,18 +288,17 @@ fn update_shortcut(
     state: State<AppState>,
     app: tauri::AppHandle,
 ) -> Result<(), String> {
+
     let old_shortcut_str = {
         let current = state.current_shortcut.lock().map_err(|e| e.to_string())?;
         current.clone()
     };
 
-    // Unregister current
     let normalized_old = normalize_shortcut(&old_shortcut_str);
     if let Ok(old) = normalized_old.parse::<Shortcut>() {
         let _ = app.global_shortcut().unregister(old);
     }
 
-    // Register new
     let normalized_new = normalize_shortcut(&shortcut);
     let new_shortcut = normalized_new
         .parse::<Shortcut>()
@@ -110,13 +307,11 @@ fn update_shortcut(
         .on_shortcut(new_shortcut, shortcut_handler)
         .map_err(|e| e.to_string())?;
 
-    // Update state
     {
         let mut current = state.current_shortcut.lock().map_err(|e| e.to_string())?;
         *current = shortcut.clone();
     }
 
-    // Save to settings
     let mut settings = load_settings();
     settings.insert("hotkey".to_string(), shortcut);
     save_settings(&settings)
@@ -126,7 +321,6 @@ fn update_shortcut(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState {
@@ -135,9 +329,26 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_setting,
             set_setting,
-            update_shortcut
+            update_shortcut,
+            get_history,
+            get_pinned,
+            pin_item,
+            unpin_item,
+            reorder_pinned,
         ])
         .setup(|app| {
+
+            // Ensure app data dir exists
+            let _ = std::fs::create_dir_all(app.path().app_data_dir().unwrap());
+
+            // Init DB
+            let conn = Connection::open(db_path(&app.handle())).map_err(|e| e.to_string())?;
+            init_db(&conn).map_err(|e| e.to_string())?;
+            drop(conn);
+
+            // Start clipboard monitor
+            start_clipboard_monitor(app.handle().clone());
+
             // Load and register initial shortcut
             let settings = load_settings();
             let hotkey_str = settings
@@ -152,7 +363,6 @@ pub fn run() {
             app.global_shortcut()
                 .on_shortcut(shortcut, shortcut_handler)?;
 
-            // Update state
             {
                 let state = app.state::<AppState>();
                 let mut current = state.current_shortcut.lock().unwrap();
@@ -188,6 +398,17 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // Intercept close on main window and hide instead
+            if let Some(win) = app.get_webview_window("main") {
+                let win_clone = win.clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win_clone.hide();
+                    }
+                });
+            }
 
             // Intercept close on settings window and hide instead
             if let Some(win) = app.get_webview_window("settings") {
