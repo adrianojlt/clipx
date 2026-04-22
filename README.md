@@ -14,6 +14,10 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Pin items** - Pin frequently used entries so they stay at the top, and reorder them however you like.
 - **Local only** - All clipboard history stays on your machine.
 
+## Download
+
+Pre-built installers for macOS, Windows, and Linux are available on the [Releases](../../releases) page.
+
 ## Running in development
 
 ```bash
