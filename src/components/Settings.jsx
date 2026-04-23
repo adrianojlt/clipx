@@ -5,6 +5,7 @@ import "./Settings.css";
 
 function Settings() {
   const [hotkey, setHotkey] = useState("");
+  const [historyLimit, setHistoryLimit] = useState(20);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -23,6 +24,12 @@ function Settings() {
       } catch {
         setHotkey("Option+Command+1");
       }
+      try {
+        const value = await invoke("get_setting", { key: "history_limit" });
+        setHistoryLimit(Number(value));
+      } catch {
+        setHistoryLimit(20);
+      }
     };
     load();
   }, []);
@@ -31,9 +38,10 @@ function Settings() {
     setError("");
     try {
       await invoke("update_shortcut", { shortcut: hotkey });
+      await invoke("set_setting", { key: "history_limit", value: String(historyLimit) });
       await getCurrentWindow().hide();
     } catch (e) {
-      setError(`Failed to update shortcut: ${e}`);
+      setError(`Failed to update settings: ${e}`);
     }
   };
 
@@ -52,6 +60,18 @@ function Settings() {
         <p className="hint">
           Examples: Option+Command+1, Cmd+Shift+A, Ctrl+Alt+T
         </p>
+      </div>
+      <div className="field">
+        <label htmlFor="history-limit">History Limit</label>
+        <input
+          id="history-limit"
+          type="number"
+          min={1}
+          max={50}
+          value={historyLimit}
+          onChange={e => setHistoryLimit(Math.min(50, Math.max(1, Number(e.target.value))))}
+        />
+        <p className="hint">Number of clipboard entries to keep (max 50)</p>
       </div>
       {error && <p className="error">{error}</p>}
       <div className="actions">

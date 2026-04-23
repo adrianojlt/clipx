@@ -73,6 +73,7 @@ fn normalize_shortcut(s: &str) -> String {
 fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: ShortcutEvent) {
     if event.state() == ShortcutState::Pressed {
         if let Some(win) = app.get_webview_window("main") {
+            let _ = win.hide();
             if let Ok(pos) = app.cursor_position() {
                 let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
                     x: pos.x as i32,
@@ -189,10 +190,16 @@ fn start_clipboard_monitor(app: AppHandle) {
             // Remove duplicate if it exists so the text appears only once
             let _ = conn.execute("DELETE FROM clipboard_history WHERE content = ?", [&text]);
             let _ = conn.execute( "INSERT INTO clipboard_history (content) VALUES (?)", [&text]);
+            let limit = load_settings()
+                .get("history_limit")
+                .and_then(|v| v.parse::<i64>().ok())
+                .unwrap_or(20)
+                .min(50)
+                .max(1);
             let _ = conn.execute(
-                "DELETE FROM clipboard_history WHERE id NOT IN (
-                    SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT 10
-                )",
+                &format!("DELETE FROM clipboard_history WHERE id NOT IN (
+                    SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT {}
+                )", limit),
                 [],
             );
 
@@ -205,9 +212,15 @@ fn start_clipboard_monitor(app: AppHandle) {
 
 #[tauri::command]
 fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
+    let limit = load_settings()
+        .get("history_limit")
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(20)
+        .min(50)
+        .max(1);
     let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare(
-        "SELECT id, content, created_at FROM clipboard_history ORDER BY created_at DESC LIMIT 10"
+        &format!("SELECT id, content, created_at FROM clipboard_history ORDER BY created_at DESC LIMIT {}", limit)
     ).map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |row| {
@@ -364,6 +377,9 @@ pub fn run() {
             reorder_pinned,
         ])
         .setup(|app| {
+
+            #[cfg(target_os = "macos")]
+            let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             // Ensure app data dir exists
             let _ = std::fs::create_dir_all(app.path().app_data_dir().unwrap());

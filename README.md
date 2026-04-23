@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="screen.png" alt="ClipX screenshot" />
+  <img src="left.png" alt="ClipX screenshot" />
+  &nbsp;&nbsp;
+  <img src="right.png" alt="ClipX screenshot" />
 </p>
 
 A lightweight clipboard manager for desktop. It keeps track of text you copy so you can recall it later without redoing the work.
@@ -11,12 +13,27 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Quick dismiss** - Press Escape to hide the popup and get back to work.
 - **Tray menu** - Open the app, change settings, or quit from the tray icon.
 - **Configurable hotkey** - Choose your own keyboard shortcut to summon the popup.
-- **Pin items** - Pin frequently used entries so they stay at the top, and reorder them however you like.
+- **Pin items** - Pin frequently used entries so they stay at the top, reorder them, and give each one a custom label.
+- **Search history** - Filter clipboard history instantly with the search box.
+- **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
 - **Local only** - All clipboard history stays on your machine.
 
 ## Download
 
 Pre-built installers for macOS, Windows, and Linux are available on the [Releases](../../releases) page.
+
+## Creating a release
+
+1. Update the version in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` if needed.
+2. Commit the changes.
+3. Tag the commit and push the tag:
+
+```bash
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+Pushing the tag triggers the GitHub Actions workflow, which builds installers for all platforms and publishes them as a new release.
 
 ## Running in development
 

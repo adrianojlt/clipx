@@ -13,6 +13,7 @@ function App() {
   const [draggingId, setDraggingId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
   const pinnedRef = useRef([]);
   const listRef = useRef(null);
 
@@ -192,6 +193,23 @@ function App() {
           History
         </button>
       </div>
+      {activeTab === "history" && (
+        <div className="search-bar">
+          <input
+            className="search-input"
+            type="text"
+            placeholder="Search history..."
+            value={historySearch}
+            onChange={e => setHistorySearch(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setHistorySearch("");
+              }
+            }}
+          />
+        </div>
+      )}
       <div className="list" ref={listRef}>
         {activeTab === "pinned" && (
           <>
@@ -266,7 +284,9 @@ function App() {
             {history.length === 0 && (
               <div className="empty">No history</div>
             )}
-            {history.map((item) => (
+            {history.filter(item =>
+              item.content.toLowerCase().includes(historySearch.toLowerCase())
+            ).map((item) => (
               <div
                 key={item.id}
                 className="item"
