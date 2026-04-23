@@ -20,6 +20,14 @@ struct ClipboardItem {
     created_at: String,
 }
 
+#[derive(serde::Serialize, Clone)]
+struct PinnedItem {
+    id: i64,
+    content: String,
+    description: String,
+    created_at: String,
+}
+
 // --- Settings helpers ---
 
 fn settings_dir() -> PathBuf {
@@ -56,9 +64,9 @@ fn save_settings(settings: &HashMap<String, String>) -> Result<(), String> {
 fn normalize_shortcut(s: &str) -> String {
     s.to_uppercase()
         .replace("OPTION", "ALT")
-        .replace("CMD", "META")
-        .replace("COMMAND", "META")
-        .replace("SUPER", "META")
+        .replace("META", "SUPER")
+        .replace("COMMAND", "SUPER")
+        .replace("CMD", "SUPER")
         .replace("CONTROL", "CTRL")
 }
 
@@ -114,11 +122,9 @@ fn init_db(conn: &Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     if !cols.contains(&"sort_order".to_string()) {
-        conn.execute(
-            "ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0",
-            [],
-        )
-        .map_err(|e| e.to_string())?;
+
+        conn.execute("ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0", []).map_err(|e| e.to_string())?;
+
         let mut stmt = conn
             .prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")
             .map_err(|e| e.to_string())?;
@@ -127,22 +133,29 @@ fn init_db(conn: &Connection) -> Result<(), String> {
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
+
         drop(stmt);
+
         for (index, id) in ids.iter().enumerate() {
-            conn.execute(
-                "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
-                [index as i64, *id],
-            )
-            .map_err(|e| e.to_string())?;
+            conn.execute("UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?", [index as i64, *id]).map_err(|e| e.to_string())?;
         }
+    }
+
+    // Migration: add description if missing
+    if !cols.contains(&"description".to_string()) {
+        conn.execute("ALTER TABLE clipboard_pinned ADD COLUMN description TEXT", []).map_err(|e| e.to_string())?;
+        conn.execute("UPDATE clipboard_pinned SET description = content WHERE description IS NULL", []).map_err(|e| e.to_string())?;
     }
 
     Ok(())
 }
 
 fn start_clipboard_monitor(app: AppHandle) {
+
     thread::spawn(move || {
+
         let db_file = db_path(&app);
+
         let mut clipboard = match Clipboard::new() {
             Ok(c) => c,
             Err(e) => {
@@ -150,6 +163,7 @@ fn start_clipboard_monitor(app: AppHandle) {
                 return;
             }
         };
+
         let mut last_text = String::new();
 
         loop {
@@ -212,17 +226,18 @@ fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
 }
 
 #[tauri::command]
-fn get_pinned(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
+fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, String> {
     let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, content, created_at FROM clipboard_pinned ORDER BY sort_order ASC")
+        .prepare("SELECT id, content, COALESCE(description, content), created_at FROM clipboard_pinned ORDER BY sort_order ASC")
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |row| {
-            Ok(ClipboardItem {
+            Ok(PinnedItem {
                 id: row.get(0)?,
                 content: row.get(1)?,
-                created_at: row.get(2)?,
+                description: row.get(2)?,
+                created_at: row.get(3)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -239,7 +254,7 @@ fn pin_item(content: String, app: AppHandle) -> Result<(), String> {
     let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
 
     conn.execute( "UPDATE clipboard_pinned SET sort_order = sort_order + 1", [],).map_err(|e| e.to_string())?;
-    conn.execute( "INSERT OR IGNORE INTO clipboard_pinned (content, sort_order) VALUES (?, 0)", [&content],).map_err(|e| e.to_string())?;
+    conn.execute("INSERT OR IGNORE INTO clipboard_pinned (content, description, sort_order) VALUES (?, ?, 0)", rusqlite::params![content, content]).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -256,6 +271,17 @@ fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), String> {
 
     tx.commit().map_err(|e| e.to_string())?;
 
+    Ok(())
+}
+
+#[tauri::command]
+fn update_pinned_description(id: i64, description: String, app: AppHandle) -> Result<(), String> {
+    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE clipboard_pinned SET description = ? WHERE id = ?",
+        rusqlite::params![description, id],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -334,6 +360,7 @@ pub fn run() {
             get_pinned,
             pin_item,
             unpin_item,
+            update_pinned_description,
             reorder_pinned,
         ])
         .setup(|app| {
@@ -354,7 +381,7 @@ pub fn run() {
             let hotkey_str = settings
                 .get("hotkey")
                 .cloned()
-                .unwrap_or_else(|| "Option+3".to_string());
+                .unwrap_or_else(|| "Option+Command+1".to_string());
 
             let normalized = normalize_shortcut(&hotkey_str);
             let shortcut = normalized
@@ -394,6 +421,12 @@ pub fn run() {
                             let _ = win.set_focus();
                         }
                     }
+                    "about" => {
+                        if let Some(win) = app.get_webview_window("about") {
+                            let _ = win.show();
+                            let _ = win.set_focus();
+                        }
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -412,6 +445,17 @@ pub fn run() {
 
             // Intercept close on settings window and hide instead
             if let Some(win) = app.get_webview_window("settings") {
+                let win_clone = win.clone();
+                win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win_clone.hide();
+                    }
+                });
+            }
+
+            // Intercept close on about window and hide instead
+            if let Some(win) = app.get_webview_window("about") {
                 let win_clone = win.clone();
                 win.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {

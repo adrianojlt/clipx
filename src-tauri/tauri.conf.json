@@ -29,6 +29,17 @@
         "visible": false,
         "center": true,
         "url": "settings.html"
+      },
+      {
+        "label": "about",
+        "title": "About ClipX",
+        "width": 280,
+        "height": 120,
+        "decorations": true,
+        "visible": false,
+        "center": true,
+        "resizable": false,
+        "url": "about.html"
       }
     ],
     "security": {

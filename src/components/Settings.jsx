@@ -21,7 +21,7 @@ function Settings() {
         const value = await invoke("get_setting", { key: "hotkey" });
         setHotkey(value);
       } catch {
-        setHotkey("Option+3");
+        setHotkey("Option+Command+1");
       }
     };
     load();
@@ -47,10 +47,10 @@ function Settings() {
           type="text"
           value={hotkey}
           onChange={(e) => setHotkey(e.target.value)}
-          placeholder="e.g. Option+3"
+          placeholder="e.g. Option+Command+1"
         />
         <p className="hint">
-          Examples: Option+3, Cmd+Shift+A, Ctrl+Alt+T
+          Examples: Option+Command+1, Cmd+Shift+A, Ctrl+Alt+T
         </p>
       </div>
       {error && <p className="error">{error}</p>}

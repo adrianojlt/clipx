@@ -11,6 +11,8 @@ function App() {
   const [pinned, setPinned] = useState([]);
   const [dragIndicator, setDragIndicator] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editingValue, setEditingValue] = useState("");
   const pinnedRef = useRef([]);
   const listRef = useRef(null);
 
@@ -76,6 +78,12 @@ function App() {
 
   const handleUnpin = async (id) => {
     await invoke("unpin_item", { id });
+    await loadData();
+  };
+
+  const handleSaveDescription = async (id) => {
+    await invoke("update_pinned_description", { id, description: editingValue });
+    setEditingId(null);
     await loadData();
   };
 
@@ -210,7 +218,31 @@ function App() {
                   >
                     &#x2630;
                   </span>
-                  <span className="text">{item.content}</span>
+                  <div className="pinned-text">
+                    {editingId === item.id ? (
+                      <input
+                        className="description-edit"
+                        value={editingValue}
+                        autoFocus
+                        onChange={e => setEditingValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") handleSaveDescription(item.id);
+                          if (e.key === "Escape") { e.stopPropagation(); setEditingId(null); }
+                        }}
+                        onClick={e => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span className="description">{item.description}</span>
+                    )}
+                    <span className="content-text">{item.content}</span>
+                  </div>
+                  <button
+                    className="action"
+                    onClick={e => { e.stopPropagation(); setEditingId(item.id); setEditingValue(item.description); }}
+                    title="Edit description"
+                  >
+                    &#x270E;
+                  </button>
                   <button
                     className="action"
                     onClick={(e) => {

@@ -141,3 +141,39 @@
 .action:hover {
   color: #fff;
 }
+
+.pinned-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  margin-right: 0.75rem;
+}
+
+.description {
+  font-size: 14px;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.content-text {
+  font-size: 10px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.description-edit {
+  font-size: 14px;
+  background: #3a3a3a;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #e0e0e0;
+  padding: 1px 4px;
+  width: 100%;
+  outline: none;
+}
