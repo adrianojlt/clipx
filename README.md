@@ -22,6 +22,12 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 
 Pre-built installers for macOS, Windows, and Linux are available on the [Releases](../../releases) page.
 
+> **macOS note:** If you see "clipboard-manager is damaged and can't be opened", run this in Terminal after installing:
+> ```bash
+> xattr -cr /Applications/clipboard-manager.app
+> ```
+> This removes the quarantine flag macOS adds to downloaded apps that aren't signed with an Apple Developer certificate.
+
 ## Creating a release
 
 1. Update the version in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` if needed.
