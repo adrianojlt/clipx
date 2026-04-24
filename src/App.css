@@ -223,6 +223,32 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-all;
+  position: relative;
+}
+
+.content-text.hidden {
+  color: transparent;
+}
+
+.content-text.hidden::after {
+  content: "••••••••••\A••••••••••";
+  white-space: pre-wrap;
+  color: #666;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.action.eye-toggle {
+  font-size: 0.85rem;
+}
+
+.action.eye-toggle.content-hidden {
+  color: #666;
+}
+
+.action.eye-toggle.content-hidden:hover {
+  color: #aaa;
 }
 
 .description-edit {
