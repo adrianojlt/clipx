@@ -58,6 +58,22 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let timeout;
+    const onResize = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(async () => {
+        await invoke("set_setting", { key: "window_width", value: String(window.innerWidth) });
+        await invoke("set_setting", { key: "window_height", value: String(window.innerHeight) });
+      }, 300);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  useEffect(() => {
     const titleBar = document.querySelector(".title-bar");
     if (!titleBar) return;
     const onMouseDown = async () => {

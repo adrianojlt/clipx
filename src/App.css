@@ -93,6 +93,11 @@
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem;
+  scrollbar-width: none;
+}
+
+.list::-webkit-scrollbar {
+  display: none;
 }
 
 .empty {

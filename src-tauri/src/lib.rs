@@ -80,6 +80,10 @@ fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: Shortcu
                     y: pos.y as i32,
                 }));
             }
+            let settings = load_settings();
+            let width = settings.get("window_width").and_then(|v| v.parse::<f64>().ok()).unwrap_or(400.0).max(300.0).min(800.0);
+            let height = settings.get("window_height").and_then(|v| v.parse::<f64>().ok()).unwrap_or(600.0).max(400.0).min(900.0);
+            let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
             let _ = win.show();
             let _ = win.set_focus();
         }
@@ -356,6 +360,18 @@ fn update_shortcut(
     save_settings(&settings)
 }
 
+#[tauri::command]
+fn apply_window_size(app: AppHandle) -> Result<(), String> {
+    let settings = load_settings();
+    let width = settings.get("window_width").and_then(|v| v.parse::<f64>().ok()).unwrap_or(400.0).max(300.0).min(800.0);
+    let height = settings.get("window_height").and_then(|v| v.parse::<f64>().ok()).unwrap_or(600.0).max(400.0).min(900.0);
+    if let Some(win) = app.get_webview_window("main") {
+        win.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -369,6 +385,7 @@ pub fn run() {
             get_setting,
             set_setting,
             update_shortcut,
+            apply_window_size,
             get_history,
             get_pinned,
             pin_item,
