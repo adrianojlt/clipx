@@ -5,6 +5,7 @@ import "./Settings.css";
 
 function Settings() {
   const [hotkey, setHotkey] = useState("");
+  const [recording, setRecording] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(20);
   const [windowWidth, setWindowWidth] = useState(400);
   const [windowHeight, setWindowHeight] = useState(600);
@@ -19,12 +20,36 @@ function Settings() {
   }, []);
 
   useEffect(() => {
+    if (!recording) return;
+    const onKeyDown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        setRecording(false);
+        return;
+      }
+      if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) return;
+      const parts = [];
+      if (e.metaKey) parts.push("Command");
+      if (e.ctrlKey) parts.push("Ctrl");
+      if (e.altKey) parts.push("Option");
+      if (e.shiftKey) parts.push("Shift");
+      const key = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      parts.push(key);
+      setHotkey(parts.join("+"));
+      setRecording(false);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [recording]);
+
+  useEffect(() => {
     const load = async () => {
       try {
         const value = await invoke("get_setting", { key: "hotkey" });
         setHotkey(value);
       } catch {
-        setHotkey("Option+Command+1");
+        setHotkey("Option+Space");
       }
       try {
         const value = await invoke("get_setting", { key: "history_limit" });
@@ -67,16 +92,24 @@ function Settings() {
       <h2>Settings</h2>
       <div className="field">
         <label htmlFor="hotkey">Global Hotkey</label>
-        <input
-          id="hotkey"
-          type="text"
-          value={hotkey}
-          onChange={(e) => setHotkey(e.target.value)}
-          placeholder="e.g. Option+Command+1"
-        />
-        <p className="hint">
-          Examples: Option+Command+1, Cmd+Shift+A, Ctrl+Alt+T
-        </p>
+        <div className="hotkey-row">
+          <input
+            id="hotkey"
+            type="text"
+            readOnly
+            value={recording ? "" : hotkey}
+            placeholder={recording ? "Press shortcut..." : "Click Record"}
+            className={recording ? "recording" : ""}
+          />
+          <button
+            type="button"
+            className={`record-btn${recording ? " active" : ""}`}
+            onClick={() => setRecording(r => !r)}
+          >
+            {recording ? "Cancel" : "Record"}
+          </button>
+        </div>
+        <p className="hint">Click Record then press your desired key combination</p>
       </div>
       <div className="field">
         <label htmlFor="history-limit">History Limit</label>

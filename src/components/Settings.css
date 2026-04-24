@@ -63,3 +63,34 @@
 .actions button:hover {
   opacity: 0.9;
 }
+
+.hotkey-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.hotkey-row input {
+  flex: 1;
+}
+
+.record-btn {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #f5f5f5;
+  color: #333;
+  font-size: 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.record-btn.active {
+  background: #ffebee;
+  border-color: #d32f2f;
+  color: #d32f2f;
+}
+
+.field input.recording {
+  border-color: #d32f2f;
+  background: #ffebee;
+}

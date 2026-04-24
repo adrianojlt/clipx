@@ -414,7 +414,7 @@ pub fn run() {
             let hotkey_str = settings
                 .get("hotkey")
                 .cloned()
-                .unwrap_or_else(|| "Option+Command+1".to_string());
+                .unwrap_or_else(|| "Option+Space".to_string());
 
             let normalized = normalize_shortcut(&hotkey_str);
             let shortcut = normalized

@@ -12,10 +12,11 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Global hotkey** - Summon the history popup instantly with a keyboard shortcut (near your mouse cursor).
 - **Quick dismiss** - Press Escape to hide the popup and get back to work.
 - **Tray menu** - Open the app, change settings, or quit from the tray icon.
-- **Configurable hotkey** - Choose your own keyboard shortcut to summon the popup.
+- **Configurable hotkey** - Record your own keyboard shortcut to summon the popup via Settings.
 - **Pin items** - Pin frequently used entries so they stay at the top, reorder them, and give each one a custom label.
 - **Search history** - Filter clipboard history instantly with the search box.
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
+- **Resizable window** - Adjust the popup width and height in Settings.
 - **Local only** - All clipboard history stays on your machine.
 
 ## Download
