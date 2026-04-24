@@ -310,6 +310,13 @@ fn unpin_item(id: i64, app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn delete_history_item(id: i64, app: AppHandle) -> Result<(), String> {
+    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM clipboard_history WHERE id = ?", [id]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 fn get_setting(key: String) -> Result<String, String> {
     let settings = load_settings();
     settings
@@ -390,6 +397,7 @@ pub fn run() {
             get_pinned,
             pin_item,
             unpin_item,
+            delete_history_item,
             update_pinned_description,
             reorder_pinned,
         ])

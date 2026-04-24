@@ -14,6 +14,8 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
   const [historySearch, setHistorySearch] = useState("");
+  const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState(null);
+  const [confirmUnpinId, setConfirmUnpinId] = useState(null);
   const pinnedRef = useRef([]);
   const listRef = useRef(null);
 
@@ -90,6 +92,12 @@ function App() {
 
   const handlePin = async (content) => {
     await invoke("pin_item", { content });
+    await loadData();
+  };
+
+  const handleDeleteHistory = async (id) => {
+    await invoke("delete_history_item", { id });
+    setConfirmDeleteHistoryId(null);
     await loadData();
   };
 
@@ -270,23 +278,42 @@ function App() {
                     )}
                     <span className="content-text">{item.content}</span>
                   </div>
-                  <button
-                    className="action"
-                    onClick={e => { e.stopPropagation(); setEditingId(item.id); setEditingValue(item.description); }}
-                    title="Edit description"
-                  >
-                    &#x270E;
-                  </button>
-                  <button
-                    className="action"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleUnpin(item.id);
-                    }}
-                    title="Unpin"
-                  >
-                    &#x2715;
-                  </button>
+                  {confirmUnpinId !== item.id && (
+                    <button
+                      className="action"
+                      onClick={e => { e.stopPropagation(); setEditingId(item.id); setEditingValue(item.description); }}
+                      title="Edit description"
+                    >
+                      &#x270E;
+                    </button>
+                  )}
+                  {confirmUnpinId === item.id ? (
+                    <span className="delete-confirm" onClick={e => e.stopPropagation()}>
+                      Remove?
+                      <button
+                        className="action confirm-yes"
+                        onClick={e => { e.stopPropagation(); handleUnpin(item.id); setConfirmUnpinId(null); }}
+                        title="Confirm remove"
+                      >
+                        &#x2713;
+                      </button>
+                      <button
+                        className="action confirm-no"
+                        onClick={e => { e.stopPropagation(); setConfirmUnpinId(null); }}
+                        title="Cancel"
+                      >
+                        &#x2715;
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      className="action"
+                      onClick={(e) => { e.stopPropagation(); setConfirmUnpinId(item.id); }}
+                      title="Unpin"
+                    >
+                      &#x2715;
+                    </button>
+                  )}
                 </div>
                 {dragIndicator?.targetId === item.id && dragIndicator.position === "after" && (
                   <div className="drop-indicator" />
@@ -300,27 +327,56 @@ function App() {
             {history.length === 0 && (
               <div className="empty">No history</div>
             )}
-            {history.filter(item =>
-              item.content.toLowerCase().includes(historySearch.toLowerCase())
-            ).map((item) => (
-              <div
-                key={item.id}
-                className="item"
-                onClick={() => handleCopy(item.content)}
-              >
-                <span className="text">{item.content}</span>
-                <button
-                  className="action"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePin(item.content);
-                  }}
-                  title="Pin"
+            {(() => {
+              const pinnedSet = new Set(pinned.map(p => p.content));
+              return history.filter(item =>
+                item.content.toLowerCase().includes(historySearch.toLowerCase())
+              ).map((item) => (
+                <div
+                  key={item.id}
+                  className="item"
+                  onClick={() => handleCopy(item.content)}
                 >
-                  &#x2605;
-                </button>
-              </div>
-            ))}
+                  <span className="text">{item.content}</span>
+                  {confirmDeleteHistoryId === item.id ? (
+                    <span className="delete-confirm" onClick={e => e.stopPropagation()}>
+                      Delete?
+                      <button
+                        className="action confirm-yes"
+                        onClick={e => { e.stopPropagation(); handleDeleteHistory(item.id); }}
+                        title="Confirm delete"
+                      >
+                        &#x2713;
+                      </button>
+                      <button
+                        className="action confirm-no"
+                        onClick={e => { e.stopPropagation(); setConfirmDeleteHistoryId(null); }}
+                        title="Cancel"
+                      >
+                        &#x2715;
+                      </button>
+                    </span>
+                  ) : (
+                    <>
+                      <button
+                        className={`action${pinnedSet.has(item.content) ? " starred" : ""}`}
+                        onClick={(e) => { e.stopPropagation(); handlePin(item.content); }}
+                        title="Pin"
+                      >
+                        &#x2605;
+                      </button>
+                      <button
+                        className="action"
+                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteHistoryId(item.id); }}
+                        title="Delete"
+                      >
+                        &#x2715;
+                      </button>
+                    </>
+                  )}
+                </div>
+              ));
+            })()}
           </>
         )}
       </div>

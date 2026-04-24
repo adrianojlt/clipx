@@ -173,6 +173,31 @@
   color: #fff;
 }
 
+.action.starred {
+  color: #f5c518;
+}
+
+.delete-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  font-size: 0.75rem;
+  color: #ccc;
+  white-space: nowrap;
+}
+
+.action.confirm-yes {
+  color: #e05555;
+}
+
+.action.confirm-yes:hover {
+  color: #ff6b6b;
+}
+
+.action.confirm-no:hover {
+  color: #fff;
+}
+
 .pinned-text {
   display: flex;
   flex-direction: column;
