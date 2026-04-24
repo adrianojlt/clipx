@@ -16,6 +16,7 @@ function App() {
   const [historySearch, setHistorySearch] = useState("");
   const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState(null);
   const [confirmUnpinId, setConfirmUnpinId] = useState(null);
+  const [currentClipboard, setCurrentClipboard] = useState("");
   const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
   const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
   const pinnedRef = useRef([]);
@@ -31,6 +32,13 @@ function App() {
     } catch (e) {
       console.error("Failed to load data", e);
     }
+  };
+
+  const loadClipboard = async () => {
+    try {
+      const text = await invoke("get_clipboard");
+      setCurrentClipboard(text);
+    } catch {}
   };
 
   const loadTabShortcuts = async () => {
@@ -52,16 +60,27 @@ function App() {
     loadData();
     loadTabShortcuts();
 
-    let unlisten;
-    const setupListener = async () => {
-      unlisten = await listen("clipboard-changed", () => {
+    let unlistenClipboard;
+    let unlistenFocus;
+
+    const setupListeners = async () => {
+      await loadClipboard();
+
+      unlistenClipboard = await listen("clipboard-changed", async () => {
         loadData();
+        await loadClipboard();
+      });
+
+      unlistenFocus = await listen("tauri://window-focus", async () => {
+        await loadClipboard();
       });
     };
-    setupListener();
+
+    setupListeners();
 
     return () => {
-      if (unlisten) unlisten();
+      if (unlistenClipboard) unlistenClipboard();
+      if (unlistenFocus) unlistenFocus();
     };
   }, []);
 
@@ -303,7 +322,7 @@ function App() {
                   <div className="drop-indicator" />
                 )}
                 <div
-                  className="item"
+                  className={`item${item.content === currentClipboard ? " current-clipboard" : ""}`}
                   onClick={() => handleCopy(item.content)}
                 >
                   <span
@@ -398,7 +417,7 @@ function App() {
               ).map((item) => (
                 <div
                   key={item.id}
-                  className="item"
+                  className={`item${item.content === currentClipboard ? " current-clipboard" : ""}`}
                   onClick={() => handleCopy(item.content)}
                 >
                   <span className="text">{item.content}</span>

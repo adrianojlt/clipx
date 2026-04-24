@@ -479,6 +479,12 @@ fn apply_window_size(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_clipboard() -> Result<String, String> {
+    let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
+    clipboard.get_text().map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -501,6 +507,7 @@ pub fn run() {
             update_pinned_description,
             reorder_pinned,
             toggle_pinned_hidden,
+            get_clipboard,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

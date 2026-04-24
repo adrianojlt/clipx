@@ -261,3 +261,13 @@
   width: 100%;
   outline: none;
 }
+
+.item.current-clipboard {
+  background: #2a2a2a;
+  border-left: 3px solid #4a9eff;
+  padding-left: calc(0.75rem - 3px);
+}
+
+.item.current-clipboard:hover {
+  background: #333;
+}
