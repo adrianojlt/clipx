@@ -16,6 +16,8 @@ function App() {
   const [historySearch, setHistorySearch] = useState("");
   const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState(null);
   const [confirmUnpinId, setConfirmUnpinId] = useState(null);
+  const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
+  const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
   const pinnedRef = useRef([]);
   const listRef = useRef(null);
 
@@ -31,12 +33,24 @@ function App() {
     }
   };
 
+  const loadTabShortcuts = async () => {
+    try {
+      const v = await invoke("get_setting", { key: "tab_shortcut_pinned" });
+      setTabShortcutPinned(v);
+    } catch {}
+    try {
+      const v = await invoke("get_setting", { key: "tab_shortcut_history" });
+      setTabShortcutHistory(v);
+    } catch {}
+  };
+
   useEffect(() => {
     pinnedRef.current = pinned;
   }, [pinned]);
 
   useEffect(() => {
     loadData();
+    loadTabShortcuts();
 
     let unlisten;
     const setupListener = async () => {
@@ -58,6 +72,40 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  const parseShortcut = (shortcut) => {
+    const parts = shortcut.split("+").map(p => p.trim());
+    const key = parts[parts.length - 1];
+    const modifiers = parts.slice(0, -1);
+    return {
+      key: key === "Space" ? " " : key.length === 1 ? key.toUpperCase() : key,
+      meta: modifiers.includes("Command") || modifiers.includes("Super") || modifiers.includes("Meta"),
+      ctrl: modifiers.includes("Ctrl") || modifiers.includes("Control"),
+      alt: modifiers.includes("Option") || modifiers.includes("Alt"),
+      shift: modifiers.includes("Shift"),
+    };
+  };
+
+  const matchesShortcut = (e, shortcut) => {
+    const s = parseShortcut(shortcut);
+    return e.key === s.key && e.metaKey === s.meta && e.ctrlKey === s.ctrl && e.altKey === s.alt && e.shiftKey === s.shift;
+  };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (matchesShortcut(e, tabShortcutPinned)) {
+        e.preventDefault();
+        setActiveTab("pinned");
+      } else if (matchesShortcut(e, tabShortcutHistory)) {
+        e.preventDefault();
+        setActiveTab("history");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tabShortcutPinned, tabShortcutHistory]);
 
   useEffect(() => {
     let timeout;

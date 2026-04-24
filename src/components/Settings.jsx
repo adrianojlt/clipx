@@ -5,7 +5,9 @@ import "./Settings.css";
 
 function Settings() {
   const [hotkey, setHotkey] = useState("");
-  const [recording, setRecording] = useState(false);
+  const [recording, setRecording] = useState(null);
+  const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
+  const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
   const [historyLimit, setHistoryLimit] = useState(20);
   const [windowWidth, setWindowWidth] = useState(400);
   const [windowHeight, setWindowHeight] = useState(600);
@@ -25,7 +27,7 @@ function Settings() {
       e.preventDefault();
       e.stopPropagation();
       if (e.key === "Escape") {
-        setRecording(false);
+        setRecording(null);
         return;
       }
       if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) return;
@@ -36,8 +38,11 @@ function Settings() {
       if (e.shiftKey) parts.push("Shift");
       const key = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
       parts.push(key);
-      setHotkey(parts.join("+"));
-      setRecording(false);
+      const shortcut = parts.join("+");
+      if (recording === "hotkey") setHotkey(shortcut);
+      else if (recording === "tab_pinned") setTabShortcutPinned(shortcut);
+      else if (recording === "tab_history") setTabShortcutHistory(shortcut);
+      setRecording(null);
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
@@ -51,6 +56,14 @@ function Settings() {
       } catch {
         setHotkey("Option+Space");
       }
+      try {
+        const value = await invoke("get_setting", { key: "tab_shortcut_pinned" });
+        setTabShortcutPinned(value);
+      } catch {}
+      try {
+        const value = await invoke("get_setting", { key: "tab_shortcut_history" });
+        setTabShortcutHistory(value);
+      } catch {}
       try {
         const value = await invoke("get_setting", { key: "history_limit" });
         setHistoryLimit(Number(value));
@@ -77,6 +90,8 @@ function Settings() {
     setError("");
     try {
       await invoke("update_shortcut", { shortcut: hotkey });
+      await invoke("set_setting", { key: "tab_shortcut_pinned", value: tabShortcutPinned });
+      await invoke("set_setting", { key: "tab_shortcut_history", value: tabShortcutHistory });
       await invoke("set_setting", { key: "history_limit", value: String(historyLimit) });
       await invoke("set_setting", { key: "window_width", value: String(windowWidth) });
       await invoke("set_setting", { key: "window_height", value: String(windowHeight) });
@@ -97,19 +112,61 @@ function Settings() {
             id="hotkey"
             type="text"
             readOnly
-            value={recording ? "" : hotkey}
-            placeholder={recording ? "Press shortcut..." : "Click Record"}
-            className={recording ? "recording" : ""}
+            value={recording === "hotkey" ? "" : hotkey}
+            placeholder={recording === "hotkey" ? "Press shortcut..." : "Click Record"}
+            className={recording === "hotkey" ? "recording" : ""}
           />
           <button
             type="button"
-            className={`record-btn${recording ? " active" : ""}`}
-            onClick={() => setRecording(r => !r)}
+            className={`record-btn${recording === "hotkey" ? " active" : ""}`}
+            onClick={() => setRecording(r => r === "hotkey" ? null : "hotkey")}
           >
-            {recording ? "Cancel" : "Record"}
+            {recording === "hotkey" ? "Cancel" : "Record"}
           </button>
         </div>
         <p className="hint">Click Record then press your desired key combination</p>
+      </div>
+      <div className="field">
+        <label htmlFor="tab-pinned">Switch to Pinned Tab</label>
+        <div className="hotkey-row">
+          <input
+            id="tab-pinned"
+            type="text"
+            readOnly
+            value={recording === "tab_pinned" ? "" : tabShortcutPinned}
+            placeholder={recording === "tab_pinned" ? "Press shortcut..." : "Click Record"}
+            className={recording === "tab_pinned" ? "recording" : ""}
+          />
+          <button
+            type="button"
+            className={`record-btn${recording === "tab_pinned" ? " active" : ""}`}
+            onClick={() => setRecording(r => r === "tab_pinned" ? null : "tab_pinned")}
+          >
+            {recording === "tab_pinned" ? "Cancel" : "Record"}
+          </button>
+        </div>
+        <p className="hint">In-app shortcut to switch to the Pinned tab</p>
+      </div>
+      <div className="field">
+        <label htmlFor="tab-history">Switch to History Tab</label>
+        <div className="hotkey-row">
+          <input
+            id="tab-history"
+            type="text"
+            readOnly
+            value={recording === "tab_history" ? "" : tabShortcutHistory}
+            placeholder={recording === "tab_history" ? "Press shortcut..." : "Click Record"}
+            className={recording === "tab_history" ? "recording" : ""}
+          />
+          <button
+            type="button"
+            className={`record-btn${recording === "tab_history" ? " active" : ""}`}
+            onClick={() => setRecording(r => r === "tab_history" ? null : "tab_history")}
+          >
+            {recording === "tab_history" ? "Cancel" : "Record"}
+          </button>
+        </div>
+        <p className="hint">In-app shortcut to switch to the History tab</p>
       </div>
       <div className="field">
         <label htmlFor="history-limit">History Limit</label>
