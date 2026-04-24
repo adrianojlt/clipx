@@ -112,6 +112,11 @@ function App() {
     await loadData();
   };
 
+  const handleToggleHidden = async (id) => {
+    await invoke("toggle_pinned_hidden", { id });
+    await loadData();
+  };
+
   // --- Manual drag-and-drop with mouse events ---
 
   const handleMouseDown = (e, id) => {
@@ -276,15 +281,26 @@ function App() {
                     ) : (
                       <span className="description">{item.description}</span>
                     )}
-                    <span className="content-text">{item.content}</span>
+                    <span className={`content-text${item.hidden ? " hidden" : ""}`}>
+                      {item.content}
+                    </span>
                   </div>
+                  {confirmUnpinId !== item.id && (
+                    <button
+                      className={`action eye-toggle${item.hidden ? " content-hidden" : ""}`}
+                      onClick={e => { e.stopPropagation(); handleToggleHidden(item.id); }}
+                      title={item.hidden ? "Show content" : "Hide content"}
+                    >
+                      {item.hidden ? "\u25CB" : "\u25C9"}
+                    </button>
+                  )}
                   {confirmUnpinId !== item.id && (
                     <button
                       className="action"
                       onClick={e => { e.stopPropagation(); setEditingId(item.id); setEditingValue(item.description); }}
                       title="Edit description"
                     >
-                      &#x270E;
+                      {"\u270E"}
                     </button>
                   )}
                   {confirmUnpinId === item.id ? (
