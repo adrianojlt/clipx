@@ -13,9 +13,10 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Quick dismiss** - Press Escape to hide the popup and get back to work.
 - **Tray menu** - Open the app, change settings, or quit from the tray icon.
 - **Configurable hotkey** - Record your own keyboard shortcut to summon the popup via Settings.
-- **Pin items** - Pin frequently used entries so they stay at the top, reorder them, and give each one a custom label.
+- **Pin items** - Pin frequently used entries so they stay at the top, reorder them, and give each one a custom label. Hide sensitive content with the eye toggle.
 - **Search history** - Filter clipboard history instantly with the search box.
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
+- **Tab shortcuts** - Switch between Pinned and History tabs with configurable keyboard shortcuts (default Command+1 / Command+2).
 - **Resizable window** - Adjust the popup width and height in Settings.
 - **Local only** - All clipboard history stays on your machine.
 
@@ -31,7 +32,7 @@ Pre-built installers for macOS, Windows, and Linux are available on the [Release
 
 ## Creating a release
 
-1. Update the version in `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml` if needed.
+1. Update the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`.
 2. Commit the changes.
 3. Tag the commit and push the tag:
 
