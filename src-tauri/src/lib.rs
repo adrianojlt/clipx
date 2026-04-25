@@ -15,6 +15,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, S
 
 struct AppState {
     current_shortcut: Mutex<String>,
+    history_limit: Mutex<u32>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -248,12 +249,12 @@ fn start_clipboard_monitor(app: AppHandle) {
                 [&text],
             );
 
-            let limit = load_settings()
-                .get("history_limit")
-                .and_then(|v| v.parse::<i64>().ok())
-                .unwrap_or(20)
-                .min(50)
-                .max(1);
+            let limit = app
+                .state::<AppState>()
+                .history_limit
+                .lock()
+                .map(|l| *l)
+                .unwrap_or(20) as i64;
 
             let _ = conn.execute(
                 &format!(
@@ -274,12 +275,12 @@ fn start_clipboard_monitor(app: AppHandle) {
 
 #[tauri::command]
 fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
-    let limit = load_settings()
-        .get("history_limit")
-        .and_then(|v| v.parse::<i64>().ok())
-        .unwrap_or(20)
-        .min(50)
-        .max(1);
+    let limit = app
+        .state::<AppState>()
+        .history_limit
+        .lock()
+        .map(|l| *l)
+        .unwrap_or(20) as i64;
 
     let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
 
@@ -432,10 +433,20 @@ fn get_setting(key: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn set_setting(key: String, value: String) -> Result<(), String> {
+fn set_setting(key: String, value: String, state: State<AppState>) -> Result<(), String> {
     let mut settings = load_settings();
-    settings.insert(key, value);
-    save_settings(&settings)
+    settings.insert(key.clone(), value.clone());
+    save_settings(&settings)?;
+
+    if key == "history_limit" {
+        if let Ok(limit) = value.parse::<u32>() {
+            if let Ok(mut cached) = state.history_limit.lock() {
+                *cached = limit.clamp(1, 50);
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -502,12 +513,22 @@ fn get_clipboard() -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let initial_limit = {
+        let settings = load_settings();
+        settings
+            .get("history_limit")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(20)
+            .clamp(1, 50)
+    };
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(AppState {
             current_shortcut: Mutex::new(String::new()),
+            history_limit: Mutex::new(initial_limit),
         })
         .invoke_handler(tauri::generate_handler![
             get_setting,
