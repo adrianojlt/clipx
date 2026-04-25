@@ -30,6 +30,16 @@ pub fn init_db(conn: &rusqlite::Connection) -> Result<(), AppError> {
         [],
     )?;
 
+    conn.execute_batch(
+        "
+        CREATE INDEX IF NOT EXISTS idx_history_created
+        ON clipboard_history(created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_pinned_sort
+        ON clipboard_pinned(sort_order ASC);
+    ",
+    )?;
+
     // Migration: add sort_order if missing
     let cols: Vec<String> = conn
         .prepare("PRAGMA table_info(clipboard_pinned)")?
