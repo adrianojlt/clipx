@@ -1,12 +1,13 @@
-use crate::db::db_path;
 use crate::error::AppError;
-use crate::PinnedItem;
-use rusqlite::Connection;
-use tauri::AppHandle;
+use crate::{AppState, PinnedItem};
+use tauri::State;
 
 #[tauri::command]
-pub fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
+pub fn get_pinned(state: State<AppState>) -> Result<Vec<PinnedItem>, AppError> {
+    let conn = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Settings(e.to_string()))?;
 
     let mut stmt = conn
         .prepare("SELECT id, content, COALESCE(description, content), COALESCE(hidden, 0), created_at FROM clipboard_pinned ORDER BY sort_order ASC")?;
@@ -31,8 +32,11 @@ pub fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, AppError> {
 }
 
 #[tauri::command]
-pub fn pin_item(content: String, app: AppHandle) -> Result<(), AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
+pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError> {
+    let conn = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Settings(e.to_string()))?;
 
     conn.execute(
         "UPDATE clipboard_pinned SET sort_order = sort_order + 1",
@@ -45,8 +49,11 @@ pub fn pin_item(content: String, app: AppHandle) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), AppError> {
-    let mut conn = Connection::open(db_path(&app)?)?;
+pub fn reorder_pinned(items: Vec<i64>, state: State<AppState>) -> Result<(), AppError> {
+    let mut conn = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Settings(e.to_string()))?;
     let tx = conn.transaction()?;
 
     for (index, id) in items.iter().enumerate() {
@@ -65,9 +72,12 @@ pub fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), AppError> {
 pub fn update_pinned_description(
     id: i64,
     description: String,
-    app: AppHandle,
+    state: State<AppState>,
 ) -> Result<(), AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
+    let conn = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Settings(e.to_string()))?;
 
     conn.execute(
         "UPDATE clipboard_pinned SET description = ? WHERE id = ?",
@@ -78,8 +88,11 @@ pub fn update_pinned_description(
 }
 
 #[tauri::command]
-pub fn unpin_item(id: i64, app: AppHandle) -> Result<(), AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
+pub fn unpin_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
+    let conn = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Settings(e.to_string()))?;
 
     conn.execute("DELETE FROM clipboard_pinned WHERE id = ?", [id])?;
 
@@ -87,8 +100,11 @@ pub fn unpin_item(id: i64, app: AppHandle) -> Result<(), AppError> {
 }
 
 #[tauri::command]
-pub fn toggle_pinned_hidden(id: i64, app: AppHandle) -> Result<bool, AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
+pub fn toggle_pinned_hidden(id: i64, state: State<AppState>) -> Result<bool, AppError> {
+    let conn = state
+        .db
+        .lock()
+        .map_err(|e| AppError::Settings(e.to_string()))?;
 
     let current: bool = conn.query_row(
         "SELECT COALESCE(hidden, 0) FROM clipboard_pinned WHERE id = ?",

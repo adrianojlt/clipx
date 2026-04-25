@@ -1,21 +1,11 @@
-use crate::db::db_path;
 use crate::AppState;
 use arboard::Clipboard;
-use rusqlite::Connection;
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
 pub fn start_clipboard_monitor(app: AppHandle) {
     thread::spawn(move || {
-        let db_file = match db_path(&app) {
-            Ok(path) => path,
-            Err(e) => {
-                eprintln!("Failed to get db path: {}", e);
-                return;
-            }
-        };
-
         let mut clipboard = match Clipboard::new() {
             Ok(c) => c,
             Err(e) => {
@@ -40,10 +30,8 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
             last_text = text.clone();
 
-            let conn = match Connection::open(&db_file) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
+            let state = app.state::<AppState>();
+            let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
             // Remove duplicate if it exists so the text appears only once
             let _ = conn.execute("DELETE FROM clipboard_history WHERE content = ?", [&text]);
@@ -53,12 +41,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
                 [&text],
             );
 
-            let limit = app
-                .state::<AppState>()
-                .history_limit
-                .lock()
-                .map(|l| *l)
-                .unwrap_or(20) as i64;
+            let limit = state.history_limit.lock().map(|l| *l).unwrap_or(20) as i64;
 
             let _ = conn.execute(
                 &format!(

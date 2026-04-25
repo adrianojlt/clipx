@@ -8,6 +8,7 @@ pub use crate::error::AppError;
 
 use std::sync::Mutex;
 
+use rusqlite::Connection;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -19,6 +20,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 pub struct AppState {
     pub(crate) current_shortcut: Mutex<String>,
     pub(crate) history_limit: Mutex<u32>,
+    pub(crate) db: Mutex<Connection>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -86,10 +88,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .manage(AppState {
-            current_shortcut: Mutex::new(String::new()),
-            history_limit: Mutex::new(initial_limit),
-        })
         .invoke_handler(tauri::generate_handler![
             commands::settings::get_setting,
             commands::settings::set_setting,
@@ -105,7 +103,7 @@ pub fn run() {
             commands::pinned::toggle_pinned_hidden,
             commands::clipboard::get_clipboard,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             #[cfg(target_os = "macos")]
             let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -118,7 +116,13 @@ pub fn run() {
             // Init DB
             let conn = rusqlite::Connection::open(crate::db::db_path(&app.handle())?)?;
             crate::db::init_db(&conn)?;
-            drop(conn);
+
+            // Manage state
+            app.manage(AppState {
+                current_shortcut: Mutex::new(String::new()),
+                history_limit: Mutex::new(initial_limit),
+                db: Mutex::new(conn),
+            });
 
             // Start clipboard monitor
             crate::monitor::start_clipboard_monitor(app.handle().clone());
