@@ -1,25 +1,22 @@
-name: Release
+name: CI
 
 on:
   push:
-    tags:
-      - "v*"
-
-permissions:
-  contents: write
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
 
 jobs:
-  build:
+  quality:
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform: macos-latest
-            args: ""
           - platform: ubuntu-22.04
-            args: ""
           - platform: windows-latest
-            args: ""
 
     runs-on: ${{ matrix.platform }}
 
@@ -62,14 +59,5 @@ jobs:
       - name: Test Rust backend
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
-      - name: Build and release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ClipX ${{ github.ref_name }}
-          releaseBody: ""
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+      - name: Build frontend
+        run: pnpm build
