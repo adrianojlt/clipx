@@ -62,3 +62,13 @@ pub(crate) fn clamp_to_monitor(
     }
     (x, y)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clamp_to_monitor_without_monitor_is_passthrough() {
+        assert_eq!(clamp_to_monitor(123, 456, 400.0, 600.0, None), (123, 456));
+    }
+}

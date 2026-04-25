@@ -22,3 +22,6 @@ tauri-plugin-global-shortcut = "2.3.1"
 arboard = "3.4"
 rusqlite = { version = "0.32", features = ["bundled"] }
 thiserror = "1"
+
+[dev-dependencies]
+tempfile = "3"

@@ -15,7 +15,9 @@ pub fn settings_dir() -> Result<PathBuf, AppError> {
 pub fn settings_dir() -> Result<PathBuf, AppError> {
     let home = std::env::var("HOME")
         .map_err(|_| AppError::Settings("HOME env var is not set".to_string()))?;
-    Ok(PathBuf::from(home).join(".config").join("clipboard-manager"))
+    Ok(PathBuf::from(home)
+        .join(".config")
+        .join("clipboard-manager"))
 }
 
 pub fn settings_path() -> Result<PathBuf, AppError> {
@@ -82,4 +84,83 @@ pub fn load_window_size(settings: &HashMap<String, String>) -> (f64, f64) {
         .unwrap_or(600.0)
         .clamp(400.0, 900.0);
     (width, height)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn normalize_shortcut_handles_option() {
+        assert_eq!(normalize_shortcut("option+space"), "ALT+SPACE");
+    }
+
+    #[test]
+    fn normalize_shortcut_maps_command_variants() {
+        assert_eq!(normalize_shortcut("Cmd+K"), "SUPER+K");
+        assert_eq!(normalize_shortcut("Command+K"), "SUPER+K");
+        assert_eq!(normalize_shortcut("Meta+K"), "SUPER+K");
+    }
+
+    #[test]
+    fn normalize_shortcut_passes_through_unknown_tokens() {
+        assert_eq!(normalize_shortcut("Shift+F1"), "SHIFT+F1");
+    }
+
+    #[test]
+    fn normalize_shortcut_empty_returns_empty() {
+        assert_eq!(normalize_shortcut(""), "");
+    }
+
+    #[test]
+    fn load_window_size_defaults() {
+        let s = HashMap::new();
+        assert_eq!(load_window_size(&s), (400.0, 600.0));
+    }
+
+    #[test]
+    fn load_window_size_clamps_upper() {
+        let mut s = HashMap::new();
+        s.insert("window_width".to_string(), "9999".to_string());
+        s.insert("window_height".to_string(), "9999".to_string());
+        assert_eq!(load_window_size(&s), (800.0, 900.0));
+    }
+
+    #[test]
+    fn load_window_size_clamps_lower() {
+        let mut s = HashMap::new();
+        s.insert("window_width".to_string(), "10".to_string());
+        s.insert("window_height".to_string(), "10".to_string());
+        assert_eq!(load_window_size(&s), (300.0, 400.0));
+    }
+
+    #[test]
+    fn load_window_size_garbage_falls_back_to_defaults() {
+        let mut s = HashMap::new();
+        s.insert("window_width".to_string(), "not-a-number".to_string());
+        assert_eq!(load_window_size(&s), (400.0, 600.0));
+    }
+
+    #[test]
+    fn settings_round_trip() {
+        use std::fs;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+
+        let mut original = HashMap::new();
+        original.insert("hotkey".to_string(), "ALT+SPACE".to_string());
+        original.insert("history_limit".to_string(), "15".to_string());
+
+        let json = serde_json::to_string(&original).unwrap();
+        fs::write(&path, &json).unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        let loaded: HashMap<String, String> = serde_json::from_str(&content).unwrap();
+
+        assert_eq!(loaded.get("hotkey").unwrap(), "ALT+SPACE");
+        assert_eq!(loaded.get("history_limit").unwrap(), "15");
+    }
 }

@@ -24,10 +24,46 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 Pre-built installers for macOS, Windows, and Linux are available on the [Releases](../../releases) page.
 
 > **macOS note:** If you see "clipboard-manager is damaged and can't be opened", run this in Terminal after installing:
+>
 > ```bash
 > xattr -cr /Applications/clipboard-manager.app
 > ```
+>
 > This removes the quarantine flag macOS adds to downloaded apps that aren't signed with an Apple Developer certificate.
+
+## Testing
+
+Run frontend unit tests:
+
+```bash
+pnpm test
+```
+
+Run tests in watch mode:
+
+```bash
+pnpm test:watch
+```
+
+Run Rust backend tests:
+
+```bash
+cd src-tauri && cargo test
+```
+
+## Code quality
+
+Lint JavaScript and JSX:
+
+```bash
+pnpm lint
+```
+
+Format code with Prettier:
+
+```bash
+pnpm format
+```
 
 ## Creating a release
 
