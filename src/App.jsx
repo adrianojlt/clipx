@@ -8,6 +8,7 @@ import {
 } from "./services/clipboardService";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { parseShortcut, matchesShortcut } from "./utils/shortcuts";
+import HistoryItem from "./components/HistoryItem";
 import "./App.css";
 
 function App() {
@@ -402,49 +403,18 @@ function App() {
               return history.filter(item =>
                 item.content.toLowerCase().includes(historySearch.toLowerCase())
               ).map((item) => (
-                <div
+                <HistoryItem
                   key={item.id}
-                  className={`item${item.content === currentClipboard ? " current-clipboard" : ""}`}
-                  onClick={() => handleCopy(item.content)}
-                >
-                  <span className="text">{item.content}</span>
-                  {confirmDeleteHistoryId === item.id ? (
-                    <span className="delete-confirm" onClick={e => e.stopPropagation()}>
-                      Delete?
-                      <button
-                        className="action confirm-yes"
-                        onClick={e => { e.stopPropagation(); handleDeleteHistory(item.id); }}
-                        title="Confirm delete"
-                      >
-                        &#x2713;
-                      </button>
-                      <button
-                        className="action confirm-no"
-                        onClick={e => { e.stopPropagation(); setConfirmDeleteHistoryId(null); }}
-                        title="Cancel"
-                      >
-                        &#x2715;
-                      </button>
-                    </span>
-                  ) : (
-                    <>
-                      <button
-                        className={`action${pinnedSet.has(item.content) ? " starred" : ""}`}
-                        onClick={(e) => { e.stopPropagation(); handlePin(item.content); }}
-                        title="Pin"
-                      >
-                        &#x2605;
-                      </button>
-                      <button
-                        className="action"
-                        onClick={(e) => { e.stopPropagation(); setConfirmDeleteHistoryId(item.id); }}
-                        title="Delete"
-                      >
-                        &#x2715;
-                      </button>
-                    </>
-                  )}
-                </div>
+                  item={item}
+                  isCurrentClipboard={item.content === currentClipboard}
+                  isPinned={pinnedSet.has(item.content)}
+                  confirmDeleteId={confirmDeleteHistoryId}
+                  onCopy={handleCopy}
+                  onPin={handlePin}
+                  onRequestDelete={setConfirmDeleteHistoryId}
+                  onConfirmDelete={handleDeleteHistory}
+                  onCancelDelete={() => setConfirmDeleteHistoryId(null)}
+                />
               ));
             })()}
           </>
