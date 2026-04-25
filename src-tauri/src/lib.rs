@@ -1,104 +1,48 @@
-use arboard::Clipboard;
-use rusqlite::Connection;
-use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
+mod commands;
+mod db;
+mod error;
+mod monitor;
+mod settings;
+
+pub use crate::error::AppError;
+
 use std::sync::Mutex;
-use std::thread;
-use std::time::Duration;
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Emitter, Manager, State,
+    Manager,
 };
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
-#[derive(Debug, thiserror::Error)]
-enum AppError {
-    #[error("Database error: {0}")]
-    Db(#[from] rusqlite::Error),
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Path error: {0}")]
-    Path(String),
-    #[error("Settings error: {0}")]
-    Settings(String),
-    #[error("Shortcut error: {0}")]
-    Shortcut(String),
-}
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
-impl serde::Serialize for AppError {
-    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-        s.serialize_str(&self.to_string())
-    }
-}
-
-struct AppState {
-    current_shortcut: Mutex<String>,
-    history_limit: Mutex<u32>,
+pub struct AppState {
+    pub(crate) current_shortcut: Mutex<String>,
+    pub(crate) history_limit: Mutex<u32>,
 }
 
 #[derive(serde::Serialize, Clone)]
-struct ClipboardItem {
-    id: i64,
-    content: String,
-    created_at: String,
+pub struct ClipboardItem {
+    pub(crate) id: i64,
+    pub(crate) content: String,
+    pub(crate) created_at: String,
 }
 
 #[derive(serde::Serialize, Clone)]
-struct PinnedItem {
-    id: i64,
-    content: String,
-    description: String,
-    hidden: bool,
-    created_at: String,
+pub struct PinnedItem {
+    pub(crate) id: i64,
+    pub(crate) content: String,
+    pub(crate) description: String,
+    pub(crate) hidden: bool,
+    pub(crate) created_at: String,
 }
 
-// --- Settings helpers ---
-
-fn settings_dir() -> PathBuf {
-    if cfg!(target_os = "windows") {
-        PathBuf::from(std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string()))
-    } else {
-        PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string())).join(".config")
-    }
-    .join("clipboard-manager")
-}
-
-fn settings_path() -> PathBuf {
-    settings_dir().join("settings.json")
-}
-
-fn load_settings() -> HashMap<String, String> {
-    let path = settings_path();
-    if let Ok(content) = fs::read_to_string(&path) {
-        serde_json::from_str(&content).unwrap_or_default()
-    } else {
-        HashMap::new()
-    }
-}
-
-fn save_settings(settings: &HashMap<String, String>) -> Result<(), AppError> {
-    let dir = settings_dir();
-    fs::create_dir_all(&dir)?;
-    let path = dir.join("settings.json");
-    let content =
-        serde_json::to_string_pretty(settings).map_err(|e| AppError::Settings(e.to_string()))?;
-    fs::write(&path, content)?;
-    Ok(())
-}
-
-fn normalize_shortcut(s: &str) -> String {
-    s.to_uppercase()
-        .replace("OPTION", "ALT")
-        .replace("META", "SUPER")
-        .replace("COMMAND", "SUPER")
-        .replace("CMD", "SUPER")
-        .replace("CONTROL", "CTRL")
-}
-
-fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: ShortcutEvent) {
-    if event.state() == ShortcutState::Pressed {
+pub(crate) fn shortcut_handler(
+    app: &tauri::AppHandle,
+    _shortcut: &Shortcut,
+    event: tauri_plugin_global_shortcut::ShortcutEvent,
+) {
+    if event.state() == tauri_plugin_global_shortcut::ShortcutState::Pressed {
         if let Some(win) = app.get_webview_window("main") {
             let _ = win.hide();
             if let Ok(pos) = app.cursor_position() {
@@ -107,7 +51,7 @@ fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: Shortcu
                     y: pos.y as i32,
                 }));
             }
-            let settings = load_settings();
+            let settings = crate::settings::load_settings();
             let width = settings
                 .get("window_width")
                 .and_then(|v| v.parse::<f64>().ok())
@@ -127,397 +71,10 @@ fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: Shortcu
     }
 }
 
-// --- Database helpers ---
-
-fn db_path(app: &AppHandle) -> Result<PathBuf, AppError> {
-    Ok(app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?
-        .join("clipx.db"))
-}
-
-fn init_db(conn: &Connection) -> Result<(), AppError> {
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS clipboard_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            content TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )",
-        [],
-    )?;
-
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS clipboard_pinned (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            content TEXT NOT NULL UNIQUE,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            sort_order INTEGER DEFAULT 0
-        )",
-        [],
-    )?;
-
-    // Migration: add sort_order if missing
-    let cols: Vec<String> = conn
-        .prepare("PRAGMA table_info(clipboard_pinned)")?
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<Vec<_>, _>>()?;
-
-    if !cols.contains(&"sort_order".to_string()) {
-        conn.execute(
-            "ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0",
-            [],
-        )?;
-
-        let mut stmt = conn.prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")?;
-
-        let ids: Vec<i64> = stmt
-            .query_map([], |row| row.get(0))?
-            .collect::<Result<Vec<_>, _>>()?;
-
-        drop(stmt);
-
-        for (index, id) in ids.iter().enumerate() {
-            conn.execute(
-                "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
-                [index as i64, *id],
-            )?;
-        }
-    }
-
-    // Migration: add description if missing
-    if !cols.contains(&"description".to_string()) {
-        conn.execute(
-            "ALTER TABLE clipboard_pinned ADD COLUMN description TEXT",
-            [],
-        )?;
-
-        conn.execute(
-            "UPDATE clipboard_pinned SET description = content WHERE description IS NULL",
-            [],
-        )?;
-    }
-
-    // Migration: add hidden if missing
-    if !cols.contains(&"hidden".to_string()) {
-        conn.execute(
-            "ALTER TABLE clipboard_pinned ADD COLUMN hidden INTEGER DEFAULT 0",
-            [],
-        )?;
-    }
-
-    Ok(())
-}
-
-fn start_clipboard_monitor(app: AppHandle) {
-    thread::spawn(move || {
-        let db_file = match db_path(&app) {
-            Ok(path) => path,
-            Err(e) => {
-                eprintln!("Failed to get db path: {}", e);
-                return;
-            }
-        };
-
-        let mut clipboard = match Clipboard::new() {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("Failed to initialize clipboard: {}", e);
-                return;
-            }
-        };
-
-        let mut last_text = String::new();
-
-        loop {
-            thread::sleep(Duration::from_millis(500));
-
-            let text = match clipboard.get_text() {
-                Ok(t) => t,
-                Err(_) => continue,
-            };
-
-            if text.is_empty() || text == last_text {
-                continue;
-            }
-
-            last_text = text.clone();
-
-            let conn = match Connection::open(&db_file) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            // Remove duplicate if it exists so the text appears only once
-            let _ = conn.execute("DELETE FROM clipboard_history WHERE content = ?", [&text]);
-
-            let _ = conn.execute(
-                "INSERT INTO clipboard_history (content) VALUES (?)",
-                [&text],
-            );
-
-            let limit = app
-                .state::<AppState>()
-                .history_limit
-                .lock()
-                .map(|l| *l)
-                .unwrap_or(20) as i64;
-
-            let _ = conn.execute(
-                &format!(
-                    "DELETE FROM clipboard_history WHERE id NOT IN (
-                    SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT {}
-                )",
-                    limit
-                ),
-                [],
-            );
-
-            let _ = app.emit("clipboard-changed", ());
-        }
-    });
-}
-
-// --- Commands ---
-
-#[tauri::command]
-fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, AppError> {
-    let limit = app
-        .state::<AppState>()
-        .history_limit
-        .lock()
-        .map(|l| *l)
-        .unwrap_or(20) as i64;
-
-    let conn = Connection::open(db_path(&app)?)?;
-
-    let mut stmt = conn.prepare(&format!(
-        "SELECT id, content, created_at FROM clipboard_history ORDER BY created_at DESC LIMIT {}",
-        limit
-    ))?;
-
-    let rows = stmt.query_map([], |row| {
-        Ok(ClipboardItem {
-            id: row.get(0)?,
-            content: row.get(1)?,
-            created_at: row.get(2)?,
-        })
-    })?;
-
-    let mut items = Vec::new();
-
-    for item in rows {
-        items.push(item?);
-    }
-
-    Ok(items)
-}
-
-#[tauri::command]
-fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
-
-    let mut stmt = conn
-        .prepare("SELECT id, content, COALESCE(description, content), COALESCE(hidden, 0), created_at FROM clipboard_pinned ORDER BY sort_order ASC")?;
-
-    let rows = stmt.query_map([], |row| {
-        Ok(PinnedItem {
-            id: row.get(0)?,
-            content: row.get(1)?,
-            description: row.get(2)?,
-            hidden: row.get::<_, i64>(3)? != 0,
-            created_at: row.get(4)?,
-        })
-    })?;
-
-    let mut items = Vec::new();
-
-    for item in rows {
-        items.push(item?);
-    }
-
-    Ok(items)
-}
-
-#[tauri::command]
-fn pin_item(content: String, app: AppHandle) -> Result<(), AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
-
-    conn.execute(
-        "UPDATE clipboard_pinned SET sort_order = sort_order + 1",
-        [],
-    )?;
-
-    conn.execute("INSERT OR IGNORE INTO clipboard_pinned (content, description, sort_order) VALUES (?, ?, 0)", rusqlite::params![content, content])?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), AppError> {
-    let mut conn = Connection::open(db_path(&app)?)?;
-    let tx = conn.transaction()?;
-
-    for (index, id) in items.iter().enumerate() {
-        tx.execute(
-            "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
-            [index as i64, *id],
-        )?;
-    }
-
-    tx.commit()?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn update_pinned_description(id: i64, description: String, app: AppHandle) -> Result<(), AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
-
-    conn.execute(
-        "UPDATE clipboard_pinned SET description = ? WHERE id = ?",
-        rusqlite::params![description, id],
-    )?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn unpin_item(id: i64, app: AppHandle) -> Result<(), AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
-
-    conn.execute("DELETE FROM clipboard_pinned WHERE id = ?", [id])?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn toggle_pinned_hidden(id: i64, app: AppHandle) -> Result<bool, AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
-
-    let current: bool = conn.query_row(
-        "SELECT COALESCE(hidden, 0) FROM clipboard_pinned WHERE id = ?",
-        [id],
-        |row| row.get::<_, i64>(0).map(|v| v != 0),
-    )?;
-
-    let new_val = if current { 0 } else { 1 };
-
-    conn.execute(
-        "UPDATE clipboard_pinned SET hidden = ? WHERE id = ?",
-        rusqlite::params![new_val, id],
-    )?;
-
-    Ok(!current)
-}
-
-#[tauri::command]
-fn delete_history_item(id: i64, app: AppHandle) -> Result<(), AppError> {
-    let conn = Connection::open(db_path(&app)?)?;
-    conn.execute("DELETE FROM clipboard_history WHERE id = ?", [id])?;
-    Ok(())
-}
-
-#[tauri::command]
-fn get_setting(key: String) -> Result<String, AppError> {
-    let settings = load_settings();
-    settings
-        .get(&key)
-        .cloned()
-        .ok_or_else(|| AppError::Settings("Setting not found".to_string()))
-}
-
-#[tauri::command]
-fn set_setting(key: String, value: String, state: State<AppState>) -> Result<(), AppError> {
-    let mut settings = load_settings();
-    settings.insert(key.clone(), value.clone());
-    save_settings(&settings)?;
-
-    if key == "history_limit" {
-        if let Ok(limit) = value.parse::<u32>() {
-            if let Ok(mut cached) = state.history_limit.lock() {
-                *cached = limit.clamp(1, 50);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-fn update_shortcut(
-    shortcut: String,
-    state: State<AppState>,
-    app: tauri::AppHandle,
-) -> Result<(), AppError> {
-    let old_shortcut_str = {
-        let current = state
-            .current_shortcut
-            .lock()
-            .map_err(|e| AppError::Shortcut(e.to_string()))?;
-        current.clone()
-    };
-
-    let normalized_old = normalize_shortcut(&old_shortcut_str);
-    if let Ok(old) = normalized_old.parse::<Shortcut>() {
-        let _ = app.global_shortcut().unregister(old);
-    }
-
-    let normalized_new = normalize_shortcut(&shortcut);
-    let new_shortcut = normalized_new
-        .parse::<Shortcut>()
-        .map_err(|e| AppError::Shortcut(e.to_string()))?;
-    app.global_shortcut()
-        .on_shortcut(new_shortcut, shortcut_handler)
-        .map_err(|e| AppError::Shortcut(e.to_string()))?;
-
-    {
-        let mut current = state
-            .current_shortcut
-            .lock()
-            .map_err(|e| AppError::Shortcut(e.to_string()))?;
-        *current = shortcut.clone();
-    }
-
-    let mut settings = load_settings();
-    settings.insert("hotkey".to_string(), shortcut);
-    save_settings(&settings)
-}
-
-#[tauri::command]
-fn apply_window_size(app: AppHandle) -> Result<(), AppError> {
-    let settings = load_settings();
-    let width = settings
-        .get("window_width")
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(400.0)
-        .max(300.0)
-        .min(800.0);
-    let height = settings
-        .get("window_height")
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(600.0)
-        .max(400.0)
-        .min(900.0);
-    if let Some(win) = app.get_webview_window("main") {
-        win.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
-            .map_err(|e| AppError::Settings(e.to_string()))?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn get_clipboard() -> Result<String, AppError> {
-    let mut clipboard = Clipboard::new().map_err(|e| AppError::Settings(e.to_string()))?;
-    clipboard
-        .get_text()
-        .map_err(|e| AppError::Settings(e.to_string()))
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let initial_limit = {
-        let settings = load_settings();
+        let settings = crate::settings::load_settings();
         settings
             .get("history_limit")
             .and_then(|v| v.parse::<u32>().ok())
@@ -534,49 +91,51 @@ pub fn run() {
             history_limit: Mutex::new(initial_limit),
         })
         .invoke_handler(tauri::generate_handler![
-            get_setting,
-            set_setting,
-            update_shortcut,
-            apply_window_size,
-            get_history,
-            get_pinned,
-            pin_item,
-            unpin_item,
-            delete_history_item,
-            update_pinned_description,
-            reorder_pinned,
-            toggle_pinned_hidden,
-            get_clipboard,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::settings::update_shortcut,
+            commands::settings::apply_window_size,
+            commands::clipboard::get_history,
+            commands::pinned::get_pinned,
+            commands::pinned::pin_item,
+            commands::pinned::unpin_item,
+            commands::clipboard::delete_history_item,
+            commands::pinned::update_pinned_description,
+            commands::pinned::reorder_pinned,
+            commands::pinned::toggle_pinned_hidden,
+            commands::clipboard::get_clipboard,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
             let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             // Ensure app data dir exists
-            let data_dir = app
-                .path()
-                .app_data_dir()
-                .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
-            std::fs::create_dir_all(&data_dir).map_err(|e| AppError::Io(e))?;
+            let data_dir = app.path().app_data_dir().map_err(|e| {
+                crate::error::AppError::Path(format!("Cannot resolve app data dir: {e}"))
+            })?;
+            std::fs::create_dir_all(&data_dir).map_err(|e| crate::error::AppError::Io(e))?;
 
             // Init DB
-            let conn = Connection::open(db_path(&app.handle())?)?;
-            init_db(&conn)?;
+            let conn = rusqlite::Connection::open(crate::db::db_path(&app.handle())?)?;
+            crate::db::init_db(&conn)?;
             drop(conn);
 
             // Start clipboard monitor
-            start_clipboard_monitor(app.handle().clone());
+            crate::monitor::start_clipboard_monitor(app.handle().clone());
 
             // Load and register initial shortcut
-            let settings = load_settings();
+            let settings = crate::settings::load_settings();
             let hotkey_str = settings
                 .get("hotkey")
                 .cloned()
                 .unwrap_or_else(|| "Option+Space".to_string());
 
-            let normalized = normalize_shortcut(&hotkey_str);
+            let normalized = crate::settings::normalize_shortcut(&hotkey_str);
             let shortcut = normalized.parse::<Shortcut>().map_err(|e| {
-                AppError::Shortcut(format!("Failed to parse shortcut '{}': {}", hotkey_str, e))
+                crate::error::AppError::Shortcut(format!(
+                    "Failed to parse shortcut '{}': {}",
+                    hotkey_str, e
+                ))
             })?;
             app.global_shortcut()
                 .on_shortcut(shortcut, shortcut_handler)?;
@@ -586,7 +145,7 @@ pub fn run() {
                 let mut current = state
                     .current_shortcut
                     .lock()
-                    .map_err(|e| AppError::Shortcut(e.to_string()))?;
+                    .map_err(|e| crate::error::AppError::Shortcut(e.to_string()))?;
                 *current = hotkey_str;
             }
 
