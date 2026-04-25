@@ -7,12 +7,18 @@ pub enum AppError {
     Db(#[from] rusqlite::Error),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
     #[error("Path error: {0}")]
     Path(String),
     #[error("Settings error: {0}")]
     Settings(String),
     #[error("Shortcut error: {0}")]
     Shortcut(String),
+    #[error("State error: {0}")]
+    State(String),
+    #[error("Window error: {0}")]
+    Window(String),
 }
 
 impl Serialize for AppError {

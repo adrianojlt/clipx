@@ -10,8 +10,10 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf, AppError> {
         .join("clipx.db"))
 }
 
-pub fn init_db(conn: &rusqlite::Connection) -> Result<(), AppError> {
-    conn.execute(
+pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
+    let tx = conn.transaction()?;
+
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS clipboard_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content TEXT NOT NULL,
@@ -20,7 +22,7 @@ pub fn init_db(conn: &rusqlite::Connection) -> Result<(), AppError> {
         [],
     )?;
 
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS clipboard_pinned (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content TEXT NOT NULL UNIQUE,
@@ -30,64 +32,56 @@ pub fn init_db(conn: &rusqlite::Connection) -> Result<(), AppError> {
         [],
     )?;
 
-    conn.execute_batch(
-        "
-        CREATE INDEX IF NOT EXISTS idx_history_created
-        ON clipboard_history(created_at DESC);
-
-        CREATE INDEX IF NOT EXISTS idx_pinned_sort
-        ON clipboard_pinned(sort_order ASC);
-    ",
+    tx.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_history_created \
+            ON clipboard_history(created_at DESC); \
+         CREATE INDEX IF NOT EXISTS idx_pinned_sort \
+            ON clipboard_pinned(sort_order ASC);",
     )?;
 
-    // Migration: add sort_order if missing
-    let cols: Vec<String> = conn
+    let cols: Vec<String> = tx
         .prepare("PRAGMA table_info(clipboard_pinned)")?
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>, _>>()?;
+    let has = |name: &str| cols.iter().any(|c| c == name);
 
-    if !cols.contains(&"sort_order".to_string()) {
-        conn.execute(
+    if !has("sort_order") {
+        tx.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0",
             [],
         )?;
 
-        let mut stmt = conn.prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")?;
-
-        let ids: Vec<i64> = stmt
+        let ids: Vec<i64> = tx
+            .prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")?
             .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
 
-        drop(stmt);
-
         for (index, id) in ids.iter().enumerate() {
-            conn.execute(
-                "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
+            tx.execute(
+                "UPDATE clipboard_pinned SET sort_order = ?1 WHERE id = ?2",
                 [index as i64, *id],
             )?;
         }
     }
 
-    // Migration: add description if missing
-    if !cols.contains(&"description".to_string()) {
-        conn.execute(
+    if !has("description") {
+        tx.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN description TEXT",
             [],
         )?;
-
-        conn.execute(
+        tx.execute(
             "UPDATE clipboard_pinned SET description = content WHERE description IS NULL",
             [],
         )?;
     }
 
-    // Migration: add hidden if missing
-    if !cols.contains(&"hidden".to_string()) {
-        conn.execute(
+    if !has("hidden") {
+        tx.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN hidden INTEGER DEFAULT 0",
             [],
         )?;
     }
 
+    tx.commit()?;
     Ok(())
 }

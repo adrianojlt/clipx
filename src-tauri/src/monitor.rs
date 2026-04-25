@@ -33,25 +33,24 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             let state = app.state::<AppState>();
             let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
-            // Remove duplicate if it exists so the text appears only once
-            let _ = conn.execute("DELETE FROM clipboard_history WHERE content = ?", [&text]);
+            if let Ok(mut stmt) = conn.prepare_cached("DELETE FROM clipboard_history WHERE content = ?1")
+            {
+                let _ = stmt.execute([&text]);
+            }
 
-            let _ = conn.execute(
-                "INSERT INTO clipboard_history (content) VALUES (?)",
-                [&text],
-            );
+            if let Ok(mut stmt) = conn.prepare_cached("INSERT INTO clipboard_history (content) VALUES (?1)")
+            {
+                let _ = stmt.execute([&text]);
+            }
 
             let limit = state.history_limit.lock().map(|l| *l).unwrap_or(20) as i64;
-
-            let _ = conn.execute(
-                &format!(
-                    "DELETE FROM clipboard_history WHERE id NOT IN (
-                    SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT {}
+            if let Ok(mut stmt) = conn.prepare_cached(
+                "DELETE FROM clipboard_history WHERE id NOT IN ( \
+                    SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1 \
                 )",
-                    limit
-                ),
-                [],
-            );
+            ) {
+                let _ = stmt.execute([limit]);
+            }
 
             let _ = app.emit("clipboard-changed", ());
         }

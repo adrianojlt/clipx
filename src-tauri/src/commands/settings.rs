@@ -1,6 +1,6 @@
 use crate::error::AppError;
-use crate::settings::{load_settings, normalize_shortcut, save_settings};
-use crate::shortcut_handler;
+use crate::settings::{load_settings, load_window_size, normalize_shortcut, save_settings};
+use crate::window::{clamp_to_monitor, monitor_under_point, shortcut_handler};
 use crate::AppState;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
@@ -41,7 +41,7 @@ pub fn update_shortcut(
         let current = state
             .current_shortcut
             .lock()
-            .map_err(|e| AppError::Shortcut(e.to_string()))?;
+            .map_err(|e| AppError::State(format!("current_shortcut mutex poisoned: {e}")))?;
         current.clone()
     };
 
@@ -62,7 +62,7 @@ pub fn update_shortcut(
         let mut current = state
             .current_shortcut
             .lock()
-            .map_err(|e| AppError::Shortcut(e.to_string()))?;
+            .map_err(|e| AppError::State(format!("current_shortcut mutex poisoned: {e}")))?;
         *current = shortcut.clone();
     }
 
@@ -73,22 +73,28 @@ pub fn update_shortcut(
 
 #[tauri::command]
 pub fn apply_window_size(app: AppHandle) -> Result<(), AppError> {
-    let settings = load_settings();
-    let width = settings
-        .get("window_width")
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(400.0)
-        .max(300.0)
-        .min(800.0);
-    let height = settings
-        .get("window_height")
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(600.0)
-        .max(400.0)
-        .min(900.0);
-    if let Some(win) = app.get_webview_window("main") {
-        win.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
-            .map_err(|e| AppError::Settings(e.to_string()))?;
+    let (width, height) = load_window_size(&load_settings());
+    let Some(win) = app.get_webview_window("main") else {
+        return Ok(());
+    };
+
+    win.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
+        .map_err(|e| AppError::Window(e.to_string()))?;
+
+    // If the window is currently visible, re-clamp its position so the resize
+    // can't push the right/bottom edge off the current monitor.
+    if win.is_visible().unwrap_or(false) {
+        if let Ok(pos) = win.outer_position() {
+            let monitor = monitor_under_point(&win, pos.x, pos.y);
+            let (x, y) = clamp_to_monitor(pos.x, pos.y, width, height, monitor.as_ref());
+            if x != pos.x || y != pos.y {
+                let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+                    x,
+                    y,
+                }));
+            }
+        }
     }
+
     Ok(())
 }
