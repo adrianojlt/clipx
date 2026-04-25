@@ -13,6 +13,26 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
+#[derive(Debug, thiserror::Error)]
+enum AppError {
+    #[error("Database error: {0}")]
+    Db(#[from] rusqlite::Error),
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Path error: {0}")]
+    Path(String),
+    #[error("Settings error: {0}")]
+    Settings(String),
+    #[error("Shortcut error: {0}")]
+    Shortcut(String),
+}
+
+impl serde::Serialize for AppError {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&self.to_string())
+    }
+}
+
 struct AppState {
     current_shortcut: Mutex<String>,
     history_limit: Mutex<u32>,
@@ -58,12 +78,13 @@ fn load_settings() -> HashMap<String, String> {
     }
 }
 
-fn save_settings(settings: &HashMap<String, String>) -> Result<(), String> {
+fn save_settings(settings: &HashMap<String, String>) -> Result<(), AppError> {
     let dir = settings_dir();
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::create_dir_all(&dir)?;
     let path = dir.join("settings.json");
-    let content = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
-    fs::write(&path, content).map_err(|e| e.to_string())?;
+    let content =
+        serde_json::to_string_pretty(settings).map_err(|e| AppError::Settings(e.to_string()))?;
+    fs::write(&path, content)?;
     Ok(())
 }
 
@@ -108,15 +129,15 @@ fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: Shortcu
 
 // --- Database helpers ---
 
-fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
+fn db_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(app
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?
+        .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?
         .join("clipx.db"))
 }
 
-fn init_db(conn: &Connection) -> Result<(), String> {
+fn init_db(conn: &Connection) -> Result<(), AppError> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS clipboard_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -124,8 +145,7 @@ fn init_db(conn: &Connection) -> Result<(), String> {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )",
         [],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS clipboard_pinned (
@@ -135,34 +155,25 @@ fn init_db(conn: &Connection) -> Result<(), String> {
             sort_order INTEGER DEFAULT 0
         )",
         [],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     // Migration: add sort_order if missing
     let cols: Vec<String> = conn
-        .prepare("PRAGMA table_info(clipboard_pinned)")
-        .map_err(|e| e.to_string())?
-        .query_map([], |row| row.get::<_, String>(1))
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+        .prepare("PRAGMA table_info(clipboard_pinned)")?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<Vec<_>, _>>()?;
 
     if !cols.contains(&"sort_order".to_string()) {
         conn.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0",
             [],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
 
-        let mut stmt = conn
-            .prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")
-            .map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")?;
 
         let ids: Vec<i64> = stmt
-            .query_map([], |row| row.get(0))
-            .map_err(|e| e.to_string())?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())?;
+            .query_map([], |row| row.get(0))?
+            .collect::<Result<Vec<_>, _>>()?;
 
         drop(stmt);
 
@@ -170,8 +181,7 @@ fn init_db(conn: &Connection) -> Result<(), String> {
             conn.execute(
                 "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
                 [index as i64, *id],
-            )
-            .map_err(|e| e.to_string())?;
+            )?;
         }
     }
 
@@ -180,14 +190,12 @@ fn init_db(conn: &Connection) -> Result<(), String> {
         conn.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN description TEXT",
             [],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
 
         conn.execute(
             "UPDATE clipboard_pinned SET description = content WHERE description IS NULL",
             [],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     // Migration: add hidden if missing
@@ -195,8 +203,7 @@ fn init_db(conn: &Connection) -> Result<(), String> {
         conn.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN hidden INTEGER DEFAULT 0",
             [],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
     Ok(())
@@ -274,7 +281,7 @@ fn start_clipboard_monitor(app: AppHandle) {
 // --- Commands ---
 
 #[tauri::command]
-fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
+fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, AppError> {
     let limit = app
         .state::<AppState>()
         .history_limit
@@ -282,158 +289,146 @@ fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
         .map(|l| *l)
         .unwrap_or(20) as i64;
 
-    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
+    let conn = Connection::open(db_path(&app)?)?;
 
-    let mut stmt = conn.prepare(
-        &format!("SELECT id, content, created_at FROM clipboard_history ORDER BY created_at DESC LIMIT {}", limit)
-    ).map_err(|e| e.to_string())?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT id, content, created_at FROM clipboard_history ORDER BY created_at DESC LIMIT {}",
+        limit
+    ))?;
 
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(ClipboardItem {
-                id: row.get(0)?,
-                content: row.get(1)?,
-                created_at: row.get(2)?,
-            })
+    let rows = stmt.query_map([], |row| {
+        Ok(ClipboardItem {
+            id: row.get(0)?,
+            content: row.get(1)?,
+            created_at: row.get(2)?,
         })
-        .map_err(|e| e.to_string())?;
+    })?;
 
     let mut items = Vec::new();
 
     for item in rows {
-        items.push(item.map_err(|e| e.to_string())?);
+        items.push(item?);
     }
 
     Ok(items)
 }
 
 #[tauri::command]
-fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, String> {
-    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
+fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, AppError> {
+    let conn = Connection::open(db_path(&app)?)?;
 
     let mut stmt = conn
-        .prepare("SELECT id, content, COALESCE(description, content), COALESCE(hidden, 0), created_at FROM clipboard_pinned ORDER BY sort_order ASC")
-        .map_err(|e| e.to_string())?;
+        .prepare("SELECT id, content, COALESCE(description, content), COALESCE(hidden, 0), created_at FROM clipboard_pinned ORDER BY sort_order ASC")?;
 
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(PinnedItem {
-                id: row.get(0)?,
-                content: row.get(1)?,
-                description: row.get(2)?,
-                hidden: row.get::<_, i64>(3)? != 0,
-                created_at: row.get(4)?,
-            })
+    let rows = stmt.query_map([], |row| {
+        Ok(PinnedItem {
+            id: row.get(0)?,
+            content: row.get(1)?,
+            description: row.get(2)?,
+            hidden: row.get::<_, i64>(3)? != 0,
+            created_at: row.get(4)?,
         })
-        .map_err(|e| e.to_string())?;
+    })?;
 
     let mut items = Vec::new();
 
     for item in rows {
-        items.push(item.map_err(|e| e.to_string())?);
+        items.push(item?);
     }
 
     Ok(items)
 }
 
 #[tauri::command]
-fn pin_item(content: String, app: AppHandle) -> Result<(), String> {
-    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
+fn pin_item(content: String, app: AppHandle) -> Result<(), AppError> {
+    let conn = Connection::open(db_path(&app)?)?;
 
     conn.execute(
         "UPDATE clipboard_pinned SET sort_order = sort_order + 1",
         [],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
-    conn.execute("INSERT OR IGNORE INTO clipboard_pinned (content, description, sort_order) VALUES (?, ?, 0)", rusqlite::params![content, content]).map_err(|e| e.to_string())?;
+    conn.execute("INSERT OR IGNORE INTO clipboard_pinned (content, description, sort_order) VALUES (?, ?, 0)", rusqlite::params![content, content])?;
 
     Ok(())
 }
 
 #[tauri::command]
-fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), String> {
-    let mut conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
+fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), AppError> {
+    let mut conn = Connection::open(db_path(&app)?)?;
+    let tx = conn.transaction()?;
 
     for (index, id) in items.iter().enumerate() {
         tx.execute(
             "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
             [index as i64, *id],
-        )
-        .map_err(|e| e.to_string())?;
+        )?;
     }
 
-    tx.commit().map_err(|e| e.to_string())?;
+    tx.commit()?;
 
     Ok(())
 }
 
 #[tauri::command]
-fn update_pinned_description(id: i64, description: String, app: AppHandle) -> Result<(), String> {
-    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
+fn update_pinned_description(id: i64, description: String, app: AppHandle) -> Result<(), AppError> {
+    let conn = Connection::open(db_path(&app)?)?;
 
     conn.execute(
         "UPDATE clipboard_pinned SET description = ? WHERE id = ?",
         rusqlite::params![description, id],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     Ok(())
 }
 
 #[tauri::command]
-fn unpin_item(id: i64, app: AppHandle) -> Result<(), String> {
-    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
+fn unpin_item(id: i64, app: AppHandle) -> Result<(), AppError> {
+    let conn = Connection::open(db_path(&app)?)?;
 
-    conn.execute("DELETE FROM clipboard_pinned WHERE id = ?", [id])
-        .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM clipboard_pinned WHERE id = ?", [id])?;
 
     Ok(())
 }
 
 #[tauri::command]
-fn toggle_pinned_hidden(id: i64, app: AppHandle) -> Result<bool, String> {
-    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
+fn toggle_pinned_hidden(id: i64, app: AppHandle) -> Result<bool, AppError> {
+    let conn = Connection::open(db_path(&app)?)?;
 
-    let current: bool = conn
-        .query_row(
-            "SELECT COALESCE(hidden, 0) FROM clipboard_pinned WHERE id = ?",
-            [id],
-            |row| row.get::<_, i64>(0).map(|v| v != 0),
-        )
-        .map_err(|e| e.to_string())?;
+    let current: bool = conn.query_row(
+        "SELECT COALESCE(hidden, 0) FROM clipboard_pinned WHERE id = ?",
+        [id],
+        |row| row.get::<_, i64>(0).map(|v| v != 0),
+    )?;
 
     let new_val = if current { 0 } else { 1 };
 
     conn.execute(
         "UPDATE clipboard_pinned SET hidden = ? WHERE id = ?",
         rusqlite::params![new_val, id],
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
 
     Ok(!current)
 }
 
 #[tauri::command]
-fn delete_history_item(id: i64, app: AppHandle) -> Result<(), String> {
-    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM clipboard_history WHERE id = ?", [id])
-        .map_err(|e| e.to_string())?;
+fn delete_history_item(id: i64, app: AppHandle) -> Result<(), AppError> {
+    let conn = Connection::open(db_path(&app)?)?;
+    conn.execute("DELETE FROM clipboard_history WHERE id = ?", [id])?;
     Ok(())
 }
 
 #[tauri::command]
-fn get_setting(key: String) -> Result<String, String> {
+fn get_setting(key: String) -> Result<String, AppError> {
     let settings = load_settings();
     settings
         .get(&key)
         .cloned()
-        .ok_or_else(|| "Setting not found".to_string())
+        .ok_or_else(|| AppError::Settings("Setting not found".to_string()))
 }
 
 #[tauri::command]
-fn set_setting(key: String, value: String, state: State<AppState>) -> Result<(), String> {
+fn set_setting(key: String, value: String, state: State<AppState>) -> Result<(), AppError> {
     let mut settings = load_settings();
     settings.insert(key.clone(), value.clone());
     save_settings(&settings)?;
@@ -454,9 +449,12 @@ fn update_shortcut(
     shortcut: String,
     state: State<AppState>,
     app: tauri::AppHandle,
-) -> Result<(), String> {
+) -> Result<(), AppError> {
     let old_shortcut_str = {
-        let current = state.current_shortcut.lock().map_err(|e| e.to_string())?;
+        let current = state
+            .current_shortcut
+            .lock()
+            .map_err(|e| AppError::Shortcut(e.to_string()))?;
         current.clone()
     };
 
@@ -468,13 +466,16 @@ fn update_shortcut(
     let normalized_new = normalize_shortcut(&shortcut);
     let new_shortcut = normalized_new
         .parse::<Shortcut>()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Shortcut(e.to_string()))?;
     app.global_shortcut()
         .on_shortcut(new_shortcut, shortcut_handler)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| AppError::Shortcut(e.to_string()))?;
 
     {
-        let mut current = state.current_shortcut.lock().map_err(|e| e.to_string())?;
+        let mut current = state
+            .current_shortcut
+            .lock()
+            .map_err(|e| AppError::Shortcut(e.to_string()))?;
         *current = shortcut.clone();
     }
 
@@ -484,7 +485,7 @@ fn update_shortcut(
 }
 
 #[tauri::command]
-fn apply_window_size(app: AppHandle) -> Result<(), String> {
+fn apply_window_size(app: AppHandle) -> Result<(), AppError> {
     let settings = load_settings();
     let width = settings
         .get("window_width")
@@ -500,15 +501,17 @@ fn apply_window_size(app: AppHandle) -> Result<(), String> {
         .min(900.0);
     if let Some(win) = app.get_webview_window("main") {
         win.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }))
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| AppError::Settings(e.to_string()))?;
     }
     Ok(())
 }
 
 #[tauri::command]
-fn get_clipboard() -> Result<String, String> {
-    let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
-    clipboard.get_text().map_err(|e| e.to_string())
+fn get_clipboard() -> Result<String, AppError> {
+    let mut clipboard = Clipboard::new().map_err(|e| AppError::Settings(e.to_string()))?;
+    clipboard
+        .get_text()
+        .map_err(|e| AppError::Settings(e.to_string()))
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -553,12 +556,12 @@ pub fn run() {
             let data_dir = app
                 .path()
                 .app_data_dir()
-                .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
-            std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
+                .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
+            std::fs::create_dir_all(&data_dir).map_err(|e| AppError::Io(e))?;
 
             // Init DB
-            let conn = Connection::open(db_path(&app.handle())?).map_err(|e| e.to_string())?;
-            init_db(&conn).map_err(|e| e.to_string())?;
+            let conn = Connection::open(db_path(&app.handle())?)?;
+            init_db(&conn)?;
             drop(conn);
 
             // Start clipboard monitor
@@ -572,15 +575,18 @@ pub fn run() {
                 .unwrap_or_else(|| "Option+Space".to_string());
 
             let normalized = normalize_shortcut(&hotkey_str);
-            let shortcut = normalized
-                .parse::<Shortcut>()
-                .map_err(|e| format!("Failed to parse shortcut '{}': {}", hotkey_str, e))?;
+            let shortcut = normalized.parse::<Shortcut>().map_err(|e| {
+                AppError::Shortcut(format!("Failed to parse shortcut '{}': {}", hotkey_str, e))
+            })?;
             app.global_shortcut()
                 .on_shortcut(shortcut, shortcut_handler)?;
 
             {
                 let state = app.state::<AppState>();
-                let mut current = state.current_shortcut.lock().map_err(|e| e.to_string())?;
+                let mut current = state
+                    .current_shortcut
+                    .lock()
+                    .map_err(|e| AppError::Shortcut(e.to_string()))?;
                 *current = hotkey_str;
             }
 
