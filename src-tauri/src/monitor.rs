@@ -4,6 +4,8 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
 
+const EVENT_CLIPBOARD_CHANGED: &str = "clipboard-changed";
+
 pub fn start_clipboard_monitor(app: AppHandle) {
     thread::spawn(move || {
         let mut clipboard = match Clipboard::new() {
@@ -33,12 +35,14 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             let state = app.state::<AppState>();
             let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
-            if let Ok(mut stmt) = conn.prepare_cached("DELETE FROM clipboard_history WHERE content = ?1")
+            if let Ok(mut stmt) =
+                conn.prepare_cached("DELETE FROM clipboard_history WHERE content = ?1")
             {
                 let _ = stmt.execute([&text]);
             }
 
-            if let Ok(mut stmt) = conn.prepare_cached("INSERT INTO clipboard_history (content) VALUES (?1)")
+            if let Ok(mut stmt) =
+                conn.prepare_cached("INSERT INTO clipboard_history (content) VALUES (?1)")
             {
                 let _ = stmt.execute([&text]);
             }
@@ -52,7 +56,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
                 let _ = stmt.execute([limit]);
             }
 
-            let _ = app.emit("clipboard-changed", ());
+            let _ = app.emit(EVENT_CLIPBOARD_CHANGED, ());
         }
     });
 }

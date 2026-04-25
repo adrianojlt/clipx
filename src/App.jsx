@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -10,6 +10,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { parseShortcut, matchesShortcut } from "./utils/shortcuts";
 import HistoryItem from "./components/HistoryItem";
 import PinnedItem from "./components/PinnedItem";
+import { EVENTS } from "./constants/events";
 import "./App.css";
 
 function App() {
@@ -28,6 +29,13 @@ function App() {
   const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
   const pinnedRef = useRef([]);
   const listRef = useRef(null);
+
+  const filteredHistory = useMemo(
+    () => history.filter(item =>
+      item.content.toLowerCase().includes(historySearch.toLowerCase())
+    ),
+    [history, historySearch]
+  );
 
   const loadData = async () => {
     try {
@@ -73,7 +81,7 @@ function App() {
     const setupListeners = async () => {
       await loadClipboard();
 
-      unlistenClipboard = await listen("clipboard-changed", async () => {
+      unlistenClipboard = await listen(EVENTS.CLIPBOARD_CHANGED, async () => {
         loadData();
         await loadClipboard();
       });
@@ -332,9 +340,7 @@ function App() {
             )}
             {(() => {
               const pinnedSet = new Set(pinned.map(p => p.content));
-              return history.filter(item =>
-                item.content.toLowerCase().includes(historySearch.toLowerCase())
-              ).map((item) => (
+              return filteredHistory.map((item) => (
                 <HistoryItem
                   key={item.id}
                   item={item}
