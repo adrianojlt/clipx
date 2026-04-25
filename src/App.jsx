@@ -9,6 +9,7 @@ import {
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { parseShortcut, matchesShortcut } from "./utils/shortcuts";
 import HistoryItem from "./components/HistoryItem";
+import PinnedItem from "./components/PinnedItem";
 import "./App.css";
 
 function App() {
@@ -300,96 +301,27 @@ function App() {
             {pinned.length === 0 && (
               <div className="empty">No pinned items</div>
             )}
-            {pinned.map((item, index) => (
-              <div
+            {pinned.map((item) => (
+              <PinnedItem
                 key={item.id}
-                data-id={item.id}
-                className={`item-wrapper${draggingId === item.id ? " dragging" : ""}`}
-              >
-                {dragIndicator?.targetId === item.id && dragIndicator.position === "before" && (
-                  <div className="drop-indicator" />
-                )}
-                <div
-                  className={`item${item.content === currentClipboard ? " current-clipboard" : ""}`}
-                  onClick={() => handleCopy(item.content)}
-                >
-                  <span
-                    className="drag-handle"
-                    onMouseDown={(e) => handleMouseDown(e, item.id)}
-                    title="Drag to reorder"
-                  >
-                    &#x2630;
-                  </span>
-                  <div className="pinned-text">
-                    {editingId === item.id ? (
-                      <input
-                        className="description-edit"
-                        value={editingValue}
-                        autoFocus
-                        onChange={e => setEditingValue(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") handleSaveDescription(item.id);
-                          if (e.key === "Escape") { e.stopPropagation(); setEditingId(null); }
-                        }}
-                        onClick={e => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span className="description">{item.description}</span>
-                    )}
-                    <span className={`content-text${item.hidden ? " hidden" : ""}`}>
-                      {item.content}
-                    </span>
-                  </div>
-                  {confirmUnpinId !== item.id && (
-                    <button
-                      className={`action eye-toggle${item.hidden ? " content-hidden" : ""}`}
-                      onClick={e => { e.stopPropagation(); handleToggleHidden(item.id); }}
-                      title={item.hidden ? "Show content" : "Hide content"}
-                    >
-                      {item.hidden ? "\u25CB" : "\u25C9"}
-                    </button>
-                  )}
-                  {confirmUnpinId !== item.id && (
-                    <button
-                      className="action"
-                      onClick={e => { e.stopPropagation(); setEditingId(item.id); setEditingValue(item.description); }}
-                      title="Edit description"
-                    >
-                      {"\u270E"}
-                    </button>
-                  )}
-                  {confirmUnpinId === item.id ? (
-                    <span className="delete-confirm" onClick={e => e.stopPropagation()}>
-                      Remove?
-                      <button
-                        className="action confirm-yes"
-                        onClick={e => { e.stopPropagation(); handleUnpin(item.id); setConfirmUnpinId(null); }}
-                        title="Confirm remove"
-                      >
-                        &#x2713;
-                      </button>
-                      <button
-                        className="action confirm-no"
-                        onClick={e => { e.stopPropagation(); setConfirmUnpinId(null); }}
-                        title="Cancel"
-                      >
-                        &#x2715;
-                      </button>
-                    </span>
-                  ) : (
-                    <button
-                      className="action"
-                      onClick={(e) => { e.stopPropagation(); setConfirmUnpinId(item.id); }}
-                      title="Unpin"
-                    >
-                      &#x2715;
-                    </button>
-                  )}
-                </div>
-                {dragIndicator?.targetId === item.id && dragIndicator.position === "after" && (
-                  <div className="drop-indicator" />
-                )}
-              </div>
+                item={item}
+                isCurrentClipboard={item.content === currentClipboard}
+                isDragging={draggingId === item.id}
+                dragIndicator={dragIndicator}
+                editingId={editingId}
+                editingValue={editingValue}
+                confirmUnpinId={confirmUnpinId}
+                onCopy={handleCopy}
+                onMouseDown={handleMouseDown}
+                onToggleHidden={handleToggleHidden}
+                onStartEdit={(id, desc) => { setEditingId(id); setEditingValue(desc); }}
+                onEditChange={setEditingValue}
+                onSaveEdit={handleSaveDescription}
+                onCancelEdit={() => { setEditingId(null); setEditingValue(""); }}
+                onRequestUnpin={setConfirmUnpinId}
+                onConfirmUnpin={(id) => { handleUnpin(id); setConfirmUnpinId(null); }}
+                onCancelUnpin={() => setConfirmUnpinId(null)}
+              />
             ))}
           </>
         )}
