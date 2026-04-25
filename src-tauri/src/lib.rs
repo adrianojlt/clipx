@@ -107,12 +107,15 @@ fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: Shortcu
 
 // --- Database helpers ---
 
-fn db_path(app: &AppHandle) -> PathBuf {
-    app.path().app_data_dir().unwrap().join("clipx.db")
+fn db_path(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Cannot resolve app data dir: {e}"))?
+        .join("clipx.db"))
 }
 
 fn init_db(conn: &Connection) -> Result<(), String> {
-
     conn.execute(
         "CREATE TABLE IF NOT EXISTS clipboard_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,7 +123,8 @@ fn init_db(conn: &Connection) -> Result<(), String> {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )",
         [],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     conn.execute(
         "CREATE TABLE IF NOT EXISTS clipboard_pinned (
@@ -130,7 +134,8 @@ fn init_db(conn: &Connection) -> Result<(), String> {
             sort_order INTEGER DEFAULT 0
         )",
         [],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     // Migration: add sort_order if missing
     let cols: Vec<String> = conn
@@ -142,11 +147,11 @@ fn init_db(conn: &Connection) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     if !cols.contains(&"sort_order".to_string()) {
-
         conn.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0",
             [],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
 
         let mut stmt = conn
             .prepare("SELECT id FROM clipboard_pinned ORDER BY created_at DESC")
@@ -164,22 +169,24 @@ fn init_db(conn: &Connection) -> Result<(), String> {
             conn.execute(
                 "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
                 [index as i64, *id],
-            ).map_err(|e| e.to_string())?;
+            )
+            .map_err(|e| e.to_string())?;
         }
     }
 
     // Migration: add description if missing
     if !cols.contains(&"description".to_string()) {
-
         conn.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN description TEXT",
             [],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
 
         conn.execute(
             "UPDATE clipboard_pinned SET description = content WHERE description IS NULL",
             [],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     // Migration: add hidden if missing
@@ -187,7 +194,8 @@ fn init_db(conn: &Connection) -> Result<(), String> {
         conn.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN hidden INTEGER DEFAULT 0",
             [],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -195,7 +203,13 @@ fn init_db(conn: &Connection) -> Result<(), String> {
 
 fn start_clipboard_monitor(app: AppHandle) {
     thread::spawn(move || {
-        let db_file = db_path(&app);
+        let db_file = match db_path(&app) {
+            Ok(path) => path,
+            Err(e) => {
+                eprintln!("Failed to get db path: {}", e);
+                return;
+            }
+        };
 
         let mut clipboard = match Clipboard::new() {
             Ok(c) => c,
@@ -260,7 +274,6 @@ fn start_clipboard_monitor(app: AppHandle) {
 
 #[tauri::command]
 fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
-
     let limit = load_settings()
         .get("history_limit")
         .and_then(|v| v.parse::<i64>().ok())
@@ -268,7 +281,7 @@ fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
         .min(50)
         .max(1);
 
-    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
 
     let mut stmt = conn.prepare(
         &format!("SELECT id, content, created_at FROM clipboard_history ORDER BY created_at DESC LIMIT {}", limit)
@@ -281,7 +294,8 @@ fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
                 content: row.get(1)?,
                 created_at: row.get(2)?,
             })
-        }).map_err(|e| e.to_string())?;
+        })
+        .map_err(|e| e.to_string())?;
 
     let mut items = Vec::new();
 
@@ -294,8 +308,7 @@ fn get_history(app: AppHandle) -> Result<Vec<ClipboardItem>, String> {
 
 #[tauri::command]
 fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, String> {
-
-    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
 
     let mut stmt = conn
         .prepare("SELECT id, content, COALESCE(description, content), COALESCE(hidden, 0), created_at FROM clipboard_pinned ORDER BY sort_order ASC")
@@ -310,7 +323,8 @@ fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, String> {
                 hidden: row.get::<_, i64>(3)? != 0,
                 created_at: row.get(4)?,
             })
-        }).map_err(|e| e.to_string())?;
+        })
+        .map_err(|e| e.to_string())?;
 
     let mut items = Vec::new();
 
@@ -323,13 +337,13 @@ fn get_pinned(app: AppHandle) -> Result<Vec<PinnedItem>, String> {
 
 #[tauri::command]
 fn pin_item(content: String, app: AppHandle) -> Result<(), String> {
-
-    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
 
     conn.execute(
         "UPDATE clipboard_pinned SET sort_order = sort_order + 1",
         [],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     conn.execute("INSERT OR IGNORE INTO clipboard_pinned (content, description, sort_order) VALUES (?, ?, 0)", rusqlite::params![content, content]).map_err(|e| e.to_string())?;
 
@@ -338,15 +352,15 @@ fn pin_item(content: String, app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), String> {
-
-    let mut conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let mut conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     for (index, id) in items.iter().enumerate() {
         tx.execute(
             "UPDATE clipboard_pinned SET sort_order = ? WHERE id = ?",
             [index as i64, *id],
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
     }
 
     tx.commit().map_err(|e| e.to_string())?;
@@ -356,52 +370,53 @@ fn reorder_pinned(items: Vec<i64>, app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn update_pinned_description(id: i64, description: String, app: AppHandle) -> Result<(), String> {
-
-    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
 
     conn.execute(
         "UPDATE clipboard_pinned SET description = ? WHERE id = ?",
         rusqlite::params![description, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
 fn unpin_item(id: i64, app: AppHandle) -> Result<(), String> {
+    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
 
-    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
-
-    conn.execute("DELETE FROM clipboard_pinned WHERE id = ?", [id]).map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM clipboard_pinned WHERE id = ?", [id])
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }
 
 #[tauri::command]
 fn toggle_pinned_hidden(id: i64, app: AppHandle) -> Result<bool, String> {
-
-    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
 
     let current: bool = conn
         .query_row(
             "SELECT COALESCE(hidden, 0) FROM clipboard_pinned WHERE id = ?",
             [id],
             |row| row.get::<_, i64>(0).map(|v| v != 0),
-        ).map_err(|e| e.to_string())?;
+        )
+        .map_err(|e| e.to_string())?;
 
     let new_val = if current { 0 } else { 1 };
 
     conn.execute(
         "UPDATE clipboard_pinned SET hidden = ? WHERE id = ?",
         rusqlite::params![new_val, id],
-    ).map_err(|e| e.to_string())?;
+    )
+    .map_err(|e| e.to_string())?;
 
     Ok(!current)
 }
 
 #[tauri::command]
 fn delete_history_item(id: i64, app: AppHandle) -> Result<(), String> {
-    let conn = Connection::open(db_path(&app)).map_err(|e| e.to_string())?;
+    let conn = Connection::open(db_path(&app)?).map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM clipboard_history WHERE id = ?", [id])
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -514,10 +529,14 @@ pub fn run() {
             let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
             // Ensure app data dir exists
-            let _ = std::fs::create_dir_all(app.path().app_data_dir().unwrap());
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| format!("Cannot resolve app data dir: {e}"))?;
+            std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
 
             // Init DB
-            let conn = Connection::open(db_path(&app.handle())).map_err(|e| e.to_string())?;
+            let conn = Connection::open(db_path(&app.handle())?).map_err(|e| e.to_string())?;
             init_db(&conn).map_err(|e| e.to_string())?;
             drop(conn);
 
@@ -540,7 +559,7 @@ pub fn run() {
 
             {
                 let state = app.state::<AppState>();
-                let mut current = state.current_shortcut.lock().unwrap();
+                let mut current = state.current_shortcut.lock().map_err(|e| e.to_string())?;
                 *current = hotkey_str;
             }
 
