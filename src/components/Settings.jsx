@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
+import { getSetting, setSetting, updateShortcut, applyWindowSize } from "../services/clipboardService";
 import "./Settings.css";
 
 function Settings() {
@@ -51,33 +51,33 @@ function Settings() {
   useEffect(() => {
     const load = async () => {
       try {
-        const value = await invoke("get_setting", { key: "hotkey" });
+        const value = await getSetting("hotkey");
         setHotkey(value);
       } catch {
         setHotkey("Option+Space");
       }
       try {
-        const value = await invoke("get_setting", { key: "tab_shortcut_pinned" });
+        const value = await getSetting("tab_shortcut_pinned");
         setTabShortcutPinned(value);
       } catch {}
       try {
-        const value = await invoke("get_setting", { key: "tab_shortcut_history" });
+        const value = await getSetting("tab_shortcut_history");
         setTabShortcutHistory(value);
       } catch {}
       try {
-        const value = await invoke("get_setting", { key: "history_limit" });
+        const value = await getSetting("history_limit");
         setHistoryLimit(Number(value));
       } catch {
         setHistoryLimit(20);
       }
       try {
-        const w = await invoke("get_setting", { key: "window_width" });
+        const w = await getSetting("window_width");
         setWindowWidth(Number(w) || 400);
       } catch {
         setWindowWidth(400);
       }
       try {
-        const h = await invoke("get_setting", { key: "window_height" });
+        const h = await getSetting("window_height");
         setWindowHeight(Number(h) || 600);
       } catch {
         setWindowHeight(600);
@@ -89,13 +89,13 @@ function Settings() {
   const handleSave = async () => {
     setError("");
     try {
-      await invoke("update_shortcut", { shortcut: hotkey });
-      await invoke("set_setting", { key: "tab_shortcut_pinned", value: tabShortcutPinned });
-      await invoke("set_setting", { key: "tab_shortcut_history", value: tabShortcutHistory });
-      await invoke("set_setting", { key: "history_limit", value: String(historyLimit) });
-      await invoke("set_setting", { key: "window_width", value: String(windowWidth) });
-      await invoke("set_setting", { key: "window_height", value: String(windowHeight) });
-      await invoke("apply_window_size");
+      await updateShortcut(hotkey);
+      await setSetting("tab_shortcut_pinned", tabShortcutPinned);
+      await setSetting("tab_shortcut_history", tabShortcutHistory);
+      await setSetting("history_limit", String(historyLimit));
+      await setSetting("window_width", String(windowWidth));
+      await setSetting("window_height", String(windowHeight));
+      await applyWindowSize();
       await getCurrentWindow().hide();
     } catch (e) {
       setError(`Failed to update settings: ${e}`);

@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import {
+    getHistory, getPinned, getClipboard, getSetting, setSetting,
+    pinItem, deleteHistoryItem, unpinItem,
+    updatePinnedDescription, togglePinnedHidden, reorderPinned,
+} from "./services/clipboardService";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { parseShortcut, matchesShortcut } from "./utils/shortcuts";
 import "./App.css";
@@ -25,9 +29,9 @@ function App() {
 
   const loadData = async () => {
     try {
-      const h = await invoke("get_history");
+      const h = await getHistory();
       setHistory(h);
-      const p = await invoke("get_pinned");
+      const p = await getPinned();
       setPinned(p);
       pinnedRef.current = p;
     } catch (e) {
@@ -37,18 +41,18 @@ function App() {
 
   const loadClipboard = async () => {
     try {
-      const text = await invoke("get_clipboard");
+      const text = await getClipboard();
       setCurrentClipboard(text);
     } catch {}
   };
 
   const loadTabShortcuts = async () => {
     try {
-      const v = await invoke("get_setting", { key: "tab_shortcut_pinned" });
+      const v = await getSetting("tab_shortcut_pinned");
       setTabShortcutPinned(v);
     } catch {}
     try {
-      const v = await invoke("get_setting", { key: "tab_shortcut_history" });
+      const v = await getSetting("tab_shortcut_history");
       setTabShortcutHistory(v);
     } catch {}
   };
@@ -114,8 +118,8 @@ function App() {
     const onResize = () => {
       clearTimeout(timeout);
       timeout = setTimeout(async () => {
-        await invoke("set_setting", { key: "window_width", value: String(window.innerWidth) });
-        await invoke("set_setting", { key: "window_height", value: String(window.innerHeight) });
+        await setSetting("window_width", String(window.innerWidth));
+        await setSetting("window_height", String(window.innerHeight));
       }, 300);
     };
     window.addEventListener("resize", onResize);
@@ -141,29 +145,29 @@ function App() {
   };
 
   const handlePin = async (content) => {
-    await invoke("pin_item", { content });
+    await pinItem(content);
     await loadData();
   };
 
   const handleDeleteHistory = async (id) => {
-    await invoke("delete_history_item", { id });
+    await deleteHistoryItem(id);
     setConfirmDeleteHistoryId(null);
     await loadData();
   };
 
   const handleUnpin = async (id) => {
-    await invoke("unpin_item", { id });
+    await unpinItem(id);
     await loadData();
   };
 
   const handleSaveDescription = async (id) => {
-    await invoke("update_pinned_description", { id, description: editingValue });
+    await updatePinnedDescription(id, editingValue);
     setEditingId(null);
     await loadData();
   };
 
   const handleToggleHidden = async (id) => {
-    await invoke("toggle_pinned_hidden", { id });
+    await togglePinnedHidden(id);
     await loadData();
   };
 
@@ -241,7 +245,7 @@ function App() {
         pinnedRef.current = newPinned;
 
         const ids = newPinned.map((item) => item.id);
-        await invoke("reorder_pinned", { items: ids });
+        await reorderPinned(ids);
       }
 
       setDraggingId(null);
