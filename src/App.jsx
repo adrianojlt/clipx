@@ -30,6 +30,7 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editingValue, setEditingValue] = useState("");
   const [historySearch, setHistorySearch] = useState("");
+  const [pinnedSearch, setPinnedSearch] = useState("");
   const [confirmDeleteHistoryId, setConfirmDeleteHistoryId] = useState(null);
   const [confirmUnpinId, setConfirmUnpinId] = useState(null);
   const [currentClipboard, setCurrentClipboard] = useState("");
@@ -42,6 +43,16 @@ function App() {
     () =>
       history.filter((item) => item.content.toLowerCase().includes(historySearch.toLowerCase())),
     [history, historySearch]
+  );
+
+  const filteredPinned = useMemo(
+    () =>
+      pinned.filter(
+        (item) =>
+          item.content.toLowerCase().includes(pinnedSearch.toLowerCase()) ||
+          item.description.toLowerCase().includes(pinnedSearch.toLowerCase())
+      ),
+    [pinned, pinnedSearch]
   );
 
   const loadData = async () => {
@@ -299,6 +310,23 @@ function App() {
           History
         </button>
       </div>
+      {activeTab === "pinned" && (
+        <div className="search-bar">
+          <input
+            className="search-input"
+            type="text"
+            placeholder="Search pinned..."
+            value={pinnedSearch}
+            onChange={(e) => setPinnedSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setPinnedSearch("");
+              }
+            }}
+          />
+        </div>
+      )}
       {activeTab === "history" && (
         <div className="search-bar">
           <input
@@ -319,8 +347,8 @@ function App() {
       <div className="list" ref={listRef}>
         {activeTab === "pinned" && (
           <>
-            {pinned.length === 0 && <div className="empty">No pinned items</div>}
-            {pinned.map((item) => (
+            {filteredPinned.length === 0 && <div className="empty">No pinned items</div>}
+            {filteredPinned.map((item) => (
               <PinnedItem
                 key={item.id}
                 item={item}

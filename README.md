@@ -13,7 +13,7 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Tray menu** - Open the app, change settings, or quit from the tray icon.
 - **Configurable hotkey** - Record your own keyboard shortcut to summon the popup via Settings.
 - **Pin items** - Pin frequently used entries so they stay at the top, reorder them, and give each one a custom label. Hide sensitive content with the eye toggle.
-- **Search history** - Filter clipboard history instantly with the search box.
+- **Search** - Filter both pinned items and clipboard history instantly with the search box.
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
 - **Tab shortcuts** - Switch between Pinned and History tabs with configurable keyboard shortcuts (default Command+1 / Command+2).
 - **Resizable window** - Adjust the popup width and height in Settings.
