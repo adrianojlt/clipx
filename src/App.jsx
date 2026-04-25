@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { parseShortcut, matchesShortcut } from "./utils/shortcuts";
 import "./App.css";
 
 function App() {
@@ -91,24 +92,6 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  const parseShortcut = (shortcut) => {
-    const parts = shortcut.split("+").map(p => p.trim());
-    const key = parts[parts.length - 1];
-    const modifiers = parts.slice(0, -1);
-    return {
-      key: key === "Space" ? " " : key.length === 1 ? key.toUpperCase() : key,
-      meta: modifiers.includes("Command") || modifiers.includes("Super") || modifiers.includes("Meta"),
-      ctrl: modifiers.includes("Ctrl") || modifiers.includes("Control"),
-      alt: modifiers.includes("Option") || modifiers.includes("Alt"),
-      shift: modifiers.includes("Shift"),
-    };
-  };
-
-  const matchesShortcut = (e, shortcut) => {
-    const s = parseShortcut(shortcut);
-    return e.key === s.key && e.metaKey === s.meta && e.ctrlKey === s.ctrl && e.altKey === s.alt && e.shiftKey === s.shift;
-  };
 
   useEffect(() => {
     const onKey = (e) => {
