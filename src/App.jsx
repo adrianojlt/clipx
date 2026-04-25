@@ -2,12 +2,20 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import {
-    getHistory, getPinned, getClipboard, getSetting, setSetting,
-    pinItem, deleteHistoryItem, unpinItem,
-    updatePinnedDescription, togglePinnedHidden, reorderPinned,
+  getHistory,
+  getPinned,
+  getClipboard,
+  getSetting,
+  setSetting,
+  pinItem,
+  deleteHistoryItem,
+  unpinItem,
+  updatePinnedDescription,
+  togglePinnedHidden,
+  reorderPinned,
 } from "./services/clipboardService";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { parseShortcut, matchesShortcut } from "./utils/shortcuts";
+import { matchesShortcut } from "./utils/shortcuts";
 import HistoryItem from "./components/HistoryItem";
 import PinnedItem from "./components/PinnedItem";
 import { EVENTS } from "./constants/events";
@@ -31,9 +39,8 @@ function App() {
   const listRef = useRef(null);
 
   const filteredHistory = useMemo(
-    () => history.filter(item =>
-      item.content.toLowerCase().includes(historySearch.toLowerCase())
-    ),
+    () =>
+      history.filter((item) => item.content.toLowerCase().includes(historySearch.toLowerCase())),
     [history, historySearch]
   );
 
@@ -53,18 +60,24 @@ function App() {
     try {
       const text = await getClipboard();
       setCurrentClipboard(text);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   };
 
   const loadTabShortcuts = async () => {
     try {
       const v = await getSetting("tab_shortcut_pinned");
       setTabShortcutPinned(v);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     try {
       const v = await getSetting("tab_shortcut_history");
       setTabShortcutHistory(v);
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   };
 
   useEffect(() => {
@@ -293,8 +306,8 @@ function App() {
             type="text"
             placeholder="Search history..."
             value={historySearch}
-            onChange={e => setHistorySearch(e.target.value)}
-            onKeyDown={e => {
+            onChange={(e) => setHistorySearch(e.target.value)}
+            onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.stopPropagation();
                 setHistorySearch("");
@@ -306,9 +319,7 @@ function App() {
       <div className="list" ref={listRef}>
         {activeTab === "pinned" && (
           <>
-            {pinned.length === 0 && (
-              <div className="empty">No pinned items</div>
-            )}
+            {pinned.length === 0 && <div className="empty">No pinned items</div>}
             {pinned.map((item) => (
               <PinnedItem
                 key={item.id}
@@ -322,12 +333,21 @@ function App() {
                 onCopy={handleCopy}
                 onMouseDown={handleMouseDown}
                 onToggleHidden={handleToggleHidden}
-                onStartEdit={(id, desc) => { setEditingId(id); setEditingValue(desc); }}
+                onStartEdit={(id, desc) => {
+                  setEditingId(id);
+                  setEditingValue(desc);
+                }}
                 onEditChange={setEditingValue}
                 onSaveEdit={handleSaveDescription}
-                onCancelEdit={() => { setEditingId(null); setEditingValue(""); }}
+                onCancelEdit={() => {
+                  setEditingId(null);
+                  setEditingValue("");
+                }}
                 onRequestUnpin={setConfirmUnpinId}
-                onConfirmUnpin={(id) => { handleUnpin(id); setConfirmUnpinId(null); }}
+                onConfirmUnpin={(id) => {
+                  handleUnpin(id);
+                  setConfirmUnpinId(null);
+                }}
                 onCancelUnpin={() => setConfirmUnpinId(null)}
               />
             ))}
@@ -335,11 +355,9 @@ function App() {
         )}
         {activeTab === "history" && (
           <>
-            {history.length === 0 && (
-              <div className="empty">No history</div>
-            )}
+            {history.length === 0 && <div className="empty">No history</div>}
             {(() => {
-              const pinnedSet = new Set(pinned.map(p => p.content));
+              const pinnedSet = new Set(pinned.map((p) => p.content));
               return filteredHistory.map((item) => (
                 <HistoryItem
                   key={item.id}

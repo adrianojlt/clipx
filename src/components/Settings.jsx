@@ -1,6 +1,11 @@
 import { useState, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { getSetting, setSetting, updateShortcut, applyWindowSize } from "../services/clipboardService";
+import {
+  getSetting,
+  setSetting,
+  updateShortcut,
+  applyWindowSize,
+} from "../services/clipboardService";
 import "./Settings.css";
 
 function Settings() {
@@ -59,11 +64,15 @@ function Settings() {
       try {
         const value = await getSetting("tab_shortcut_pinned");
         setTabShortcutPinned(value);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
       try {
         const value = await getSetting("tab_shortcut_history");
         setTabShortcutHistory(value);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
       try {
         const value = await getSetting("history_limit");
         setHistoryLimit(Number(value));
@@ -119,7 +128,7 @@ function Settings() {
           <button
             type="button"
             className={`record-btn${recording === "hotkey" ? " active" : ""}`}
-            onClick={() => setRecording(r => r === "hotkey" ? null : "hotkey")}
+            onClick={() => setRecording((r) => (r === "hotkey" ? null : "hotkey"))}
           >
             {recording === "hotkey" ? "Cancel" : "Record"}
           </button>
@@ -140,7 +149,7 @@ function Settings() {
           <button
             type="button"
             className={`record-btn${recording === "tab_pinned" ? " active" : ""}`}
-            onClick={() => setRecording(r => r === "tab_pinned" ? null : "tab_pinned")}
+            onClick={() => setRecording((r) => (r === "tab_pinned" ? null : "tab_pinned"))}
           >
             {recording === "tab_pinned" ? "Cancel" : "Record"}
           </button>
@@ -161,7 +170,7 @@ function Settings() {
           <button
             type="button"
             className={`record-btn${recording === "tab_history" ? " active" : ""}`}
-            onClick={() => setRecording(r => r === "tab_history" ? null : "tab_history")}
+            onClick={() => setRecording((r) => (r === "tab_history" ? null : "tab_history"))}
           >
             {recording === "tab_history" ? "Cancel" : "Record"}
           </button>
@@ -176,7 +185,7 @@ function Settings() {
           min={1}
           max={50}
           value={historyLimit}
-          onChange={e => setHistoryLimit(Math.min(50, Math.max(1, Number(e.target.value))))}
+          onChange={(e) => setHistoryLimit(Math.min(50, Math.max(1, Number(e.target.value))))}
         />
         <p className="hint">Number of clipboard entries to keep (max 50)</p>
       </div>
@@ -188,7 +197,7 @@ function Settings() {
           min={300}
           max={800}
           value={windowWidth}
-          onChange={e => setWindowWidth(Math.min(800, Math.max(300, Number(e.target.value))))}
+          onChange={(e) => setWindowWidth(Math.min(800, Math.max(300, Number(e.target.value))))}
         />
         <p className="hint">Popup window width in pixels (300-800)</p>
       </div>
@@ -200,7 +209,7 @@ function Settings() {
           min={400}
           max={900}
           value={windowHeight}
-          onChange={e => setWindowHeight(Math.min(900, Math.max(400, Number(e.target.value))))}
+          onChange={(e) => setWindowHeight(Math.min(900, Math.max(400, Number(e.target.value))))}
         />
         <p className="hint">Popup window height in pixels (400-900)</p>
       </div>

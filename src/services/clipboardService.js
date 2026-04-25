@@ -17,7 +17,7 @@ export const deleteHistoryItem = (id) => invoke("delete_history_item", { id });
 export const unpinItem = (id) => invoke("unpin_item", { id });
 
 export const updatePinnedDescription = (id, description) =>
-    invoke("update_pinned_description", { id, description });
+  invoke("update_pinned_description", { id, description });
 
 export const togglePinnedHidden = (id) => invoke("toggle_pinned_hidden", { id });
 
