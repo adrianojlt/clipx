@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -23,11 +26,14 @@
     "@eslint/js": "^9.39.4",
     "@tauri-apps/cli": "^2",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/ui": "^4.1.5",
     "eslint": "^9.39.4",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.5.0",
+    "jsdom": "^29.0.2",
     "prettier": "^3.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^4.1.5"
   }
 }
