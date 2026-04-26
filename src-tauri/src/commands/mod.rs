@@ -1,4 +1,5 @@
 pub mod clipboard;
+pub mod logging;
 pub mod pinned;
 pub mod settings;
 

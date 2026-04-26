@@ -65,6 +65,29 @@ Format code with Prettier:
 pnpm format
 ```
 
+## Troubleshooting
+
+If something goes wrong, check the log file for details.
+
+**Log file location:**
+
+- macOS: `~/Library/Application Support/com.adriano.clipboard-manager/logs/clipx.log`
+- Windows: `%APPDATA%/clipboard-manager/logs/clipx.log`
+- Linux: `~/.config/clipboard-manager/logs/clipx.log`
+
+**What gets logged:**
+
+- App startup and shutdown
+- Database errors
+- Clipboard monitor failures
+- Settings load/save errors
+- Shortcut registration failures
+
+**What is NOT logged:**
+
+- Clipboard content itself (privacy protection)
+- Normal day-to-day operations
+
 ## Creating a release
 
 1. Update the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`.

@@ -5,6 +5,7 @@ import {
   setSetting,
   updateShortcut,
   applyWindowSize,
+  logError,
 } from "../services/clipboardService";
 import "./Settings.css";
 
@@ -58,38 +59,42 @@ function Settings() {
       try {
         const value = await getSetting("hotkey");
         setHotkey(value);
-      } catch {
+      } catch (e) {
         setHotkey("Option+Space");
+        await logError("warn", `Failed to load hotkey setting: ${e}`);
       }
       try {
         const value = await getSetting("tab_shortcut_pinned");
         setTabShortcutPinned(value);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        await logError("warn", `Failed to load tab shortcut pinned: ${e}`);
       }
       try {
         const value = await getSetting("tab_shortcut_history");
         setTabShortcutHistory(value);
-      } catch {
-        /* ignore */
+      } catch (e) {
+        await logError("warn", `Failed to load tab shortcut history: ${e}`);
       }
       try {
         const value = await getSetting("history_limit");
         setHistoryLimit(Number(value));
-      } catch {
+      } catch (e) {
         setHistoryLimit(20);
+        await logError("warn", `Failed to load history limit: ${e}`);
       }
       try {
         const w = await getSetting("window_width");
         setWindowWidth(Number(w) || 400);
-      } catch {
+      } catch (e) {
         setWindowWidth(400);
+        await logError("warn", `Failed to load window width: ${e}`);
       }
       try {
         const h = await getSetting("window_height");
         setWindowHeight(Number(h) || 600);
-      } catch {
+      } catch (e) {
         setWindowHeight(600);
+        await logError("warn", `Failed to load window height: ${e}`);
       }
     };
     load();
@@ -108,6 +113,7 @@ function Settings() {
       await getCurrentWindow().hide();
     } catch (e) {
       setError(`Failed to update settings: ${e}`);
+      await logError("error", `Failed to save settings: ${e}`);
     }
   };
 

@@ -11,7 +11,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
         let mut clipboard = match Clipboard::new() {
             Ok(c) => c,
             Err(e) => {
-                eprintln!("Failed to initialize clipboard: {}", e);
+                log::error!("Failed to initialize clipboard: {}", e);
                 return;
             }
         };

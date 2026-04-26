@@ -28,13 +28,13 @@ pub fn load_settings() -> HashMap<String, String> {
     let path = match settings_path() {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("settings: cannot resolve path ({e}), using empty settings");
+            log::warn!("settings: cannot resolve path ({e}), using empty settings");
             return HashMap::new();
         }
     };
     match fs::read_to_string(&path) {
         Ok(content) => serde_json::from_str(&content).unwrap_or_else(|e| {
-            eprintln!(
+            log::warn!(
                 "settings: failed to parse {} ({e}), using empty settings",
                 path.display()
             );
@@ -42,7 +42,7 @@ pub fn load_settings() -> HashMap<String, String> {
         }),
         Err(e) if e.kind() == ErrorKind::NotFound => HashMap::new(),
         Err(e) => {
-            eprintln!(
+            log::warn!(
                 "settings: failed to read {} ({e}), using empty settings",
                 path.display()
             );

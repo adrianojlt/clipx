@@ -88,10 +88,8 @@ pub fn apply_window_size(app: AppHandle) -> Result<(), AppError> {
             let monitor = monitor_under_point(&win, pos.x, pos.y);
             let (x, y) = clamp_to_monitor(pos.x, pos.y, width, height, monitor.as_ref());
             if x != pos.x || y != pos.y {
-                let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-                    x,
-                    y,
-                }));
+                let _ =
+                    win.set_position(tauri::Position::Physical(tauri::PhysicalPosition { x, y }));
             }
         }
     }

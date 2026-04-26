@@ -26,3 +26,5 @@ export const reorderPinned = (items) => invoke("reorder_pinned", { items });
 export const updateShortcut = (shortcut) => invoke("update_shortcut", { shortcut });
 
 export const applyWindowSize = () => invoke("apply_window_size");
+
+export const logError = (level, message) => invoke("log_frontend_error", { level, message });

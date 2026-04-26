@@ -13,6 +13,7 @@ import {
   updatePinnedDescription,
   togglePinnedHidden,
   reorderPinned,
+  logError,
 } from "./services/clipboardService";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { matchesShortcut } from "./utils/shortcuts";
@@ -64,6 +65,7 @@ function App() {
       pinnedRef.current = p;
     } catch (e) {
       console.error("Failed to load data", e);
+      await logError("error", `Failed to load data: ${e}`);
     }
   };
 
@@ -71,8 +73,8 @@ function App() {
     try {
       const text = await getClipboard();
       setCurrentClipboard(text);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      await logError("warn", `Failed to load clipboard: ${e}`);
     }
   };
 
@@ -80,14 +82,14 @@ function App() {
     try {
       const v = await getSetting("tab_shortcut_pinned");
       setTabShortcutPinned(v);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      await logError("warn", `Failed to load tab shortcut pinned: ${e}`);
     }
     try {
       const v = await getSetting("tab_shortcut_history");
       setTabShortcutHistory(v);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      await logError("warn", `Failed to load tab shortcut history: ${e}`);
     }
   };
 
@@ -152,8 +154,12 @@ function App() {
     const onResize = () => {
       clearTimeout(timeout);
       timeout = setTimeout(async () => {
-        await setSetting("window_width", String(window.innerWidth));
-        await setSetting("window_height", String(window.innerHeight));
+        try {
+          await setSetting("window_width", String(window.innerWidth));
+          await setSetting("window_height", String(window.innerHeight));
+        } catch (e) {
+          await logError("warn", `Failed to save window size: ${e}`);
+        }
       }, 300);
     };
     window.addEventListener("resize", onResize);
@@ -167,7 +173,11 @@ function App() {
     const titleBar = document.querySelector(".title-bar");
     if (!titleBar) return;
     const onMouseDown = async () => {
-      await getCurrentWindow().startDragging();
+      try {
+        await getCurrentWindow().startDragging();
+      } catch (e) {
+        await logError("warn", `Failed to start dragging: ${e}`);
+      }
     };
     titleBar.addEventListener("mousedown", onMouseDown);
     return () => titleBar.removeEventListener("mousedown", onMouseDown);
@@ -179,30 +189,50 @@ function App() {
   };
 
   const handlePin = async (content) => {
-    await pinItem(content);
-    await loadData();
+    try {
+      await pinItem(content);
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to pin item: ${e}`);
+    }
   };
 
   const handleDeleteHistory = async (id) => {
-    await deleteHistoryItem(id);
-    setConfirmDeleteHistoryId(null);
-    await loadData();
+    try {
+      await deleteHistoryItem(id);
+      setConfirmDeleteHistoryId(null);
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to delete history item: ${e}`);
+    }
   };
 
   const handleUnpin = async (id) => {
-    await unpinItem(id);
-    await loadData();
+    try {
+      await unpinItem(id);
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to unpin item: ${e}`);
+    }
   };
 
   const handleSaveDescription = async (id) => {
-    await updatePinnedDescription(id, editingValue);
-    setEditingId(null);
-    await loadData();
+    try {
+      await updatePinnedDescription(id, editingValue);
+      setEditingId(null);
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to save description: ${e}`);
+    }
   };
 
   const handleToggleHidden = async (id) => {
-    await togglePinnedHidden(id);
-    await loadData();
+    try {
+      await togglePinnedHidden(id);
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to toggle hidden: ${e}`);
+    }
   };
 
   // --- Manual drag-and-drop with mouse events ---
@@ -278,8 +308,12 @@ function App() {
         setPinned(newPinned);
         pinnedRef.current = newPinned;
 
-        const ids = newPinned.map((item) => item.id);
-        await reorderPinned(ids);
+        try {
+          const ids = newPinned.map((item) => item.id);
+          await reorderPinned(ids);
+        } catch (e) {
+          await logError("error", `Failed to reorder pinned: ${e}`);
+        }
       }
 
       setDraggingId(null);

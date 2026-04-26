@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod error;
+mod logging;
 mod monitor;
 mod settings;
 mod window;
@@ -69,10 +70,17 @@ pub fn run() {
             commands::pinned::reorder_pinned,
             commands::pinned::toggle_pinned_hidden,
             commands::clipboard::get_clipboard,
+            commands::logging::log_frontend_error,
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
+            let _ = crate::logging::init_logging(&data_dir);
 
             init_app_state(app, initial_limit)?;
             crate::monitor::start_clipboard_monitor(app.handle().clone());
