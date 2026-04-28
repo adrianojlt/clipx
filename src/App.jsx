@@ -188,6 +188,25 @@ function App() {
     await getCurrentWindow().hide();
   };
 
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (activeTab !== "pinned") return;
+
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 5 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const index = num - 1;
+        if (index < filteredPinned.length) {
+          e.preventDefault();
+          handleCopy(filteredPinned[index].content);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeTab, filteredPinned]);
+
   const handlePin = async (content) => {
     try {
       await pinItem(content);
