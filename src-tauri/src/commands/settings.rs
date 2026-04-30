@@ -2,7 +2,7 @@ use crate::error::AppError;
 use crate::settings::{load_settings, load_window_size, normalize_shortcut, save_settings};
 use crate::window::{clamp_to_monitor, monitor_under_point, shortcut_handler};
 use crate::AppState;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 #[tauri::command]
@@ -15,7 +15,7 @@ pub fn get_setting(key: String) -> Result<String, AppError> {
 }
 
 #[tauri::command]
-pub fn set_setting(key: String, value: String, state: State<AppState>) -> Result<(), AppError> {
+pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppHandle) -> Result<(), AppError> {
     let mut settings = load_settings();
     settings.insert(key.clone(), value.clone());
     save_settings(&settings)?;
@@ -26,6 +26,10 @@ pub fn set_setting(key: String, value: String, state: State<AppState>) -> Result
                 *cached = limit.clamp(1, 50);
             }
         }
+    }
+
+    if key == "tab_shortcut_pinned" || key == "tab_shortcut_history" {
+        let _ = app.emit("settings-changed", &key);
     }
 
     Ok(())

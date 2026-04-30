@@ -103,6 +103,7 @@ function App() {
 
     let unlistenClipboard;
     let unlistenFocus;
+    let unlistenSettings;
 
     const setupListeners = async () => {
       await loadClipboard();
@@ -115,6 +116,10 @@ function App() {
       unlistenFocus = await listen("tauri://window-focus", async () => {
         await loadClipboard();
       });
+
+      unlistenSettings = await listen("settings-changed", () => {
+        loadTabShortcuts();
+      });
     };
 
     setupListeners();
@@ -122,6 +127,7 @@ function App() {
     return () => {
       if (unlistenClipboard) unlistenClipboard();
       if (unlistenFocus) unlistenFocus();
+      if (unlistenSettings) unlistenSettings();
     };
   }, []);
 
