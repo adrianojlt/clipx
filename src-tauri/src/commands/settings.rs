@@ -6,8 +6,8 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 #[tauri::command]
-pub fn get_setting(key: String) -> Result<String, AppError> {
-    let settings = load_settings();
+pub fn get_setting(key: String, app: AppHandle) -> Result<String, AppError> {
+    let settings = load_settings(&app);
     settings
         .get(&key)
         .cloned()
@@ -16,9 +16,9 @@ pub fn get_setting(key: String) -> Result<String, AppError> {
 
 #[tauri::command]
 pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppHandle) -> Result<(), AppError> {
-    let mut settings = load_settings();
+    let mut settings = load_settings(&app);
     settings.insert(key.clone(), value.clone());
-    save_settings(&settings)?;
+    save_settings(&app, &settings)?;
 
     if key == "history_limit" {
         if let Ok(limit) = value.parse::<u32>() {
@@ -70,14 +70,14 @@ pub fn update_shortcut(
         *current = shortcut.clone();
     }
 
-    let mut settings = load_settings();
+    let mut settings = load_settings(&app);
     settings.insert("hotkey".to_string(), shortcut);
-    save_settings(&settings)
+    save_settings(&app, &settings)
 }
 
 #[tauri::command]
 pub fn apply_window_size(app: AppHandle) -> Result<(), AppError> {
-    let (width, height) = load_window_size(&load_settings());
+    let (width, height) = load_window_size(&load_settings(&app));
     let Some(win) = app.get_webview_window("main") else {
         return Ok(());
     };

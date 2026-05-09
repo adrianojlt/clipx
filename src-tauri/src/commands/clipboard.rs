@@ -1,7 +1,8 @@
 use crate::commands::lock_db;
 use crate::error::AppError;
 use crate::{AppState, ClipboardItem};
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_clipboard_manager::ClipboardExt;
 
 #[tauri::command]
 pub fn get_history(state: State<AppState>) -> Result<Vec<ClipboardItem>, AppError> {
@@ -32,11 +33,9 @@ pub fn get_history(state: State<AppState>) -> Result<Vec<ClipboardItem>, AppErro
 }
 
 #[tauri::command]
-pub fn get_clipboard() -> Result<String, AppError> {
-    let mut clipboard =
-        arboard::Clipboard::new().map_err(|e| AppError::Window(format!("clipboard init: {e}")))?;
-    clipboard
-        .get_text()
+pub fn get_clipboard(app: AppHandle) -> Result<String, AppError> {
+    app.clipboard()
+        .read_text()
         .map_err(|e| AppError::Window(format!("clipboard read: {e}")))
 }
 

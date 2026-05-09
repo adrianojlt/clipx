@@ -39,10 +39,12 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
             ON clipboard_pinned(sort_order ASC);",
     )?;
 
+    
     let cols: Vec<String> = tx
         .prepare("PRAGMA table_info(clipboard_pinned)")?
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<Vec<_>, _>>()?;
+
     let has = |name: &str| cols.iter().any(|c| c == name);
 
     if !has("sort_order") {

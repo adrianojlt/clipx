@@ -8,6 +8,8 @@ mod window;
 
 pub use crate::error::AppError;
 
+pub(crate) const MAX_CLIP_BYTES: usize = 1_048_576;
+
 use std::sync::Mutex;
 
 use rusqlite::Connection;
@@ -43,16 +45,10 @@ pub struct PinnedItem {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let initial_limit = {
-        let settings = crate::settings::load_settings();
-        settings
-            .get("history_limit")
-            .and_then(|v| v.parse::<u32>().ok())
-            .unwrap_or(20)
-            .clamp(1, 50)
-    };
-
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_window(app, "main");
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -72,7 +68,7 @@ pub fn run() {
             commands::clipboard::get_clipboard,
             commands::logging::log_frontend_error,
         ])
-        .setup(move |app| {
+        .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
@@ -82,7 +78,11 @@ pub fn run() {
                 .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
             let _ = crate::logging::init_logging(&data_dir);
 
-            init_app_state(app, initial_limit)?;
+            if let Err(e) = crate::settings::migrate_legacy_settings(app.handle()) {
+                log::warn!("settings: legacy migration failed: {e}");
+            }
+
+            init_app_state(app)?;
             crate::monitor::start_clipboard_monitor(app.handle().clone());
             register_initial_shortcut(app)?;
             build_tray(app)?;
@@ -97,12 +97,18 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn init_app_state(app: &mut tauri::App, initial_limit: u32) -> Result<(), AppError> {
+fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     let data_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
     std::fs::create_dir_all(&data_dir)?;
+
+    let initial_limit = crate::settings::load_settings(app.handle())
+        .get("history_limit")
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(20)
+        .clamp(1, 50);
 
     let mut conn = Connection::open(crate::db::db_path(app.handle())?)?;
     crate::db::init_db(&mut conn)?;
@@ -117,7 +123,7 @@ fn init_app_state(app: &mut tauri::App, initial_limit: u32) -> Result<(), AppErr
 }
 
 fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
-    let settings = crate::settings::load_settings();
+    let settings = crate::settings::load_settings(app.handle());
     let hotkey_str = settings
         .get("hotkey")
         .cloned()

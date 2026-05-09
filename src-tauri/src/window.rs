@@ -10,7 +10,7 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
         return;
     };
 
-    let (width, height) = load_window_size(&load_settings());
+    let (width, height) = load_window_size(&load_settings(app));
 
     let Ok(cursor) = app.cursor_position() else {
         return;

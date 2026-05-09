@@ -1,6 +1,6 @@
 use crate::commands::lock_db;
 use crate::error::AppError;
-use crate::{AppState, PinnedItem};
+use crate::{AppState, PinnedItem, MAX_CLIP_BYTES};
 use rusqlite::OptionalExtension;
 use tauri::State;
 
@@ -30,6 +30,13 @@ pub fn get_pinned(state: State<AppState>) -> Result<Vec<PinnedItem>, AppError> {
 
 #[tauri::command]
 pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError> {
+
+    if content.len() > MAX_CLIP_BYTES {
+        return Err(AppError::Validation(format!(
+            "Content exceeds {MAX_CLIP_BYTES}-byte limit"
+        )));
+    }
+
     let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
@@ -96,6 +103,7 @@ pub fn unpin_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn toggle_pinned_hidden(id: i64, state: State<AppState>) -> Result<bool, AppError> {
+
     let conn = lock_db(&state)?;
 
     let current: bool = conn.query_row(

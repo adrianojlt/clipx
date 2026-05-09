@@ -17,6 +17,8 @@ pub enum AppError {
     Shortcut(String),
     #[error("State error: {0}")]
     State(String),
+    #[error("Validation error: {0}")]
+    Validation(String),
     #[error("Window error: {0}")]
     Window(String),
 }

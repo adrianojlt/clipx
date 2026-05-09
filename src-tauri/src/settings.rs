@@ -2,44 +2,99 @@ use crate::error::AppError;
 use std::collections::HashMap;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use tauri::{AppHandle, Manager};
+
+pub fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    Ok(app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?
+        .join("settings.json"))
+}
 
 #[cfg(target_os = "windows")]
-pub fn settings_dir() -> Result<PathBuf, AppError> {
+fn legacy_settings_path() -> Result<PathBuf, AppError> {
     let base = std::env::var("APPDATA")
         .map_err(|_| AppError::Settings("APPDATA env var is not set".to_string()))?;
-    Ok(PathBuf::from(base).join("clipboard-manager"))
+    Ok(PathBuf::from(base)
+        .join("clipboard-manager")
+        .join("settings.json"))
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn settings_dir() -> Result<PathBuf, AppError> {
+fn legacy_settings_path() -> Result<PathBuf, AppError> {
     let home = std::env::var("HOME")
         .map_err(|_| AppError::Settings("HOME env var is not set".to_string()))?;
     Ok(PathBuf::from(home)
         .join(".config")
-        .join("clipboard-manager"))
+        .join("clipboard-manager")
+        .join("settings.json"))
 }
 
-pub fn settings_path() -> Result<PathBuf, AppError> {
-    Ok(settings_dir()?.join("settings.json"))
-}
+pub fn migrate_legacy_settings(app: &AppHandle) -> Result<(), AppError> {
 
-pub fn load_settings() -> HashMap<String, String> {
-    let path = match settings_path() {
+    let new_path = settings_path(app)?;
+
+    if new_path.exists() {
+        return Ok(());
+    }
+
+    let legacy = match legacy_settings_path() {
         Ok(p) => p,
-        Err(e) => {
-            log::warn!("settings: cannot resolve path ({e}), using empty settings");
-            return HashMap::new();
-        }
+        Err(_) => return Ok(()),
     };
-    match fs::read_to_string(&path) {
-        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|e| {
-            log::warn!(
-                "settings: failed to parse {} ({e}), using empty settings",
-                path.display()
-            );
-            HashMap::new()
-        }),
+
+    if !legacy.exists() {
+        return Ok(());
+    }
+
+    if let Some(parent) = new_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    fs::copy(&legacy, &new_path)?;
+    let renamed = legacy.with_extension("json.legacy");
+    fs::rename(&legacy, &renamed)?;
+
+    log::info!(
+        "settings: migrated {} -> {} (legacy renamed to {})",
+        legacy.display(),
+        new_path.display(),
+        renamed.display()
+    );
+
+    Ok(())
+}
+
+fn corrupt_backup_path(path: &Path) -> PathBuf {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    path.with_extension(format!("json.corrupt-{ts}"))
+}
+
+fn read_settings_file(path: &Path) -> HashMap<String, String> {
+    match fs::read_to_string(path) {
+        Ok(content) => match serde_json::from_str::<HashMap<String, String>>(&content) {
+            Ok(s) => s,
+            Err(e) => {
+                let backup = corrupt_backup_path(path);
+                match fs::rename(path, &backup) {
+                    Ok(_) => log::warn!(
+                        "settings: failed to parse {} ({e}); backed up to {}, using empty settings",
+                        path.display(),
+                        backup.display()
+                    ),
+                    Err(rename_err) => log::warn!(
+                        "settings: failed to parse {} ({e}); backup rename failed ({rename_err}), using empty settings",
+                        path.display()
+                    ),
+                }
+                HashMap::new()
+            }
+        },
         Err(e) if e.kind() == ErrorKind::NotFound => HashMap::new(),
         Err(e) => {
             log::warn!(
@@ -51,13 +106,31 @@ pub fn load_settings() -> HashMap<String, String> {
     }
 }
 
-pub fn save_settings(settings: &HashMap<String, String>) -> Result<(), AppError> {
-    let dir = settings_dir()?;
-    fs::create_dir_all(&dir)?;
-    let path = dir.join("settings.json");
+fn write_settings_file(path: &Path, settings: &HashMap<String, String>) -> Result<(), AppError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
     let content = serde_json::to_string_pretty(settings)?;
-    fs::write(&path, content)?;
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, content)?;
+    fs::rename(&tmp, path)?;
     Ok(())
+}
+
+pub fn load_settings(app: &AppHandle) -> HashMap<String, String> {
+    let path = match settings_path(app) {
+        Ok(p) => p,
+        Err(e) => {
+            log::warn!("settings: cannot resolve path ({e}), using empty settings");
+            return HashMap::new();
+        }
+    };
+    read_settings_file(&path)
+}
+
+pub fn save_settings(app: &AppHandle, settings: &HashMap<String, String>) -> Result<(), AppError> {
+    let path = settings_path(app)?;
+    write_settings_file(&path, settings)
 }
 
 pub fn normalize_shortcut(s: &str) -> String {
@@ -162,5 +235,46 @@ mod tests {
 
         assert_eq!(loaded.get("hotkey").unwrap(), "ALT+SPACE");
         assert_eq!(loaded.get("history_limit").unwrap(), "15");
+    }
+
+    #[test]
+    fn write_settings_file_is_atomic() {
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        let mut original = HashMap::new();
+        original.insert("hotkey".to_string(), "ALT+SPACE".to_string());
+
+        write_settings_file(&path, &original).unwrap();
+        assert!(path.exists());
+        assert!(!dir.path().join("settings.json.tmp").exists());
+
+        let loaded = read_settings_file(&path);
+        assert_eq!(loaded.get("hotkey").unwrap(), "ALT+SPACE");
+    }
+
+    #[test]
+    fn read_settings_file_backs_up_corrupt_content() {
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(&path, "{not valid json").unwrap();
+
+        let loaded = read_settings_file(&path);
+        assert!(loaded.is_empty());
+        assert!(!path.exists(), "corrupt file should have been renamed");
+
+        let backups: Vec<_> = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("settings.json.corrupt-")
+            })
+            .collect();
+        assert_eq!(backups.len(), 1, "expected exactly one corrupt backup");
     }
 }
