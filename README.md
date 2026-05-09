@@ -90,16 +90,29 @@ If something goes wrong, check the log file for details.
 
 ## Creating a release
 
-1. Update the version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`.
-2. Commit the changes.
-3. Tag the commit and push the tag:
+1. Bump the version in all three places (replace `0.1.9` with the new version):
+   - `package.json` - `"version"` field
+   - `src-tauri/tauri.conf.json` - `"version"` field
+   - `src-tauri/Cargo.toml` - `version` field
+
+2. Update `Cargo.lock` by running a build:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+cd src-tauri && cargo build
+```
+
+3. Commit and tag:
+
+```bash
+git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+git commit -m "bump version to vX.Y.Z"
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 Pushing the tag triggers the GitHub Actions workflow, which builds installers for all platforms and publishes them as a new release.
+
+> The artifact filenames (e.g. `clipboard-manager_0.1.9_aarch64.dmg`) come from the version in `tauri.conf.json`, not the git tag - so all three files must be bumped before tagging.
 
 ## Running in development
 
