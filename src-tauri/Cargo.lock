@@ -506,7 +506,6 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "thiserror 1.0.69",
- "time",
 ]
 
 [[package]]

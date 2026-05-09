@@ -1,30 +1,56 @@
 use crate::error::AppError;
-use crate::settings::{load_settings, load_window_size, normalize_shortcut, save_settings};
+use crate::settings::{load_settings, load_window_size, normalize_shortcut, save_settings, Settings};
 use crate::window::{clamp_to_monitor, monitor_under_point, shortcut_handler};
 use crate::AppState;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
+fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError> {
+    match key {
+        "hotkey" => s.hotkey = value.to_string(),
+        "history_limit" => {
+            s.history_limit = value
+                .parse::<u32>()
+                .map_err(|_| AppError::Validation(format!("Invalid history_limit: {value}")))?;
+        }
+        "window_width" => {
+            s.window_width = value
+                .parse::<f64>()
+                .map_err(|_| AppError::Validation(format!("Invalid window_width: {value}")))?;
+        }
+        "window_height" => {
+            s.window_height = value
+                .parse::<f64>()
+                .map_err(|_| AppError::Validation(format!("Invalid window_height: {value}")))?;
+        }
+        "tab_shortcut_pinned" => s.tab_shortcut_pinned = value.to_string(),
+        "tab_shortcut_history" => s.tab_shortcut_history = value.to_string(),
+        _ => return Err(AppError::Settings(format!("Unknown setting: {key}"))),
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn get_setting(key: String, app: AppHandle) -> Result<String, AppError> {
     let settings = load_settings(&app);
-    settings
-        .get(&key)
-        .cloned()
-        .ok_or_else(|| AppError::Settings("Setting not found".to_string()))
+    let val = serde_json::to_value(&settings)?;
+    match val.get(&key) {
+        Some(serde_json::Value::String(s)) => Ok(s.clone()),
+        Some(v) => Ok(v.to_string()),
+        None => Err(AppError::Settings(format!("Unknown setting: {key}"))),
+    }
 }
 
 #[tauri::command]
 pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppHandle) -> Result<(), AppError> {
     let mut settings = load_settings(&app);
-    settings.insert(key.clone(), value.clone());
+    apply_field(&mut settings, &key, &value)?;
+    settings.validate();
     save_settings(&app, &settings)?;
 
     if key == "history_limit" {
-        if let Ok(limit) = value.parse::<u32>() {
-            if let Ok(mut cached) = state.history_limit.lock() {
-                *cached = limit.clamp(1, 50);
-            }
+        if let Ok(mut cached) = state.history_limit.lock() {
+            *cached = settings.history_limit;
         }
     }
 
@@ -74,7 +100,7 @@ pub fn update_shortcut(
     }
 
     let mut settings = load_settings(&app);
-    settings.insert("hotkey".to_string(), shortcut);
+    settings.hotkey = shortcut;
     save_settings(&app, &settings)
 }
 

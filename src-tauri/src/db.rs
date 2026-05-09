@@ -11,6 +11,9 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 }
 
 pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
+
+    conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -39,7 +42,6 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
             ON clipboard_pinned(sort_order ASC);",
     )?;
 
-    
     let cols: Vec<String> = tx
         .prepare("PRAGMA table_info(clipboard_pinned)")?
         .query_map([], |row| row.get::<_, String>(1))?

@@ -107,17 +107,15 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
         .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
     std::fs::create_dir_all(&data_dir)?;
 
-    let initial_limit = crate::settings::load_settings(app.handle())
-        .get("history_limit")
-        .and_then(|v| v.parse::<u32>().ok())
-        .unwrap_or(20)
-        .clamp(1, 50);
+    let settings = crate::settings::load_settings(app.handle());
+    let initial_limit = settings.history_limit;
+    let initial_hotkey = settings.hotkey.clone();
 
     let mut conn = Connection::open(crate::db::db_path(app.handle())?)?;
     crate::db::init_db(&mut conn)?;
 
     app.manage(AppState {
-        current_shortcut: Mutex::new(String::new()),
+        current_shortcut: Mutex::new(initial_hotkey),
         history_limit: Mutex::new(initial_limit),
         db: Mutex::new(conn),
     });
@@ -127,10 +125,7 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
 
 fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
     let settings = crate::settings::load_settings(app.handle());
-    let hotkey_str = settings
-        .get("hotkey")
-        .cloned()
-        .unwrap_or_else(|| "Option+Space".to_string());
+    let hotkey_str = settings.hotkey;
 
     let normalized = crate::settings::normalize_shortcut(&hotkey_str);
     let shortcut = normalized
@@ -140,12 +135,6 @@ fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
         .on_shortcut(shortcut, crate::window::shortcut_handler)
         .map_err(|e| AppError::Shortcut(e.to_string()))?;
 
-    let state = app.state::<AppState>();
-    let mut current = state
-        .current_shortcut
-        .lock()
-        .map_err(|e| AppError::State(format!("current_shortcut mutex poisoned: {e}")))?;
-    *current = hotkey_str;
     Ok(())
 }
 

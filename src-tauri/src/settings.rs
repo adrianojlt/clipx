@@ -5,6 +5,61 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct Settings {
+    pub hotkey: String,
+    pub history_limit: u32,
+    pub window_width: f64,
+    pub window_height: f64,
+    pub tab_shortcut_pinned: String,
+    pub tab_shortcut_history: String,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            hotkey: "Option+Space".to_string(),
+            history_limit: 20,
+            window_width: 400.0,
+            window_height: 600.0,
+            tab_shortcut_pinned: "Command+1".to_string(),
+            tab_shortcut_history: "Command+2".to_string(),
+        }
+    }
+}
+
+impl Settings {
+
+    pub fn validate(&mut self) {
+        self.history_limit = self.history_limit.clamp(1, 50);
+        self.window_width = self.window_width.clamp(300.0, 800.0);
+        self.window_height = self.window_height.clamp(400.0, 900.0);
+    }
+
+    fn from_map(map: HashMap<String, String>) -> Self {
+        let mut s = Self::default();
+        if let Some(v) = map.get("hotkey") {
+            s.hotkey = v.clone();
+        }
+        if let Some(v) = map.get("history_limit").and_then(|v| v.parse().ok()) {
+            s.history_limit = v;
+        }
+        if let Some(v) = map.get("window_width").and_then(|v| v.parse().ok()) {
+            s.window_width = v;
+        }
+        if let Some(v) = map.get("window_height").and_then(|v| v.parse().ok()) {
+            s.window_height = v;
+        }
+        if let Some(v) = map.get("tab_shortcut_pinned") {
+            s.tab_shortcut_pinned = v.clone();
+        }
+        if let Some(v) = map.get("tab_shortcut_history") {
+            s.tab_shortcut_history = v.clone();
+        }
+        s
+    }
+}
+
 pub fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
     Ok(app
         .path()
@@ -33,7 +88,6 @@ fn legacy_settings_path() -> Result<PathBuf, AppError> {
 }
 
 pub fn migrate_legacy_settings(app: &AppHandle) -> Result<(), AppError> {
-
     let new_path = settings_path(app)?;
 
     if new_path.exists() {
@@ -75,38 +129,49 @@ fn corrupt_backup_path(path: &Path) -> PathBuf {
     path.with_extension(format!("json.corrupt-{ts}"))
 }
 
-fn read_settings_file(path: &Path) -> HashMap<String, String> {
-    match fs::read_to_string(path) {
-        Ok(content) => match serde_json::from_str::<HashMap<String, String>>(&content) {
-            Ok(s) => s,
-            Err(e) => {
-                let backup = corrupt_backup_path(path);
-                match fs::rename(path, &backup) {
-                    Ok(_) => log::warn!(
-                        "settings: failed to parse {} ({e}); backed up to {}, using empty settings",
-                        path.display(),
-                        backup.display()
-                    ),
-                    Err(rename_err) => log::warn!(
-                        "settings: failed to parse {} ({e}); backup rename failed ({rename_err}), using empty settings",
-                        path.display()
-                    ),
-                }
-                HashMap::new()
-            }
-        },
-        Err(e) if e.kind() == ErrorKind::NotFound => HashMap::new(),
+fn read_settings_file(path: &Path) -> Settings {
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Settings::default(),
         Err(e) => {
             log::warn!(
-                "settings: failed to read {} ({e}), using empty settings",
+                "settings: failed to read {} ({e}), using defaults",
                 path.display()
             );
-            HashMap::new()
+            return Settings::default();
         }
+    };
+
+    // Try new typed format first.
+    if let Ok(mut s) = serde_json::from_str::<Settings>(&content) {
+        s.validate();
+        return s;
     }
+
+    // Fall back to old string-map format (migrates existing installs).
+    if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
+        let mut s = Settings::from_map(map);
+        s.validate();
+        return s;
+    }
+
+    // Truly corrupt - back up and use defaults.
+    let backup = corrupt_backup_path(path);
+    match fs::rename(path, &backup) {
+        Ok(_) => log::warn!(
+            "settings: failed to parse {}; backed up to {}, using defaults",
+            path.display(),
+            backup.display()
+        ),
+        Err(rename_err) => log::warn!(
+            "settings: failed to parse {}; backup rename failed ({rename_err}), using defaults",
+            path.display()
+        ),
+    }
+    Settings::default()
 }
 
-fn write_settings_file(path: &Path, settings: &HashMap<String, String>) -> Result<(), AppError> {
+fn write_settings_file(path: &Path, settings: &Settings) -> Result<(), AppError> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -117,18 +182,18 @@ fn write_settings_file(path: &Path, settings: &HashMap<String, String>) -> Resul
     Ok(())
 }
 
-pub fn load_settings(app: &AppHandle) -> HashMap<String, String> {
+pub fn load_settings(app: &AppHandle) -> Settings {
     let path = match settings_path(app) {
         Ok(p) => p,
         Err(e) => {
-            log::warn!("settings: cannot resolve path ({e}), using empty settings");
-            return HashMap::new();
+            log::warn!("settings: cannot resolve path ({e}), using defaults");
+            return Settings::default();
         }
     };
     read_settings_file(&path)
 }
 
-pub fn save_settings(app: &AppHandle, settings: &HashMap<String, String>) -> Result<(), AppError> {
+pub fn save_settings(app: &AppHandle, settings: &Settings) -> Result<(), AppError> {
     let path = settings_path(app)?;
     write_settings_file(&path, settings)
 }
@@ -145,24 +210,13 @@ pub fn normalize_shortcut(s: &str) -> String {
         .join("+")
 }
 
-pub fn load_window_size(settings: &HashMap<String, String>) -> (f64, f64) {
-    let width = settings
-        .get("window_width")
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(400.0)
-        .clamp(300.0, 800.0);
-    let height = settings
-        .get("window_height")
-        .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(600.0)
-        .clamp(400.0, 900.0);
-    (width, height)
+pub fn load_window_size(settings: &Settings) -> (f64, f64) {
+    (settings.window_width, settings.window_height)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
 
     #[test]
     fn normalize_shortcut_handles_option() {
@@ -188,53 +242,53 @@ mod tests {
 
     #[test]
     fn load_window_size_defaults() {
-        let s = HashMap::new();
+        let s = Settings::default();
         assert_eq!(load_window_size(&s), (400.0, 600.0));
     }
 
     #[test]
     fn load_window_size_clamps_upper() {
-        let mut s = HashMap::new();
-        s.insert("window_width".to_string(), "9999".to_string());
-        s.insert("window_height".to_string(), "9999".to_string());
+        let mut s = Settings::default();
+        s.window_width = 9999.0;
+        s.window_height = 9999.0;
+        s.validate();
         assert_eq!(load_window_size(&s), (800.0, 900.0));
     }
 
     #[test]
     fn load_window_size_clamps_lower() {
-        let mut s = HashMap::new();
-        s.insert("window_width".to_string(), "10".to_string());
-        s.insert("window_height".to_string(), "10".to_string());
+        let mut s = Settings::default();
+        s.window_width = 10.0;
+        s.window_height = 10.0;
+        s.validate();
         assert_eq!(load_window_size(&s), (300.0, 400.0));
     }
 
     #[test]
     fn load_window_size_garbage_falls_back_to_defaults() {
-        let mut s = HashMap::new();
-        s.insert("window_width".to_string(), "not-a-number".to_string());
+        // from_map leaves defaults when the value doesn't parse
+        let mut map = HashMap::new();
+        map.insert("window_width".to_string(), "not-a-number".to_string());
+        let s = Settings::from_map(map);
         assert_eq!(load_window_size(&s), (400.0, 600.0));
     }
 
     #[test]
     fn settings_round_trip() {
-        use std::fs;
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("settings.json");
 
-        let mut original = HashMap::new();
-        original.insert("hotkey".to_string(), "ALT+SPACE".to_string());
-        original.insert("history_limit".to_string(), "15".to_string());
+        let mut original = Settings::default();
+        original.hotkey = "ALT+SPACE".to_string();
+        original.history_limit = 15;
 
-        let json = serde_json::to_string(&original).unwrap();
-        fs::write(&path, &json).unwrap();
+        write_settings_file(&path, &original).unwrap();
+        let loaded = read_settings_file(&path);
 
-        let content = fs::read_to_string(&path).unwrap();
-        let loaded: HashMap<String, String> = serde_json::from_str(&content).unwrap();
-
-        assert_eq!(loaded.get("hotkey").unwrap(), "ALT+SPACE");
-        assert_eq!(loaded.get("history_limit").unwrap(), "15");
+        assert_eq!(loaded.hotkey, "ALT+SPACE");
+        assert_eq!(loaded.history_limit, 15);
     }
 
     #[test]
@@ -243,15 +297,15 @@ mod tests {
 
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("settings.json");
-        let mut original = HashMap::new();
-        original.insert("hotkey".to_string(), "ALT+SPACE".to_string());
+        let mut s = Settings::default();
+        s.hotkey = "ALT+SPACE".to_string();
 
-        write_settings_file(&path, &original).unwrap();
+        write_settings_file(&path, &s).unwrap();
         assert!(path.exists());
         assert!(!dir.path().join("settings.json.tmp").exists());
 
         let loaded = read_settings_file(&path);
-        assert_eq!(loaded.get("hotkey").unwrap(), "ALT+SPACE");
+        assert_eq!(loaded.hotkey, "ALT+SPACE");
     }
 
     #[test]
@@ -263,7 +317,7 @@ mod tests {
         fs::write(&path, "{not valid json").unwrap();
 
         let loaded = read_settings_file(&path);
-        assert!(loaded.is_empty());
+        assert_eq!(loaded.hotkey, Settings::default().hotkey);
         assert!(!path.exists(), "corrupt file should have been renamed");
 
         let backups: Vec<_> = fs::read_dir(dir.path())
@@ -276,5 +330,46 @@ mod tests {
             })
             .collect();
         assert_eq!(backups.len(), 1, "expected exactly one corrupt backup");
+    }
+
+    #[test]
+    fn read_settings_file_migrates_old_string_map_format() {
+
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+
+        // Old format: all values are JSON strings
+        fs::write(
+            &path,
+            r#"{"hotkey":"ALT+SPACE","history_limit":"15","window_width":"500","window_height":"700","tab_shortcut_pinned":"Command+1","tab_shortcut_history":"Command+2"}"#,
+        )
+        .unwrap();
+
+        let loaded = read_settings_file(&path);
+
+        assert_eq!(loaded.hotkey, "ALT+SPACE");
+        assert_eq!(loaded.history_limit, 15);
+        assert_eq!(loaded.window_width, 500.0);
+        assert!(!path.with_extension("json.corrupt-0").exists());
+    }
+
+    #[test]
+    fn validate_clamps_all_fields() {
+
+        let mut s = Settings {
+            hotkey: "X".to_string(),
+            history_limit: 200,
+            window_width: 50.0,
+            window_height: 5000.0,
+            tab_shortcut_pinned: "A".to_string(),
+            tab_shortcut_history: "B".to_string(),
+        };
+
+        s.validate();
+        assert_eq!(s.history_limit, 50);
+        assert_eq!(s.window_width, 300.0);
+        assert_eq!(s.window_height, 900.0);
     }
 }

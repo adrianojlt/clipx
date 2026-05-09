@@ -19,6 +19,8 @@ pub enum AppError {
     State(String),
     #[error("Validation error: {0}")]
     Validation(String),
+    #[error("Not found: id {0}")]
+    NotFound(i64),
     #[error("Window error: {0}")]
     Window(String),
 }

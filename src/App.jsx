@@ -39,6 +39,7 @@ function App() {
   const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
   const pinnedRef = useRef([]);
   const listRef = useRef(null);
+  const dragCleanupRef = useRef(null);
 
   const filteredHistory = useMemo(
     () =>
@@ -98,36 +99,55 @@ function App() {
   }, [pinned]);
 
   useEffect(() => {
+    return () => {
+      if (dragCleanupRef.current) {
+        dragCleanupRef.current();
+        dragCleanupRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     loadData();
     loadTabShortcuts();
 
-    let unlistenClipboard;
-    let unlistenFocus;
-    let unlistenSettings;
+    let cancelled = false;
+    const unlisteners = [];
 
     const setupListeners = async () => {
+
       await loadClipboard();
 
-      unlistenClipboard = await listen(EVENTS.CLIPBOARD_CHANGED, async () => {
+      if (cancelled) return;
+
+      const u1 = await listen(EVENTS.CLIPBOARD_CHANGED, async () => {
         loadData();
         await loadClipboard();
       });
 
-      unlistenFocus = await listen("tauri://window-focus", async () => {
+      if (cancelled) { u1(); return; }
+      unlisteners.push(u1);
+
+      const u2 = await listen("tauri://window-focus", async () => {
         await loadClipboard();
       });
 
-      unlistenSettings = await listen("settings-changed", () => {
+      if (cancelled) { u2(); return; }
+      unlisteners.push(u2);
+
+      const u3 = await listen("settings-changed", () => {
         loadTabShortcuts();
       });
+
+      if (cancelled) { u3(); return; }
+      unlisteners.push(u3);
     };
 
     setupListeners();
 
     return () => {
-      if (unlistenClipboard) unlistenClipboard();
-      if (unlistenFocus) unlistenFocus();
-      if (unlistenSettings) unlistenSettings();
+      cancelled = true;
+      unlisteners.forEach((fn) => fn());
     };
   }, []);
 
@@ -305,6 +325,7 @@ function App() {
     const onMouseUp = async () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+      dragCleanupRef.current = null;
 
       const currentPinned = pinnedRef.current;
       const draggedIndex = currentPinned.findIndex((item) => item.id === id);
@@ -345,6 +366,10 @@ function App() {
       setDragIndicator(null);
     };
 
+    dragCleanupRef.current = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   };
