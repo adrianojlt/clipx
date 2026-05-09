@@ -2,6 +2,7 @@ export default function HistoryItem({
   item,
   isCurrentClipboard,
   isPinned,
+  isHidden,
   confirmDeleteId,
   onCopy,
   onPin,
@@ -16,7 +17,7 @@ export default function HistoryItem({
       className={`item${isCurrentClipboard ? " current-clipboard" : ""}`}
       onClick={() => onCopy(item.content)}
     >
-      <span className="text">{item.content}</span>
+      <span className={`text${isHidden ? " hidden" : ""}`}>{item.content}</span>
       {isConfirming ? (
         <span className="delete-confirm" onClick={(e) => e.stopPropagation()}>
           Delete?

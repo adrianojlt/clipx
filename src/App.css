@@ -231,11 +231,14 @@
   position: relative;
 }
 
-.content-text.hidden {
+.content-text.hidden,
+.text.hidden {
   color: transparent;
+  position: relative;
 }
 
-.content-text.hidden::after {
+.content-text.hidden::after,
+.text.hidden::after {
   content: "••••••••••\A••••••••••";
   white-space: pre-wrap;
   color: #666;

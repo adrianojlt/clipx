@@ -445,12 +445,14 @@ function App() {
             {history.length === 0 && <div className="empty">No history</div>}
             {(() => {
               const pinnedSet = new Set(pinned.map((p) => p.content));
+              const pinnedHiddenSet = new Set(pinned.filter((p) => p.hidden).map((p) => p.content));
               return filteredHistory.map((item) => (
                 <HistoryItem
                   key={item.id}
                   item={item}
                   isCurrentClipboard={item.content === currentClipboard}
                   isPinned={pinnedSet.has(item.content)}
+                  isHidden={pinnedHiddenSet.has(item.content)}
                   confirmDeleteId={confirmDeleteHistoryId}
                   onCopy={handleCopy}
                   onPin={handlePin}
