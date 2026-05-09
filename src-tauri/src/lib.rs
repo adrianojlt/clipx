@@ -76,7 +76,10 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
-            let _ = crate::logging::init_logging(&data_dir);
+
+            if let Err(e) = crate::logging::init_logging(&data_dir) {
+                eprintln!("logging init failed: {e}");
+            }
 
             if let Err(e) = crate::settings::migrate_legacy_settings(app.handle()) {
                 log::warn!("settings: legacy migration failed: {e}");

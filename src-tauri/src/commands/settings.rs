@@ -49,18 +49,21 @@ pub fn update_shortcut(
         current.clone()
     };
 
-    let normalized_old = normalize_shortcut(&old_shortcut_str);
-    if let Ok(old) = normalized_old.parse::<Shortcut>() {
-        let _ = app.global_shortcut().unregister(old);
-    }
-
     let normalized_new = normalize_shortcut(&shortcut);
-    let new_shortcut = normalized_new
-        .parse::<Shortcut>()
-        .map_err(|e| AppError::Shortcut(e.to_string()))?;
-    app.global_shortcut()
-        .on_shortcut(new_shortcut, shortcut_handler)
-        .map_err(|e| AppError::Shortcut(e.to_string()))?;
+    let normalized_old = normalize_shortcut(&old_shortcut_str);
+
+    if normalized_new != normalized_old {
+        let new_shortcut = normalized_new
+            .parse::<Shortcut>()
+            .map_err(|e| AppError::Shortcut(e.to_string()))?;
+        app.global_shortcut()
+            .on_shortcut(new_shortcut, shortcut_handler)
+            .map_err(|e| AppError::Shortcut(e.to_string()))?;
+
+        if let Ok(old) = normalized_old.parse::<Shortcut>() {
+            let _ = app.global_shortcut().unregister(old);
+        }
+    }
 
     {
         let mut current = state

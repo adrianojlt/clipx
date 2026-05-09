@@ -7,8 +7,6 @@
     "core:default",
     "opener:default",
     "clipboard-manager:allow-write-text",
-    "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister",
     "core:window:allow-hide",
     "core:window:allow-show",
     "core:window:allow-set-focus",

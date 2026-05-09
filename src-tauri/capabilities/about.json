@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "about",
+  "description": "Minimal capability for the About window",
+  "windows": ["about"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-hide",
+    "opener:default"
+  ]
+}
