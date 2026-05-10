@@ -1,3 +1,6 @@
+import { useState, useRef } from "react";
+import ReactDOM from "react-dom";
+
 export default function HistoryItem({
   item,
   isCurrentClipboard,
@@ -11,11 +14,43 @@ export default function HistoryItem({
   onCancelDelete,
 }) {
   const isConfirming = confirmDeleteId === item.id;
+  const [tooltip, setTooltip] = useState(null);
+  const timerRef = useRef(null);
+  const hideRef = useRef(null);
+  const itemRef = useRef(null);
+
+  function handleMouseEnter() {
+    timerRef.current = setTimeout(() => {
+
+      if (!itemRef.current) return;
+
+      const rect = itemRef.current.getBoundingClientRect();
+      const estimatedHeight = 120;
+
+      const top = rect.bottom + estimatedHeight > window.innerHeight
+          ? rect.top - estimatedHeight - 4
+          : rect.bottom + 4;
+
+      const left = Math.min(rect.left, window.innerWidth - 328);
+
+      setTooltip({ top, left });
+
+    }, 2000);
+  }
+
+  function handleMouseLeave() {
+    clearTimeout(timerRef.current);
+    hideRef.current = setTimeout(() => setTooltip(null), 100);
+  }
 
   return (
+    <>
     <div
+      ref={itemRef}
       className={`item${isCurrentClipboard ? " current-clipboard" : ""}`}
       onClick={() => onCopy(item.content)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <span className={`text${isHidden ? " hidden" : ""}`}>{item.content}</span>
       {isConfirming ? (
@@ -67,5 +102,17 @@ export default function HistoryItem({
         </>
       )}
     </div>
+    {tooltip && ReactDOM.createPortal(
+      <div
+        className="hover-tooltip"
+        style={{ top: tooltip.top, left: tooltip.left }}
+        onMouseEnter={() => clearTimeout(hideRef.current)}
+        onMouseLeave={() => setTooltip(null)}
+      >
+        {item.content}
+      </div>,
+      document.body
+    )}
+    </>
   );
 }
