@@ -50,6 +50,7 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
     let has = |name: &str| cols.iter().any(|c| c == name);
 
     if !has("sort_order") {
+
         tx.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN sort_order INTEGER DEFAULT 0",
             [],
@@ -69,10 +70,12 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
     }
 
     if !has("description") {
+
         tx.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN description TEXT",
             [],
         )?;
+
         tx.execute(
             "UPDATE clipboard_pinned SET description = content WHERE description IS NULL",
             [],
@@ -80,6 +83,7 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
     }
 
     if !has("hidden") {
+
         tx.execute(
             "ALTER TABLE clipboard_pinned ADD COLUMN hidden INTEGER DEFAULT 0",
             [],
@@ -87,5 +91,6 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
     }
 
     tx.commit()?;
+    
     Ok(())
 }

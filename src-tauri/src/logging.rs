@@ -6,7 +6,9 @@ use std::fs::OpenOptions;
 const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
 
 pub fn init_logging(app_data_dir: &std::path::Path) -> Result<(), AppError> {
+
     let log_dir = app_data_dir.join("logs");
+
     std::fs::create_dir_all(&log_dir).map_err(|e| {
         AppError::Io(std::io::Error::new(
             std::io::ErrorKind::Other,

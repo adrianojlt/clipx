@@ -6,11 +6,18 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 
 const EVENT_CLIPBOARD_CHANGED: &str = "clipboard-changed";
 
+// Code responsible to check for changes in clipboard ...
+// Polling was chosen because no portable clipboard change event exists, 
+// and macOS doesn't expose one at all
 pub fn start_clipboard_monitor(app: AppHandle) {
+
     thread::spawn(move || {
+
         let mut last_text = String::new();
 
         loop {
+
+            // we will check every 500ms for new content in the clipboard
             thread::sleep(Duration::from_millis(500));
 
             let text = match app.clipboard().read_text() {
@@ -22,6 +29,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
                 continue;
             }
 
+            // content didn't change? do nothing ...
             if text.len() > MAX_CLIP_BYTES {
                 last_text = text;
                 continue;
@@ -29,8 +37,10 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
             last_text = text.clone();
 
+            // Get history limit from state, default to 20 if lock fails
             let state = app.state::<AppState>();
             let limit = state.history_limit.lock().map(|l| *l).unwrap_or(20) as i64;
+
             let mut conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
             let result: rusqlite::Result<()> = (|| {

@@ -4,20 +4,26 @@ use tauri::command;
 const MAX_FRONTEND_MSG: usize = 4096;
 
 fn sanitize_frontend_message(message: &str) -> String {
+
     let truncated = if message.len() > MAX_FRONTEND_MSG {
+
         let mut end = MAX_FRONTEND_MSG;
+
         while !message.is_char_boundary(end) {
             end -= 1;
         }
+
         &message[..end]
     } else {
         message
     };
+
     truncated.replace('\\', "\\\\").replace('\n', "\\n").replace('\r', "\\r")
 }
 
 #[command]
 pub fn log_frontend_error(level: String, message: String) {
+
     let level = match level.as_str() {
         "error" => Level::Error,
         "warn" => Level::Warn,
@@ -25,6 +31,7 @@ pub fn log_frontend_error(level: String, message: String) {
         "debug" => Level::Debug,
         _ => Level::Info,
     };
+
     log::log!(level, "[frontend] {}", sanitize_frontend_message(&message));
 }
 

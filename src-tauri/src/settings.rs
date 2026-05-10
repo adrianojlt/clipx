@@ -37,7 +37,9 @@ impl Settings {
     }
 
     fn from_map(map: HashMap<String, String>) -> Self {
+
         let mut s = Self::default();
+
         if let Some(v) = map.get("hotkey") {
             s.hotkey = v.clone();
         }
@@ -88,6 +90,7 @@ fn legacy_settings_path() -> Result<PathBuf, AppError> {
 }
 
 pub fn migrate_legacy_settings(app: &AppHandle) -> Result<(), AppError> {
+
     let new_path = settings_path(app)?;
 
     if new_path.exists() {
@@ -155,7 +158,7 @@ fn read_settings_file(path: &Path) -> Settings {
         return s;
     }
 
-    // Truly corrupt - back up and use defaults.
+    // Truly corrupt, back up and use defaults.
     let backup = corrupt_backup_path(path);
     match fs::rename(path, &backup) {
         Ok(_) => log::warn!(
@@ -216,6 +219,7 @@ pub fn load_window_size(settings: &Settings) -> (f64, f64) {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]

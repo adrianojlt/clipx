@@ -101,10 +101,12 @@ pub fn run() {
 }
 
 fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
+
     let data_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| AppError::Path(format!("Cannot resolve app data dir: {e}")))?;
+        
     std::fs::create_dir_all(&data_dir)?;
 
     let settings = crate::settings::load_settings(app.handle());
@@ -124,13 +126,16 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
 }
 
 fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
+
     let settings = crate::settings::load_settings(app.handle());
     let hotkey_str = settings.hotkey;
 
     let normalized = crate::settings::normalize_shortcut(&hotkey_str);
+
     let shortcut = normalized
         .parse::<Shortcut>()
         .map_err(|e| AppError::Shortcut(format!("Failed to parse '{}': {}", hotkey_str, e)))?;
+
     app.global_shortcut()
         .on_shortcut(shortcut, crate::window::shortcut_handler)
         .map_err(|e| AppError::Shortcut(e.to_string()))?;
@@ -139,6 +144,7 @@ fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
 }
 
 fn build_tray(app: &tauri::App) -> Result<(), AppError> {
+
     let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)
         .map_err(|e| AppError::Window(e.to_string()))?;
     let settings_i = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)

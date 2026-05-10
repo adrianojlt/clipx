@@ -346,9 +346,11 @@ function App() {
       }
 
       if (targetIndex !== draggedIndex && targetIndex !== -1) {
+
         const newPinned = [...currentPinned];
         const [draggedItem] = newPinned.splice(draggedIndex, 1);
         const insertIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+
         newPinned.splice(insertIndex, 0, draggedItem);
 
         setPinned(newPinned);
@@ -375,6 +377,7 @@ function App() {
   };
 
   return (
+
     <main className="container">
       <div className="title-bar">
         <img src="/icon.png" alt="ClipX" className="app-icon" />

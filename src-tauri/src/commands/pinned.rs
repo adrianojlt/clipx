@@ -6,6 +6,7 @@ use tauri::State;
 
 #[tauri::command]
 pub fn get_pinned(state: State<AppState>) -> Result<Vec<PinnedItem>, AppError> {
+
     let conn = lock_db(&state)?;
 
     let mut stmt = conn.prepare(
@@ -66,6 +67,7 @@ pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError>
 
 #[tauri::command]
 pub fn reorder_pinned(items: Vec<i64>, state: State<AppState>) -> Result<(), AppError> {
+
     let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
@@ -91,19 +93,24 @@ pub fn update_pinned_description(
         "UPDATE clipboard_pinned SET description = ?1 WHERE id = ?2",
         rusqlite::params![description, id],
     )?;
+
     if n == 0 {
         return Err(AppError::NotFound(id));
     }
+
     Ok(())
 }
 
 #[tauri::command]
 pub fn unpin_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
+
     let conn = lock_db(&state)?;
     let n = conn.execute("DELETE FROM clipboard_pinned WHERE id = ?1", [id])?;
+
     if n == 0 {
         return Err(AppError::NotFound(id));
     }
+
     Ok(())
 }
 

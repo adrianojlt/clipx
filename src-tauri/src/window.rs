@@ -3,13 +3,17 @@ use tauri::{Manager, Monitor, PhysicalPosition, WebviewWindow};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutEvent, ShortcutState};
 
 pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: ShortcutEvent) {
+
+    // ignore key-up events
     if event.state() != ShortcutState::Pressed {
         return;
     }
+
     let Some(win) = app.get_webview_window("main") else {
         return;
     };
 
+    // reads cursor position
     let (width, height) = load_window_size(&load_settings(app));
 
     let Ok(cursor) = app.cursor_position() else {
@@ -17,6 +21,7 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
     };
 
     let monitor = monitor_under_point(&win, cursor.x as i32, cursor.y as i32);
+
     let (x, y) = clamp_to_monitor(
         cursor.x as i32,
         cursor.y as i32,
@@ -25,6 +30,7 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
         monitor.as_ref(),
     );
 
+    // show pop up window near the mouse
     let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize { width, height }));
     let _ = win.set_position(tauri::Position::Physical(PhysicalPosition { x, y }));
     let _ = win.show();
@@ -65,6 +71,7 @@ pub(crate) fn clamp_to_monitor(
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
