@@ -35,8 +35,14 @@ pub fn get_history(state: State<AppState>) -> Result<Vec<ClipboardItem>, AppErro
 
 #[tauri::command]
 pub fn get_clipboard(app: AppHandle) -> Result<String, AppError> {
-    app.clipboard()
-        .read_text()
+    let (tx, rx) = std::sync::mpsc::channel::<Result<String, String>>();
+    let app_inner = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(app_inner.clipboard().read_text().map_err(|e| e.to_string()));
+    })
+    .map_err(|e| AppError::Window(format!("dispatch to main thread failed: {e}")))?;
+    rx.recv_timeout(std::time::Duration::from_secs(2))
+        .map_err(|_| AppError::Window("clipboard read timed out".into()))?
         .map_err(|e| AppError::Window(format!("clipboard read: {e}")))
 }
 

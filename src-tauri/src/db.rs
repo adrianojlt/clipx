@@ -30,7 +30,9 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content TEXT NOT NULL UNIQUE,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            sort_order INTEGER DEFAULT 0
+            sort_order INTEGER DEFAULT 0,
+            description TEXT,
+            hidden INTEGER DEFAULT 0
         )",
         [],
     )?;

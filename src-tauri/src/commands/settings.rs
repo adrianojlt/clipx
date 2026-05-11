@@ -121,7 +121,9 @@ pub fn update_shortcut(
                 .map_err(|e| AppError::Shortcut(e.to_string()))?;
 
             if let Ok(old) = normalized_old.parse::<Shortcut>() {
-                let _ = app.global_shortcut().unregister(old);
+                if let Err(e) = app.global_shortcut().unregister(old) {
+                    log::warn!("update_shortcut: failed to unregister '{}': {e}", normalized_old);
+                }
             }
         }
 
