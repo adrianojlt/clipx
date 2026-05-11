@@ -1,4 +1,4 @@
-use crate::settings::{load_settings, load_window_size};
+use crate::AppState;
 use tauri::{Manager, Monitor, PhysicalPosition, WebviewWindow};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutEvent, ShortcutState};
 
@@ -13,8 +13,10 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
         return;
     };
 
-    // reads cursor position
-    let (width, height) = load_window_size(&load_settings(app));
+    // get cursor position
+    let state = app.state::<AppState>();
+    let width = state.window_width.lock().map(|w| *w).unwrap_or(400.0);
+    let height = state.window_height.lock().map(|h| *h).unwrap_or(600.0);
 
     let Ok(cursor) = app.cursor_position() else {
         return;

@@ -8,7 +8,6 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError> {
 
     match key {
-        "hotkey" => s.hotkey = value.to_string(),
         "history_limit" => {
             s.history_limit = value
                 .parse::<u32>()
@@ -49,6 +48,10 @@ pub fn get_setting(key: String, app: AppHandle) -> Result<String, AppError> {
 #[tauri::command]
 pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppHandle) -> Result<(), AppError> {
 
+    if key == "hotkey" {
+        return update_shortcut(value, state, app);
+    }
+
     let mut settings = load_settings(&app);
     apply_field(&mut settings, &key, &value)?;
     settings.validate();
@@ -57,6 +60,18 @@ pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppH
     if key == "history_limit" {
         if let Ok(mut cached) = state.history_limit.lock() {
             *cached = settings.history_limit;
+        }
+    }
+
+    if key == "window_width" {
+        if let Ok(mut w) = state.window_width.lock() {
+            *w = settings.window_width;
+        }
+    }
+
+    if key == "window_height" {
+        if let Ok(mut h) = state.window_height.lock() {
+            *h = settings.window_height;
         }
     }
 
@@ -73,6 +88,7 @@ pub fn update_shortcut(
     state: State<AppState>,
     app: tauri::AppHandle,
 ) -> Result<(), AppError> {
+    
     let old_shortcut_str = {
         let current = state
             .current_shortcut
@@ -109,12 +125,19 @@ pub fn update_shortcut(
 
     let mut settings = load_settings(&app);
     settings.hotkey = shortcut;
+
     save_settings(&app, &settings)
 }
 
 #[tauri::command]
 pub fn apply_window_size(app: AppHandle) -> Result<(), AppError> {
+
     let (width, height) = load_window_size(&load_settings(&app));
+
+    let state = app.state::<AppState>();
+    if let Ok(mut w) = state.window_width.lock() { *w = width; }
+    if let Ok(mut h) = state.window_height.lock() { *h = height; }
+
     let Some(win) = app.get_webview_window("main") else {
         return Ok(());
     };

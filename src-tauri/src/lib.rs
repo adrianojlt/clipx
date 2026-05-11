@@ -24,6 +24,8 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 pub struct AppState {
     pub(crate) current_shortcut: Mutex<String>,
     pub(crate) history_limit: Mutex<u32>,
+    pub(crate) window_width: Mutex<f64>,
+    pub(crate) window_height: Mutex<f64>,
     pub(crate) db: Mutex<Connection>,
 }
 
@@ -119,6 +121,8 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     app.manage(AppState {
         current_shortcut: Mutex::new(initial_hotkey),
         history_limit: Mutex::new(initial_limit),
+        window_width: Mutex::new(settings.window_width),
+        window_height: Mutex::new(settings.window_height),
         db: Mutex::new(conn),
     });
 
