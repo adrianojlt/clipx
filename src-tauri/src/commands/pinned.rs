@@ -41,24 +41,15 @@ pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError>
     let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
-    let exists = tx
-        .query_row(
-            "SELECT 1 FROM clipboard_pinned WHERE content = ?1",
-            [&content],
-            |_| Ok(()),
-        )
-        .optional()?
-        .is_some();
+    tx.execute("UPDATE clipboard_pinned SET sort_order = sort_order + 1", [])?;
+    tx.execute(
+        "INSERT OR IGNORE INTO clipboard_pinned (content, description, sort_order) VALUES (?1, ?1, 0)",
+        rusqlite::params![content],
+    )?;
 
-    if !exists {
-        tx.execute(
-            "UPDATE clipboard_pinned SET sort_order = sort_order + 1",
-            [],
-        )?;
-        tx.execute(
-            "INSERT INTO clipboard_pinned (content, description, sort_order) VALUES (?1, ?1, 0)",
-            rusqlite::params![content],
-        )?;
+    if tx.changes() == 0 {
+        // Already pinned - undo the sort_order bump
+        tx.execute("UPDATE clipboard_pinned SET sort_order = sort_order - 1", [])?;
     }
 
     tx.commit()?;
@@ -128,22 +119,19 @@ pub fn toggle_pinned_hidden(id: i64, state: State<AppState>) -> Result<bool, App
 
     let conn = lock_db(&state)?;
 
-    let n = conn.execute(
-        "UPDATE clipboard_pinned \
-         SET hidden = CASE WHEN COALESCE(hidden, 0) = 0 THEN 1 ELSE 0 END \
-         WHERE id = ?1",
-        [id],
-    )?;
+    let new_val: Option<bool> = conn
+        .query_row(
+            "UPDATE clipboard_pinned \
+             SET hidden = CASE WHEN COALESCE(hidden, 0) = 0 THEN 1 ELSE 0 END \
+             WHERE id = ?1 \
+             RETURNING hidden",
+            [id],
+            |row| row.get::<_, i64>(0).map(|v| v != 0),
+        )
+        .optional()?;
 
-    if n == 0 {
-        return Err(AppError::NotFound(id));
+    match new_val {
+        Some(v) => Ok(v),
+        None => Err(AppError::NotFound(id)),
     }
-
-    let new_val: bool = conn.query_row(
-        "SELECT hidden FROM clipboard_pinned WHERE id = ?1",
-        [id],
-        |row| row.get::<_, i64>(0).map(|v| v != 0),
-    )?;
-
-    Ok(new_val)
 }

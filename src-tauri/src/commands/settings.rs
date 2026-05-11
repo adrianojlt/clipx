@@ -124,39 +124,32 @@ pub fn update_shortcut(
     app: tauri::AppHandle,
 ) -> Result<(), AppError> {
 
-    let old_shortcut_str = {
-        let current = state
-            .current_shortcut
-            .lock()
-            .map_err(|e| AppError::State(format!("current_shortcut mutex poisoned: {e}")))?;
-        current.clone()
-    };
-
-    let normalized_new = normalize_shortcut(&shortcut);
-    let normalized_old = normalize_shortcut(&old_shortcut_str);
-
-    if normalized_new != normalized_old {
-
-        let new_shortcut = normalized_new
-            .parse::<Shortcut>()
-            .map_err(|e| AppError::Shortcut(e.to_string()))?;
-
-        app.global_shortcut()
-            .on_shortcut(new_shortcut, shortcut_handler)
-            .map_err(|e| AppError::Shortcut(e.to_string()))?;
-
-        if let Ok(old) = normalized_old.parse::<Shortcut>() {
-            let _ = app.global_shortcut().unregister(old);
-        }
-    }
-
     {
         let mut current = state
             .current_shortcut
             .lock()
             .map_err(|e| AppError::State(format!("current_shortcut mutex poisoned: {e}")))?;
+
+        let normalized_new = normalize_shortcut(&shortcut);
+        let normalized_old = normalize_shortcut(&*current);
+
+        if normalized_new != normalized_old {
+
+            let new_shortcut = normalized_new
+                .parse::<Shortcut>()
+                .map_err(|e| AppError::Shortcut(e.to_string()))?;
+
+            app.global_shortcut()
+                .on_shortcut(new_shortcut, shortcut_handler)
+                .map_err(|e| AppError::Shortcut(e.to_string()))?;
+
+            if let Ok(old) = normalized_old.parse::<Shortcut>() {
+                let _ = app.global_shortcut().unregister(old);
+            }
+        }
+
         *current = shortcut.clone();
-    }
+    } // lock released before settings_from_state re-acquires it
 
     let mut settings = settings_from_state(&state)?;
     settings.hotkey = shortcut;
