@@ -102,8 +102,15 @@ pub fn update_pinned_description(
     state: State<AppState>,
 ) -> Result<(), AppError> {
     
-    if description.len() > MAX_CLIP_BYTES {
-        return Err(AppError::Validation("Description too large".into()));
+    if id <= 0 {
+        return Err(AppError::Validation("Invalid id".into()));
+    }
+
+    if description.len() > crate::MAX_DESC_BYTES {
+        return Err(AppError::Validation(format!(
+            "Description exceeds {}-byte limit",
+            crate::MAX_DESC_BYTES
+        )));
     }
 
     let conn = lock_db(&state)?;
@@ -122,6 +129,10 @@ pub fn update_pinned_description(
 #[tauri::command]
 pub fn unpin_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
 
+    if id <= 0 {
+        return Err(AppError::Validation("Invalid id".into()));
+    }
+
     let conn = lock_db(&state)?;
     let n = conn.execute("DELETE FROM clipboard_pinned WHERE id = ?1", [id])?;
 
@@ -134,6 +145,10 @@ pub fn unpin_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
 
 #[tauri::command]
 pub fn toggle_pinned_hidden(id: i64, state: State<AppState>) -> Result<bool, AppError> {
+
+    if id <= 0 {
+        return Err(AppError::Validation("Invalid id".into()));
+    }
 
     let conn = lock_db(&state)?;
 

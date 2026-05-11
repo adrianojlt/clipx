@@ -9,6 +9,7 @@ mod window;
 pub use crate::error::AppError;
 
 pub(crate) const MAX_CLIP_BYTES: usize = 1_048_576;
+pub(crate) const MAX_DESC_BYTES: usize = 256;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -26,7 +27,10 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 pub struct AppState {
     pub(crate) settings: Mutex<Settings>,
     pub(crate) db: Mutex<Connection>,
+    pub(crate) db_monitor: Mutex<Connection>,
     pub(crate) shutdown: Arc<AtomicBool>,
+    pub(crate) monitor_handles: Mutex<Option<(std::thread::JoinHandle<()>, std::thread::JoinHandle<()>)>>,
+    pub(crate) monitor_tx: Mutex<Option<std::sync::mpsc::Sender<String>>>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -102,9 +106,17 @@ pub fn run() {
         .expect("error while running tauri application")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
-                app.state::<AppState>()
-                    .shutdown
-                    .store(true, Ordering::Relaxed);
+                let state = app.state::<AppState>();
+                state.shutdown.store(true, Ordering::SeqCst);
+
+                state.monitor_tx.lock().ok().map(|mut g| g.take());
+
+                if let Some((poll_h, writer_h)) =
+                    state.monitor_handles.lock().ok().and_then(|mut g| g.take())
+                {
+                    let _ = poll_h.join();
+                    let _ = writer_h.join();
+                }
             }
         });
 }
@@ -123,10 +135,16 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     let mut conn = Connection::open(crate::db::db_path(app.handle())?)?;
     crate::db::init_db(&mut conn)?;
 
+    let conn_monitor = Connection::open(crate::db::db_path(app.handle())?)?;
+    conn_monitor.execute_batch("PRAGMA busy_timeout = 5000;")?;
+
     app.manage(AppState {
         settings: Mutex::new(settings),
         db: Mutex::new(conn),
+        db_monitor: Mutex::new(conn_monitor),
         shutdown: Arc::new(AtomicBool::new(false)),
+        monitor_handles: Mutex::new(None),
+        monitor_tx: Mutex::new(None),
     });
 
     Ok(())

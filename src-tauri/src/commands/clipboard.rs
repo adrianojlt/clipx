@@ -43,6 +43,10 @@ pub fn get_clipboard(app: AppHandle) -> Result<String, AppError> {
 #[tauri::command]
 pub fn delete_history_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
 
+    if id <= 0 {
+        return Err(AppError::Validation("Invalid id".into()));
+    }
+
     let conn = lock_db(&state)?;
     let n = conn.execute("DELETE FROM clipboard_history WHERE id = ?1", [id])?;
 

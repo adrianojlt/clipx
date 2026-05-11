@@ -101,7 +101,7 @@ pub fn update_shortcut(
     app: tauri::AppHandle,
 ) -> Result<(), AppError> {
 
-    {
+    let settings = {
         let mut s = state
             .settings
             .lock()
@@ -126,9 +126,10 @@ pub fn update_shortcut(
         }
 
         s.hotkey = shortcut;
-    } // lock released before settings_from_state re-acquires it
+        s.clone()
+    };
 
-    save_settings(&app, &settings_from_state(&state)?)
+    save_settings(&app, &settings)
 }
 
 #[tauri::command]

@@ -8,33 +8,48 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 
 const EVENT_CLIPBOARD_CHANGED: &str = "clipboard-changed";
 
-// Code responsible to check for changes in clipboard ...
-// Polling was chosen because no portable clipboard change event exists,
-// and macOS doesn't expose one at all
 pub fn start_clipboard_monitor(app: AppHandle) {
-
     let (tx, rx) = mpsc::channel::<String>();
 
-    let shutdown = app.state::<AppState>().shutdown.clone();
+    let state = app.state::<AppState>();
+    let shutdown = state.shutdown.clone();
+
+    {
+        let mut guard = state.monitor_tx.lock().unwrap();
+        *guard = Some(tx.clone());
+    }
+
     let shutdown_poll = shutdown.clone();
+    let shutdown_writer = shutdown.clone();
 
-    // Polling thread: reads clipboard every 500ms, sends new content to the writer
     let app_poll = app.clone();
+    let app_writer = app.clone();
+    let tx_poll = tx;
 
-    thread::spawn(move || {
-
+    let poll_handle = thread::spawn(move || {
         let mut last_text = String::new();
 
         loop {
-
-            // we will check every 500ms for new content in the clipboard
             thread::sleep(Duration::from_millis(500));
 
-            if shutdown_poll.load(Ordering::Relaxed) {
+            if shutdown_poll.load(Ordering::SeqCst) {
                 break;
             }
 
-            let text = match app_poll.clipboard().read_text() {
+            let app_clip = app_poll.clone();
+            let (resp_tx, resp_rx): (mpsc::Sender<String>, mpsc::Receiver<String>) = mpsc::channel();
+
+            let dispatch_result = app_poll.run_on_main_thread(move || {
+                if let Ok(text) = app_clip.clipboard().read_text() {
+                    let _ = resp_tx.send(text);
+                }
+            });
+
+            if dispatch_result.is_err() {
+                continue;
+            }
+
+            let text = match resp_rx.recv_timeout(Duration::from_secs(2)) {
                 Ok(t) => t,
                 Err(_) => continue,
             };
@@ -43,33 +58,35 @@ pub fn start_clipboard_monitor(app: AppHandle) {
                 continue;
             }
 
-            // content didn't change? do nothing ...
             if text.len() > MAX_CLIP_BYTES {
                 continue;
             }
 
             last_text = text.clone();
-            let _ = tx.send(text);
+            let _ = tx_poll.send(text);
         }
     });
 
-    // Writer thread: persists clipboard changes to DB and emits the changed event
-    thread::spawn(move || {
-
+    let writer_handle = thread::spawn(move || {
         while let Ok(text) = rx.recv() {
+            if shutdown_writer.load(Ordering::SeqCst) {
+                break;
+            }
 
-            let state = app.state::<AppState>();
+            let state = app_writer.state::<AppState>();
 
-            // Get history limit from state, default to 20 if lock fails
-            let limit = state.settings.lock().map(|s| s.history_limit).unwrap_or(20) as i64;
+            let limit = state
+                .settings
+                .lock()
+                .map(|s| s.history_limit)
+                .unwrap_or(20) as i64;
 
-            let result: rusqlite::Result<()> = match state.db.lock() {
+            let result: rusqlite::Result<()> = match state.db_monitor.lock() {
                 Err(e) => {
-                    log::error!("clipboard monitor: db mutex poisoned: {e}");
+                    log::error!("clipboard monitor: db_monitor mutex poisoned: {e}");
                     continue;
                 }
                 Ok(mut conn) => (|| {
-
                     let tx = conn.transaction()?;
 
                     tx.execute(
@@ -96,8 +113,14 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             if let Err(e) = result {
                 log::warn!("clipboard monitor: transaction failed: {e}");
             } else {
-                let _ = app.emit(EVENT_CLIPBOARD_CHANGED, ());
+                let _ = app_writer.emit(EVENT_CLIPBOARD_CHANGED, ());
             }
         }
     });
+
+    let state = app.state::<AppState>();
+    {
+        let mut guard = state.monitor_handles.lock().unwrap();
+        *guard = Some((poll_handle, writer_handle));
+    }
 }
