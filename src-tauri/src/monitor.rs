@@ -1,4 +1,5 @@
 use crate::{AppState, MAX_CLIP_BYTES};
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
@@ -7,9 +8,14 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 const EVENT_CLIPBOARD_CHANGED: &str = "clipboard-changed";
 
 // Code responsible to check for changes in clipboard ...
-// Polling was chosen because no portable clipboard change event exists, 
+// Polling was chosen because no portable clipboard change event exists,
 // and macOS doesn't expose one at all
 pub fn start_clipboard_monitor(app: AppHandle) {
+
+    let (tx, rx) = mpsc::channel::<String>();
+
+    // Polling thread: reads clipboard every 500ms, sends new content to the writer
+    let app_poll = app.clone();
 
     thread::spawn(move || {
 
@@ -20,7 +26,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             // we will check every 500ms for new content in the clipboard
             thread::sleep(Duration::from_millis(500));
 
-            let text = match app.clipboard().read_text() {
+            let text = match app_poll.clipboard().read_text() {
                 Ok(t) => t,
                 Err(_) => continue,
             };
@@ -36,43 +42,54 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             }
 
             last_text = text.clone();
+            let _ = tx.send(text);
+        }
+    });
+
+    // Writer thread: persists clipboard changes to DB and emits the changed event
+    thread::spawn(move || {
+
+        while let Ok(text) = rx.recv() {
+
+            let state = app.state::<AppState>();
 
             // Get history limit from state, default to 20 if lock fails
-            let state = app.state::<AppState>();
             let limit = state.history_limit.lock().map(|l| *l).unwrap_or(20) as i64;
 
-            let mut conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
+            let result: rusqlite::Result<()> = {
 
-            let result: rusqlite::Result<()> = (|| {
+                let mut conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
-                let tx = conn.transaction()?;
+                (|| {
 
-                tx.execute(
-                    "DELETE FROM clipboard_history WHERE content = ?1",
-                    [&text],
-                )?;
+                    let tx = conn.transaction()?;
 
-                tx.execute(
-                    "INSERT INTO clipboard_history (content) VALUES (?1)",
-                    [&text],
-                )?;
+                    tx.execute(
+                        "DELETE FROM clipboard_history WHERE content = ?1",
+                        [&text],
+                    )?;
 
-                tx.execute(
-                    "DELETE FROM clipboard_history WHERE id NOT IN ( \
-                        SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1 \
-                    )",
-                    [limit],
-                )?;
+                    tx.execute(
+                        "INSERT INTO clipboard_history (content) VALUES (?1)",
+                        [&text],
+                    )?;
 
-                tx.commit()
-            })();
+                    tx.execute(
+                        "DELETE FROM clipboard_history WHERE id NOT IN ( \
+                             SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1 \
+                         )",
+                        [limit],
+                    )?;
+
+                    tx.commit()
+                })()
+                // conn guard dropped here when the block exits
+            };
 
             if let Err(e) = result {
                 log::warn!("clipboard monitor: transaction failed: {e}");
                 continue;
             }
-
-            drop(conn);
 
             let _ = app.emit(EVENT_CLIPBOARD_CHANGED, ());
         }
