@@ -20,27 +20,27 @@ export default function HistoryItem({
   const itemRef = useRef(null);
 
   function handleMouseEnter() {
+    clearTimeout(hideRef.current);
+    if (timerRef.current) return;
     timerRef.current = setTimeout(() => {
-
+      timerRef.current = null;
       if (!itemRef.current) return;
-
       const rect = itemRef.current.getBoundingClientRect();
       const estimatedHeight = 120;
-
       const top = rect.bottom + estimatedHeight > window.innerHeight
-          ? rect.top - estimatedHeight - 4
-          : rect.bottom + 4;
-
+        ? rect.top - estimatedHeight - 4
+        : rect.bottom + 4;
       const left = Math.min(rect.left, window.innerWidth - 328);
-
       setTooltip({ top, left });
-
     }, 2000);
   }
 
   function handleMouseLeave() {
-    clearTimeout(timerRef.current);
-    hideRef.current = setTimeout(() => setTooltip(null), 100);
+    hideRef.current = setTimeout(() => {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+      setTooltip(null);
+    }, 100);
   }
 
   return (
