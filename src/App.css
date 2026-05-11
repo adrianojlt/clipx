@@ -83,7 +83,6 @@
   font-size: 0.82rem;
   padding: 0.3rem 0.5rem;
   outline: none;
-  box-sizing: border-box;
 }
 
 .search-input::placeholder {
