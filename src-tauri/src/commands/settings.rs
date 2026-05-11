@@ -33,43 +33,20 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
 }
 
 fn settings_from_state(state: &State<AppState>) -> Result<Settings, AppError> {
-    Ok(Settings {
-        hotkey: state
-            .current_shortcut
-            .lock()
-            .map_err(|_| AppError::State("current_shortcut poisoned".into()))?
-            .clone(),
-        history_limit: *state
-            .history_limit
-            .lock()
-            .map_err(|_| AppError::State("history_limit poisoned".into()))?,
-        window_width: *state
-            .window_width
-            .lock()
-            .map_err(|_| AppError::State("window_width poisoned".into()))?,
-        window_height: *state
-            .window_height
-            .lock()
-            .map_err(|_| AppError::State("window_height poisoned".into()))?,
-        tab_shortcut_pinned: state
-            .tab_shortcut_pinned
-            .lock()
-            .map_err(|_| AppError::State("tab_shortcut_pinned poisoned".into()))?
-            .clone(),
-        tab_shortcut_history: state
-            .tab_shortcut_history
-            .lock()
-            .map_err(|_| AppError::State("tab_shortcut_history poisoned".into()))?
-            .clone(),
-    })
+    state
+        .settings
+        .lock()
+        .map(|s| s.clone())
+        .map_err(|_| AppError::State("settings mutex poisoned".into()))
 }
 
-fn apply_settings_to_state(settings: &Settings, state: &State<AppState>) {
-    if let Ok(mut v) = state.history_limit.lock()        { *v = settings.history_limit; }
-    if let Ok(mut v) = state.window_width.lock()         { *v = settings.window_width; }
-    if let Ok(mut v) = state.window_height.lock()        { *v = settings.window_height; }
-    if let Ok(mut v) = state.tab_shortcut_pinned.lock()  { *v = settings.tab_shortcut_pinned.clone(); }
-    if let Ok(mut v) = state.tab_shortcut_history.lock() { *v = settings.tab_shortcut_history.clone(); }
+fn apply_settings_to_state(settings: &Settings, state: &State<AppState>) -> Result<(), AppError> {
+    let mut s = state
+        .settings
+        .lock()
+        .map_err(|_| AppError::State("settings mutex poisoned".into()))?;
+    *s = settings.clone();
+    Ok(())
 }
 
 #[tauri::command]
@@ -96,8 +73,8 @@ pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppH
     apply_field(&mut settings, &key, &value)?;
 
     settings.validate();
-    apply_settings_to_state(&settings, &state);
     save_settings(&app, &settings)?;
+    apply_settings_to_state(&settings, &state)?;
 
     if key == "tab_shortcut_pinned" || key == "tab_shortcut_history" {
         let _ = app.emit("settings-changed", &key);
@@ -125,13 +102,13 @@ pub fn update_shortcut(
 ) -> Result<(), AppError> {
 
     {
-        let mut current = state
-            .current_shortcut
+        let mut s = state
+            .settings
             .lock()
-            .map_err(|e| AppError::State(format!("current_shortcut mutex poisoned: {e}")))?;
+            .map_err(|e| AppError::State(format!("settings mutex poisoned: {e}")))?;
 
         let normalized_new = normalize_shortcut(&shortcut);
-        let normalized_old = normalize_shortcut(&*current);
+        let normalized_old = normalize_shortcut(&s.hotkey);
 
         if normalized_new != normalized_old {
 
@@ -148,20 +125,20 @@ pub fn update_shortcut(
             }
         }
 
-        *current = shortcut.clone();
+        s.hotkey = shortcut;
     } // lock released before settings_from_state re-acquires it
 
-    let mut settings = settings_from_state(&state)?;
-    settings.hotkey = shortcut;
-
-    save_settings(&app, &settings)
+    save_settings(&app, &settings_from_state(&state)?)
 }
 
 #[tauri::command]
 pub fn apply_window_size(state: State<AppState>, app: AppHandle) -> Result<(), AppError> {
 
-    let width  = state.window_width.lock().map(|w| *w).unwrap_or(400.0);
-    let height = state.window_height.lock().map(|h| *h).unwrap_or(600.0);
+    let (width, height) = state
+        .settings
+        .lock()
+        .map(|s| (s.window_width, s.window_height))
+        .unwrap_or((400.0, 600.0));
 
     let Some(win) = app.get_webview_window("main") else {
         return Ok(());

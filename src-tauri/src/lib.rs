@@ -10,7 +10,8 @@ pub use crate::error::AppError;
 
 pub(crate) const MAX_CLIP_BYTES: usize = 1_048_576;
 
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 use tauri::{
@@ -19,16 +20,13 @@ use tauri::{
     AppHandle, Manager,
 };
 
+use crate::settings::Settings;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
 pub struct AppState {
-    pub(crate) current_shortcut: Mutex<String>,
-    pub(crate) history_limit: Mutex<u32>,
-    pub(crate) window_width: Mutex<f64>,
-    pub(crate) window_height: Mutex<f64>,
-    pub(crate) tab_shortcut_pinned: Mutex<String>,
-    pub(crate) tab_shortcut_history: Mutex<String>,
+    pub(crate) settings: Mutex<Settings>,
     pub(crate) db: Mutex<Connection>,
+    pub(crate) shutdown: Arc<AtomicBool>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -100,8 +98,15 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                app.state::<AppState>()
+                    .shutdown
+                    .store(true, Ordering::Relaxed);
+            }
+        });
 }
 
 fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
@@ -119,13 +124,9 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     crate::db::init_db(&mut conn)?;
 
     app.manage(AppState {
-        current_shortcut: Mutex::new(settings.hotkey.clone()),
-        history_limit: Mutex::new(settings.history_limit),
-        window_width: Mutex::new(settings.window_width),
-        window_height: Mutex::new(settings.window_height),
-        tab_shortcut_pinned: Mutex::new(settings.tab_shortcut_pinned.clone()),
-        tab_shortcut_history: Mutex::new(settings.tab_shortcut_history.clone()),
+        settings: Mutex::new(settings),
         db: Mutex::new(conn),
+        shutdown: Arc::new(AtomicBool::new(false)),
     });
 
     Ok(())
@@ -135,9 +136,10 @@ fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
 
     let state = app.state::<AppState>();
     let hotkey_str = state
-        .current_shortcut
+        .settings
         .lock()
-        .map_err(|_| AppError::State("current_shortcut poisoned".into()))?
+        .map_err(|_| AppError::State("settings poisoned".into()))?
+        .hotkey
         .clone();
 
     let normalized = crate::settings::normalize_shortcut(&hotkey_str);

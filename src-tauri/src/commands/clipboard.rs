@@ -8,10 +8,10 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 pub fn get_history(state: State<AppState>) -> Result<Vec<ClipboardItem>, AppError> {
 
     let limit = state
-        .history_limit
+        .settings
         .lock()
-        .map(|l| *l)
-        .map_err(|e| AppError::State(format!("history_limit mutex poisoned: {e}")))?
+        .map(|s| s.history_limit)
+        .map_err(|e| AppError::State(format!("settings mutex poisoned: {e}")))?
         as i64;
 
     let conn = lock_db(&state)?;

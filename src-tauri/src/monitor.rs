@@ -1,4 +1,5 @@
 use crate::{AppState, MAX_CLIP_BYTES};
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -14,6 +15,9 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
     let (tx, rx) = mpsc::channel::<String>();
 
+    let shutdown = app.state::<AppState>().shutdown.clone();
+    let shutdown_poll = shutdown.clone();
+
     // Polling thread: reads clipboard every 500ms, sends new content to the writer
     let app_poll = app.clone();
 
@@ -26,6 +30,10 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             // we will check every 500ms for new content in the clipboard
             thread::sleep(Duration::from_millis(500));
 
+            if shutdown_poll.load(Ordering::Relaxed) {
+                break;
+            }
+
             let text = match app_poll.clipboard().read_text() {
                 Ok(t) => t,
                 Err(_) => continue,
@@ -37,7 +45,6 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
             // content didn't change? do nothing ...
             if text.len() > MAX_CLIP_BYTES {
-                last_text = text;
                 continue;
             }
 
@@ -54,7 +61,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
             let state = app.state::<AppState>();
 
             // Get history limit from state, default to 20 if lock fails
-            let limit = state.history_limit.lock().map(|l| *l).unwrap_or(20) as i64;
+            let limit = state.settings.lock().map(|s| s.history_limit).unwrap_or(20) as i64;
 
             let result: rusqlite::Result<()> = match state.db.lock() {
                 Err(e) => {

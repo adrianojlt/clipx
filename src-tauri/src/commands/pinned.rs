@@ -66,6 +66,24 @@ pub fn reorder_pinned(items: Vec<i64>, state: State<AppState>) -> Result<(), App
     let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
+    let mut expected: Vec<i64> = {
+        let mut stmt = tx.prepare("SELECT id FROM clipboard_pinned ORDER BY id")?;
+        let rows: Result<Vec<i64>, _> = stmt.query_map([], |row| row.get(0))?.collect();
+        rows?
+    };
+
+    let mut received = items.clone();
+
+    expected.sort_unstable();
+    received.sort_unstable();
+    received.dedup();
+
+    if received != expected {
+        return Err(AppError::Validation(
+            "reorder_pinned: IDs do not match current pinned set".into(),
+        ));
+    }
+
     for (index, id) in items.iter().enumerate() {
         tx.execute(
             "UPDATE clipboard_pinned SET sort_order = ?1 WHERE id = ?2",

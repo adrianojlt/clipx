@@ -15,8 +15,11 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
 
     // get cursor position
     let state = app.state::<AppState>();
-    let width = state.window_width.lock().map(|w| *w).unwrap_or(400.0);
-    let height = state.window_height.lock().map(|h| *h).unwrap_or(600.0);
+    let (width, height) = state
+        .settings
+        .lock()
+        .map(|s| (s.window_width, s.window_height))
+        .unwrap_or((400.0, 600.0));
 
     let Ok(cursor) = app.cursor_position() else {
         return;
