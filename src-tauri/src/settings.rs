@@ -155,6 +155,9 @@ fn read_settings_file(path: &Path) -> Settings {
     if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&content) {
         let mut s = Settings::from_map(map);
         s.validate();
+        if let Err(e) = write_settings_file(path, &s) {
+            log::warn!("settings: failed to upgrade old format: {e}");
+        }
         return s;
     }
 
@@ -213,9 +216,6 @@ pub fn normalize_shortcut(s: &str) -> String {
         .join("+")
 }
 
-pub fn load_window_size(settings: &Settings) -> (f64, f64) {
-    (settings.window_width, settings.window_height)
-}
 
 #[cfg(test)]
 mod tests {
@@ -242,39 +242,6 @@ mod tests {
     #[test]
     fn normalize_shortcut_empty_returns_empty() {
         assert_eq!(normalize_shortcut(""), "");
-    }
-
-    #[test]
-    fn load_window_size_defaults() {
-        let s = Settings::default();
-        assert_eq!(load_window_size(&s), (400.0, 600.0));
-    }
-
-    #[test]
-    fn load_window_size_clamps_upper() {
-        let mut s = Settings::default();
-        s.window_width = 9999.0;
-        s.window_height = 9999.0;
-        s.validate();
-        assert_eq!(load_window_size(&s), (800.0, 900.0));
-    }
-
-    #[test]
-    fn load_window_size_clamps_lower() {
-        let mut s = Settings::default();
-        s.window_width = 10.0;
-        s.window_height = 10.0;
-        s.validate();
-        assert_eq!(load_window_size(&s), (300.0, 400.0));
-    }
-
-    #[test]
-    fn load_window_size_garbage_falls_back_to_defaults() {
-        // from_map leaves defaults when the value doesn't parse
-        let mut map = HashMap::new();
-        map.insert("window_width".to_string(), "not-a-number".to_string());
-        let s = Settings::from_map(map);
-        assert_eq!(load_window_size(&s), (400.0, 600.0));
     }
 
     #[test]

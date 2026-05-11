@@ -1,5 +1,6 @@
+use crate::commands::lock_db;
 use crate::error::AppError;
-use crate::settings::{load_settings, load_window_size, normalize_shortcut, save_settings, Settings};
+use crate::settings::{normalize_shortcut, save_settings, Settings};
 use crate::window::{clamp_to_monitor, monitor_under_point, shortcut_handler};
 use crate::AppState;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -31,11 +32,50 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
     Ok(())
 }
 
+fn settings_from_state(state: &State<AppState>) -> Result<Settings, AppError> {
+    Ok(Settings {
+        hotkey: state
+            .current_shortcut
+            .lock()
+            .map_err(|_| AppError::State("current_shortcut poisoned".into()))?
+            .clone(),
+        history_limit: *state
+            .history_limit
+            .lock()
+            .map_err(|_| AppError::State("history_limit poisoned".into()))?,
+        window_width: *state
+            .window_width
+            .lock()
+            .map_err(|_| AppError::State("window_width poisoned".into()))?,
+        window_height: *state
+            .window_height
+            .lock()
+            .map_err(|_| AppError::State("window_height poisoned".into()))?,
+        tab_shortcut_pinned: state
+            .tab_shortcut_pinned
+            .lock()
+            .map_err(|_| AppError::State("tab_shortcut_pinned poisoned".into()))?
+            .clone(),
+        tab_shortcut_history: state
+            .tab_shortcut_history
+            .lock()
+            .map_err(|_| AppError::State("tab_shortcut_history poisoned".into()))?
+            .clone(),
+    })
+}
+
+fn apply_settings_to_state(settings: &Settings, state: &State<AppState>) {
+    if let Ok(mut v) = state.history_limit.lock()        { *v = settings.history_limit; }
+    if let Ok(mut v) = state.window_width.lock()         { *v = settings.window_width; }
+    if let Ok(mut v) = state.window_height.lock()        { *v = settings.window_height; }
+    if let Ok(mut v) = state.tab_shortcut_pinned.lock()  { *v = settings.tab_shortcut_pinned.clone(); }
+    if let Ok(mut v) = state.tab_shortcut_history.lock() { *v = settings.tab_shortcut_history.clone(); }
+}
+
 #[tauri::command]
-pub fn get_setting(key: String, app: AppHandle) -> Result<String, AppError> {
+pub fn get_setting(key: String, state: State<AppState>) -> Result<String, AppError> {
 
-    let settings = load_settings(&app);
-
+    let settings = settings_from_state(&state)?;
     let val = serde_json::to_value(&settings)?;
 
     match val.get(&key) {
@@ -52,31 +92,26 @@ pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppH
         return update_shortcut(value, state, app);
     }
 
-    let mut settings = load_settings(&app);
+    let mut settings = settings_from_state(&state)?;
     apply_field(&mut settings, &key, &value)?;
+
     settings.validate();
+    apply_settings_to_state(&settings, &state);
     save_settings(&app, &settings)?;
-
-    if key == "history_limit" {
-        if let Ok(mut cached) = state.history_limit.lock() {
-            *cached = settings.history_limit;
-        }
-    }
-
-    if key == "window_width" {
-        if let Ok(mut w) = state.window_width.lock() {
-            *w = settings.window_width;
-        }
-    }
-
-    if key == "window_height" {
-        if let Ok(mut h) = state.window_height.lock() {
-            *h = settings.window_height;
-        }
-    }
 
     if key == "tab_shortcut_pinned" || key == "tab_shortcut_history" {
         let _ = app.emit("settings-changed", &key);
+    }
+
+    if key == "history_limit" {
+
+        let conn = lock_db(&state)?;
+
+        conn.execute(
+            "DELETE FROM clipboard_history WHERE id NOT IN \
+             (SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1)",
+            [settings.history_limit as i64],
+        )?;
     }
 
     Ok(())
@@ -88,7 +123,7 @@ pub fn update_shortcut(
     state: State<AppState>,
     app: tauri::AppHandle,
 ) -> Result<(), AppError> {
-    
+
     let old_shortcut_str = {
         let current = state
             .current_shortcut
@@ -123,20 +158,17 @@ pub fn update_shortcut(
         *current = shortcut.clone();
     }
 
-    let mut settings = load_settings(&app);
+    let mut settings = settings_from_state(&state)?;
     settings.hotkey = shortcut;
 
     save_settings(&app, &settings)
 }
 
 #[tauri::command]
-pub fn apply_window_size(app: AppHandle) -> Result<(), AppError> {
+pub fn apply_window_size(state: State<AppState>, app: AppHandle) -> Result<(), AppError> {
 
-    let (width, height) = load_window_size(&load_settings(&app));
-
-    let state = app.state::<AppState>();
-    if let Ok(mut w) = state.window_width.lock() { *w = width; }
-    if let Ok(mut h) = state.window_height.lock() { *h = height; }
+    let width  = state.window_width.lock().map(|w| *w).unwrap_or(400.0);
+    let height = state.window_height.lock().map(|h| *h).unwrap_or(600.0);
 
     let Some(win) = app.get_webview_window("main") else {
         return Ok(());

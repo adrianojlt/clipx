@@ -51,47 +51,54 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
         while let Ok(text) = rx.recv() {
 
-            let state = app.state::<AppState>();
+            let panic_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
 
-            // Get history limit from state, default to 20 if lock fails
-            let limit = state.history_limit.lock().map(|l| *l).unwrap_or(20) as i64;
+                let state = app.state::<AppState>();
 
-            let result: rusqlite::Result<()> = {
+                // Get history limit from state, default to 20 if lock fails
+                let limit = state.history_limit.lock().map(|l| *l).unwrap_or(20) as i64;
 
-                let mut conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
+                let result: rusqlite::Result<()> = {
 
-                (|| {
+                    let mut conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
 
-                    let tx = conn.transaction()?;
+                    (|| {
 
-                    tx.execute(
-                        "DELETE FROM clipboard_history WHERE content = ?1",
-                        [&text],
-                    )?;
+                        let tx = conn.transaction()?;
 
-                    tx.execute(
-                        "INSERT INTO clipboard_history (content) VALUES (?1)",
-                        [&text],
-                    )?;
+                        tx.execute(
+                            "DELETE FROM clipboard_history WHERE content = ?1",
+                            [&text],
+                        )?;
 
-                    tx.execute(
-                        "DELETE FROM clipboard_history WHERE id NOT IN ( \
-                             SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1 \
-                         )",
-                        [limit],
-                    )?;
+                        tx.execute(
+                            "INSERT INTO clipboard_history (content) VALUES (?1)",
+                            [&text],
+                        )?;
 
-                    tx.commit()
-                })()
-                // conn guard dropped here when the block exits
-            };
+                        tx.execute(
+                            "DELETE FROM clipboard_history WHERE id NOT IN ( \
+                                 SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1 \
+                             )",
+                            [limit],
+                        )?;
 
-            if let Err(e) = result {
-                log::warn!("clipboard monitor: transaction failed: {e}");
-                continue;
+                        tx.commit()
+                    })()
+                    // conn guard dropped here when the block exits
+                };
+
+                if let Err(e) = result {
+                    log::warn!("clipboard monitor: transaction failed: {e}");
+                    return;
+                }
+
+                let _ = app.emit(EVENT_CLIPBOARD_CHANGED, ());
+            }));
+
+            if panic_result.is_err() {
+                log::error!("clipboard writer: panic processing item; skipping");
             }
-
-            let _ = app.emit(EVENT_CLIPBOARD_CHANGED, ());
         }
     });
 }

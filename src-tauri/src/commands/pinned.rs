@@ -68,6 +68,10 @@ pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError>
 #[tauri::command]
 pub fn reorder_pinned(items: Vec<i64>, state: State<AppState>) -> Result<(), AppError> {
 
+    if items.len() > 500 {
+        return Err(AppError::Validation("Too many items in reorder_pinned".into()));
+    }
+
     let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
@@ -88,6 +92,11 @@ pub fn update_pinned_description(
     description: String,
     state: State<AppState>,
 ) -> Result<(), AppError> {
+    
+    if description.len() > MAX_CLIP_BYTES {
+        return Err(AppError::Validation("Description too large".into()));
+    }
+
     let conn = lock_db(&state)?;
     let n = conn.execute(
         "UPDATE clipboard_pinned SET description = ?1 WHERE id = ?2",
@@ -119,18 +128,22 @@ pub fn toggle_pinned_hidden(id: i64, state: State<AppState>) -> Result<bool, App
 
     let conn = lock_db(&state)?;
 
-    let current: bool = conn.query_row(
-        "SELECT COALESCE(hidden, 0) FROM clipboard_pinned WHERE id = ?1",
+    let n = conn.execute(
+        "UPDATE clipboard_pinned \
+         SET hidden = CASE WHEN COALESCE(hidden, 0) = 0 THEN 1 ELSE 0 END \
+         WHERE id = ?1",
+        [id],
+    )?;
+
+    if n == 0 {
+        return Err(AppError::NotFound(id));
+    }
+
+    let new_val: bool = conn.query_row(
+        "SELECT hidden FROM clipboard_pinned WHERE id = ?1",
         [id],
         |row| row.get::<_, i64>(0).map(|v| v != 0),
     )?;
 
-    let new_val = i64::from(!current);
-
-    conn.execute(
-        "UPDATE clipboard_pinned SET hidden = ?1 WHERE id = ?2",
-        rusqlite::params![new_val, id],
-    )?;
-
-    Ok(!current)
+    Ok(new_val)
 }

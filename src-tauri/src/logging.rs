@@ -2,6 +2,7 @@ use crate::error::AppError;
 use log::LevelFilter;
 use simplelog::{Config, WriteLogger};
 use std::fs::OpenOptions;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_LOG_BYTES: u64 = 5 * 1024 * 1024;
 
@@ -22,7 +23,11 @@ pub fn init_logging(app_data_dir: &std::path::Path) -> Result<(), AppError> {
 
         if meta.len() > MAX_LOG_BYTES {
 
-            let rotated = log_dir.join("clipx.log.1");
+            let ts = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let rotated = log_dir.join(format!("clipx.log.{ts}"));
 
             if let Err(e) = std::fs::rename(&log_path, &rotated) {
                 eprintln!("log rotation failed: {e}");

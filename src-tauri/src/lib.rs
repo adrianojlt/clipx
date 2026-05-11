@@ -26,6 +26,8 @@ pub struct AppState {
     pub(crate) history_limit: Mutex<u32>,
     pub(crate) window_width: Mutex<f64>,
     pub(crate) window_height: Mutex<f64>,
+    pub(crate) tab_shortcut_pinned: Mutex<String>,
+    pub(crate) tab_shortcut_history: Mutex<String>,
     pub(crate) db: Mutex<Connection>,
 }
 
@@ -112,17 +114,17 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     std::fs::create_dir_all(&data_dir)?;
 
     let settings = crate::settings::load_settings(app.handle());
-    let initial_limit = settings.history_limit;
-    let initial_hotkey = settings.hotkey.clone();
 
     let mut conn = Connection::open(crate::db::db_path(app.handle())?)?;
     crate::db::init_db(&mut conn)?;
 
     app.manage(AppState {
-        current_shortcut: Mutex::new(initial_hotkey),
-        history_limit: Mutex::new(initial_limit),
+        current_shortcut: Mutex::new(settings.hotkey.clone()),
+        history_limit: Mutex::new(settings.history_limit),
         window_width: Mutex::new(settings.window_width),
         window_height: Mutex::new(settings.window_height),
+        tab_shortcut_pinned: Mutex::new(settings.tab_shortcut_pinned.clone()),
+        tab_shortcut_history: Mutex::new(settings.tab_shortcut_history.clone()),
         db: Mutex::new(conn),
     });
 
@@ -131,8 +133,12 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
 
 fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
 
-    let settings = crate::settings::load_settings(app.handle());
-    let hotkey_str = settings.hotkey;
+    let state = app.state::<AppState>();
+    let hotkey_str = state
+        .current_shortcut
+        .lock()
+        .map_err(|_| AppError::State("current_shortcut poisoned".into()))?
+        .clone();
 
     let normalized = crate::settings::normalize_shortcut(&hotkey_str);
 
