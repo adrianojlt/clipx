@@ -4,11 +4,11 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_clipboard_manager::ClipboardExt;
 
 const EVENT_CLIPBOARD_CHANGED: &str = "clipboard-changed";
 
 pub fn start_clipboard_monitor(app: AppHandle) {
+
     let (tx, rx) = mpsc::channel::<String>();
 
     let state = app.state::<AppState>();
@@ -36,29 +36,12 @@ pub fn start_clipboard_monitor(app: AppHandle) {
                 break;
             }
 
-            let app_clip = app_poll.clone();
-            let (resp_tx, resp_rx): (mpsc::Sender<String>, mpsc::Receiver<String>) = mpsc::channel();
-
-            let dispatch_result = app_poll.run_on_main_thread(move || {
-                if let Ok(text) = app_clip.clipboard().read_text() {
-                    let _ = resp_tx.send(text);
-                }
-            });
-
-            if dispatch_result.is_err() {
-                continue;
-            }
-
-            let text = match resp_rx.recv_timeout(Duration::from_secs(2)) {
+            let text = match crate::commands::clipboard::read_clipboard_on_main_thread(&app_poll) {
                 Ok(t) => t,
                 Err(_) => continue,
             };
 
-            if text.is_empty() || text == last_text {
-                continue;
-            }
-
-            if text.len() > MAX_CLIP_BYTES {
+            if text.is_empty() || text == last_text || text.len() > MAX_CLIP_BYTES {
                 continue;
             }
 
@@ -99,6 +82,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
                         [&text],
                     )?;
 
+                    // keep the most recent, exclude the others ...
                     tx.execute(
                         "DELETE FROM clipboard_history WHERE id NOT IN ( \
                              SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1 \

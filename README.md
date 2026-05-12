@@ -23,10 +23,10 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 
 Pre-built installers for macOS, Windows, and Linux are available on the [Releases](../../releases) page.
 
-> **macOS note:** If you see "clipboard-manager is damaged and can't be opened", run this in Terminal after installing:
+> **macOS note:** If you see "ClipX is damaged and can't be opened", run this in Terminal after installing:
 >
 > ```bash
-> xattr -cr /Applications/clipboard-manager.app
+> xattr -cr /Applications/ClipX.app
 > ```
 >
 > This removes the quarantine flag macOS adds to downloaded apps that aren't signed with an Apple Developer certificate.
@@ -71,9 +71,9 @@ If something goes wrong, check the log file for details.
 
 **Log file location:**
 
-- macOS: `~/Library/Application Support/com.adriano.clipboard-manager/logs/clipx.log`
-- Windows: `%APPDATA%/clipboard-manager/logs/clipx.log`
-- Linux: `~/.config/clipboard-manager/logs/clipx.log`
+- macOS: `~/Library/Application Support/com.adriano.clipx/logs/clipx.log`
+- Windows: `%APPDATA%/ClipX/logs/clipx.log`
+- Linux: `~/.config/ClipX/logs/clipx.log`
 
 **What gets logged:**
 
@@ -112,7 +112,7 @@ git push origin vX.Y.Z
 
 Pushing the tag triggers the GitHub Actions workflow, which builds installers for all platforms and publishes them as a new release.
 
-> The artifact filenames (e.g. `clipboard-manager_0.1.9_aarch64.dmg`) come from the version in `tauri.conf.json`, not the git tag - so all three files must be bumped before tagging.
+> The artifact filenames (e.g. `ClipX_0.1.9_aarch64.dmg`) come from the version in `tauri.conf.json`, not the git tag - so all three files must be bumped before tagging.
 
 ## Running in development
 
