@@ -14,6 +14,7 @@ function Settings() {
   const [recording, setRecording] = useState(null);
   const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
   const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
+  const [tabShortcutFind, setTabShortcutFind] = useState("Command+F");
   const [historyLimit, setHistoryLimit] = useState(20);
   const [windowWidth, setWindowWidth] = useState(400);
   const [windowHeight, setWindowHeight] = useState(600);
@@ -28,29 +29,44 @@ function Settings() {
   }, []);
 
   useEffect(() => {
+
     if (!recording) return;
+
     const onKeyDown = (e) => {
+
       e.preventDefault();
       e.stopPropagation();
+
       if (e.key === "Escape") {
         setRecording(null);
         return;
       }
+
       if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) return;
+
       const parts = [];
+
       if (e.metaKey) parts.push("Command");
       if (e.ctrlKey) parts.push("Ctrl");
       if (e.altKey) parts.push("Option");
       if (e.shiftKey) parts.push("Shift");
+
       const key = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+
       parts.push(key);
+
       const shortcut = parts.join("+");
+
       if (recording === "hotkey") setHotkey(shortcut);
       else if (recording === "tab_pinned") setTabShortcutPinned(shortcut);
       else if (recording === "tab_history") setTabShortcutHistory(shortcut);
+      else if (recording === "tab_find") setTabShortcutFind(shortcut);
+
       setRecording(null);
     };
+
     window.addEventListener("keydown", onKeyDown, true);
+
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [recording]);
 
@@ -74,6 +90,12 @@ function Settings() {
         setTabShortcutHistory(value);
       } catch (e) {
         await logError("warn", `Failed to load tab shortcut history: ${e}`);
+      }
+      try {
+        const value = await getSetting("tab_shortcut_find");
+        setTabShortcutFind(value);
+      } catch (e) {
+        await logError("warn", `Failed to load tab shortcut find: ${e}`);
       }
       try {
         const value = await getSetting("history_limit");
@@ -106,6 +128,7 @@ function Settings() {
       await updateShortcut(hotkey);
       await setSetting("tab_shortcut_pinned", tabShortcutPinned);
       await setSetting("tab_shortcut_history", tabShortcutHistory);
+      await setSetting("tab_shortcut_find", tabShortcutFind);
       await setSetting("history_limit", String(historyLimit));
       await setSetting("window_width", String(windowWidth));
       await setSetting("window_height", String(windowHeight));
@@ -182,6 +205,27 @@ function Settings() {
           </button>
         </div>
         <p className="hint">In-app shortcut to switch to the History tab</p>
+      </div>
+      <div className="field">
+        <label htmlFor="tab-find">Focus Search Box</label>
+        <div className="hotkey-row">
+          <input
+            id="tab-find"
+            type="text"
+            readOnly
+            value={recording === "tab_find" ? "" : tabShortcutFind}
+            placeholder={recording === "tab_find" ? "Press shortcut..." : "Click Record"}
+            className={recording === "tab_find" ? "recording" : ""}
+          />
+          <button
+            type="button"
+            className={`record-btn${recording === "tab_find" ? " active" : ""}`}
+            onClick={() => setRecording((r) => (r === "tab_find" ? null : "tab_find"))}
+          >
+            {recording === "tab_find" ? "Cancel" : "Record"}
+          </button>
+        </div>
+        <p className="hint">In-app shortcut to focus the search box of the active tab</p>
       </div>
       <div className="field">
         <label htmlFor="history-limit">History Limit</label>

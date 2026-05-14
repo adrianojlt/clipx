@@ -15,7 +15,7 @@ export function parseShortcut(shortcut) {
 export function matchesShortcut(e, shortcut) {
   const s = parseShortcut(shortcut);
   return (
-    e.key === s.key &&
+    e.key.toLowerCase() === s.key.toLowerCase() &&
     e.metaKey === s.meta &&
     e.ctrlKey === s.ctrl &&
     e.altKey === s.alt &&

@@ -37,9 +37,12 @@ function App() {
   const [currentClipboard, setCurrentClipboard] = useState("");
   const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
   const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
+  const [tabShortcutFind, setTabShortcutFind] = useState("Command+F");
   const pinnedRef = useRef([]);
   const listRef = useRef(null);
   const dragCleanupRef = useRef(null);
+  const pinnedSearchRef = useRef(null);
+  const historySearchRef = useRef(null);
 
   const filteredHistory = useMemo(
     () =>
@@ -98,6 +101,12 @@ function App() {
       setTabShortcutHistory(v);
     } catch (e) {
       await logError("warn", `Failed to load tab shortcut history: ${e}`);
+    }
+    try {
+      const v = await getSetting("tab_shortcut_find");
+      setTabShortcutFind(v);
+    } catch (e) {
+      await logError("warn", `Failed to load tab shortcut find: ${e}`);
     }
   };
 
@@ -181,6 +190,17 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [tabShortcutPinned, tabShortcutHistory]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!matchesShortcut(e, tabShortcutFind)) return;
+      e.preventDefault();
+      const ref = activeTab === "pinned" ? pinnedSearchRef : historySearchRef;
+      ref.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tabShortcutFind, activeTab]);
 
   useEffect(() => {
     let timeout;
@@ -407,6 +427,7 @@ function App() {
       {activeTab === "pinned" && (
         <div className="search-bar">
           <input
+            ref={pinnedSearchRef}
             className="search-input"
             type="text"
             placeholder="Search pinned..."
@@ -415,7 +436,7 @@ function App() {
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.stopPropagation();
-                setPinnedSearch("");
+                e.target.blur();
               }
             }}
           />
@@ -424,6 +445,7 @@ function App() {
       {activeTab === "history" && (
         <div className="search-bar">
           <input
+            ref={historySearchRef}
             className="search-input"
             type="text"
             placeholder="Search history..."
@@ -432,7 +454,7 @@ function App() {
             onKeyDown={(e) => {
               if (e.key === "Escape") {
                 e.stopPropagation();
-                setHistorySearch("");
+                e.target.blur();
               }
             }}
           />

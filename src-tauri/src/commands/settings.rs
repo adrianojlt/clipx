@@ -6,6 +6,10 @@ use crate::AppState;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
+fn is_tab_shortcut(key: &str) -> bool {
+    key.starts_with("tab_shortcut_")
+}
+
 fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError> {
 
     match key {
@@ -26,6 +30,7 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
         }
         "tab_shortcut_pinned" => s.tab_shortcut_pinned = value.to_string(),
         "tab_shortcut_history" => s.tab_shortcut_history = value.to_string(),
+        "tab_shortcut_find" => s.tab_shortcut_find = value.to_string(),
         _ => return Err(AppError::Settings(format!("Unknown setting: {key}"))),
     }
 
@@ -76,7 +81,7 @@ pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppH
     save_settings(&app, &settings)?;
     apply_settings_to_state(&settings, &state)?;
 
-    if key == "tab_shortcut_pinned" || key == "tab_shortcut_history" {
+    if is_tab_shortcut(&key) {
         let _ = app.emit("settings-changed", &key);
     }
 
@@ -102,6 +107,7 @@ pub fn update_shortcut(
 ) -> Result<(), AppError> {
 
     let settings = {
+
         let mut s = state
             .settings
             .lock()
