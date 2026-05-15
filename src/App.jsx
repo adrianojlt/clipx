@@ -124,6 +124,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+
     loadData();
     loadTabShortcuts();
 
@@ -168,17 +169,24 @@ function App() {
   }, []);
 
   useEffect(() => {
+
     const onKey = async (e) => {
       if (e.key === "Escape") await getCurrentWindow().hide();
     };
+
     window.addEventListener("keydown", onKey);
+
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   useEffect(() => {
+
     const onKey = (e) => {
+
       const tag = e.target.tagName;
+
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+
       if (matchesShortcut(e, tabShortcutPinned)) {
         e.preventDefault();
         setActiveTab("pinned");
@@ -187,15 +195,20 @@ function App() {
         setActiveTab("history");
       }
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [tabShortcutPinned, tabShortcutHistory]);
 
   useEffect(() => {
     const onKey = (e) => {
+
       if (!matchesShortcut(e, tabShortcutFind)) return;
+
       e.preventDefault();
+
       const ref = activeTab === "pinned" ? pinnedSearchRef : historySearchRef;
+
       ref.current?.focus();
     };
     window.addEventListener("keydown", onKey);
@@ -203,9 +216,13 @@ function App() {
   }, [tabShortcutFind, activeTab]);
 
   useEffect(() => {
+
     let timeout;
+
     const onResize = () => {
+
       clearTimeout(timeout);
+
       timeout = setTimeout(async () => {
         try {
           await setSetting("window_width", String(window.innerWidth));
@@ -215,7 +232,9 @@ function App() {
         }
       }, 300);
     };
+
     window.addEventListener("resize", onResize);
+
     return () => {
       window.removeEventListener("resize", onResize);
       clearTimeout(timeout);
@@ -223,16 +242,21 @@ function App() {
   }, []);
 
   useEffect(() => {
+
     const titleBar = document.querySelector(".title-bar");
+
     if (!titleBar) return;
     const onMouseDown = async () => {
+
       try {
         await getCurrentWindow().startDragging();
       } catch (e) {
         await logError("warn", `Failed to start dragging: ${e}`);
       }
     };
+
     titleBar.addEventListener("mousedown", onMouseDown);
+
     return () => titleBar.removeEventListener("mousedown", onMouseDown);
   }, []);
 
@@ -242,23 +266,33 @@ function App() {
   };
 
   useEffect(() => {
+
     const onKey = (e) => {
+
       const tag = e.target.tagName;
+
+      // if it's in a field ... ignore
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (activeTab !== "pinned") return;
 
       const num = parseInt(e.key);
+
       if (num >= 1 && num <= 5 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+
         const index = num - 1;
-        if (index < filteredPinned.length) {
+        const list = activeTab === "pinned" ? filteredPinned : filteredHistory;
+
+        if (index < list.length) {
           e.preventDefault();
-          handleCopy(filteredPinned[index].content);
+          handleCopy(list[index].content);
         }
       }
     };
+
     window.addEventListener("keydown", onKey);
+
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeTab, filteredPinned]);
+
+  }, [activeTab, filteredPinned, filteredHistory]);
 
   const handlePin = async (content) => {
     try {
@@ -310,26 +344,33 @@ function App() {
   // --- Manual drag-and-drop with mouse events ---
 
   const handleMouseDown = (e, id) => {
+
     e.preventDefault();
     e.stopPropagation();
+
     setDraggingId(id);
     let currentIndicator = null;
 
     const onMouseMove = (ev) => {
+
       if (!listRef.current) return;
+
       const listRect = listRef.current.getBoundingClientRect();
       const relY = ev.clientY - listRect.top + listRef.current.scrollTop;
 
       const children = Array.from(listRef.current.children);
+
       let closest = null;
       let closestPos = "after";
       let minDist = Infinity;
 
       for (const child of children) {
+
         const rect = child.getBoundingClientRect();
         const childTop = rect.top - listRect.top + listRef.current.scrollTop;
         const childCenter = childTop + rect.height / 2;
         const dist = Math.abs(relY - childCenter);
+
         if (dist < minDist) {
           minDist = dist;
           closest = child;
@@ -338,7 +379,9 @@ function App() {
       }
 
       if (closest) {
+
         const targetId = Number(closest.dataset.id);
+
         if (targetId !== id) {
           currentIndicator = { targetId, position: closestPos };
           setDragIndicator(currentIndicator);
@@ -350,12 +393,15 @@ function App() {
     };
 
     const onMouseUp = async () => {
+
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+
       dragCleanupRef.current = null;
 
       const currentPinned = pinnedRef.current;
       const draggedIndex = currentPinned.findIndex((item) => item.id === id);
+
       if (draggedIndex === -1) {
         setDraggingId(null);
         setDragIndicator(null);
@@ -363,13 +409,10 @@ function App() {
       }
 
       let targetIndex = draggedIndex;
+
       if (currentIndicator) {
         targetIndex = currentPinned.findIndex((item) => item.id === currentIndicator.targetId);
-        if (targetIndex !== -1) {
-          if (currentIndicator.position === "after") {
-            targetIndex += 1;
-          }
-        }
+        if (targetIndex !== -1 && currentIndicator.position === "after") targetIndex += 1;
       }
 
       if (targetIndex !== draggedIndex && targetIndex !== -1) {
