@@ -1,6 +1,7 @@
 pub mod clipboard;
 pub mod logging;
 pub mod pinned;
+pub mod sessions;
 pub mod settings;
 
 use crate::error::AppError;

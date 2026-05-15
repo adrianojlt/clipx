@@ -49,6 +49,15 @@ pub struct PinnedItem {
     pub(crate) created_at: String,
 }
 
+#[derive(serde::Serialize, Clone)]
+pub struct Session {
+    pub(crate) id: i64,
+    pub(crate) name: String,
+    pub(crate) is_global: bool,
+    pub(crate) is_active: bool,
+    pub(crate) sort_order: i64,
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -73,6 +82,12 @@ pub fn run() {
             commands::pinned::toggle_pinned_hidden,
             commands::clipboard::get_clipboard,
             commands::logging::log_frontend_error,
+            commands::sessions::get_sessions,
+            commands::sessions::create_session,
+            commands::sessions::delete_session,
+            commands::sessions::activate_session,
+            commands::sessions::reorder_sessions,
+            commands::sessions::pin_item_to_session,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

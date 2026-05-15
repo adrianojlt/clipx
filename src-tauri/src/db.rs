@@ -26,6 +26,29 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
     )?;
 
     tx.execute(
+        "CREATE TABLE IF NOT EXISTS sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            is_global INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )",
+        [],
+    )?;
+
+    tx.execute(
+        "INSERT OR IGNORE INTO sessions (id, name, is_global, is_active, sort_order) \
+         VALUES (1, 'Favorites', 1, 1, 0)",
+        [],
+    )?;
+
+    tx.execute(
+        "UPDATE sessions SET name = 'Favorites' WHERE is_global = 1 AND name = 'Global'",
+        [],
+    )?;
+
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS clipboard_pinned (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content TEXT NOT NULL UNIQUE,
@@ -92,7 +115,32 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
         )?;
     }
 
+    // Migrate clipboard_pinned to add session_id with UNIQUE(content, session_id)
+    if !has("session_id") {
+
+        tx.execute_batch(
+            "CREATE TABLE clipboard_pinned_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                session_id INTEGER NOT NULL DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                sort_order INTEGER DEFAULT 0,
+                description TEXT,
+                hidden INTEGER DEFAULT 0,
+                UNIQUE(content, session_id),
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            );
+            INSERT INTO clipboard_pinned_new
+                SELECT id, content, 1, created_at, sort_order, description, hidden
+                FROM clipboard_pinned;
+            DROP TABLE clipboard_pinned;
+            ALTER TABLE clipboard_pinned_new RENAME TO clipboard_pinned;
+            CREATE INDEX idx_pinned_sort ON clipboard_pinned(sort_order ASC);
+            CREATE INDEX idx_pinned_session ON clipboard_pinned(session_id);",
+        )?;
+    }
+
     tx.commit()?;
-    
+
     Ok(())
 }

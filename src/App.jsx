@@ -14,11 +14,18 @@ import {
   togglePinnedHidden,
   reorderPinned,
   logError,
+  getSessions,
+  createSession,
+  deleteSession,
+  activateSession,
+  reorderSessions,
+  pinItemToSession,
 } from "./services/clipboardService";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { matchesShortcut } from "./utils/shortcuts";
 import HistoryItem from "./components/HistoryItem";
 import PinnedItem from "./components/PinnedItem";
+import SessionItem from "./components/SessionItem";
 import { EVENTS } from "./constants/events";
 import "./App.css";
 
@@ -37,10 +44,19 @@ function App() {
   const [currentClipboard, setCurrentClipboard] = useState("");
   const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
   const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
+  const [tabShortcutSessions, setTabShortcutSessions] = useState("Command+3");
   const [tabShortcutFind, setTabShortcutFind] = useState("Command+F");
+  const [sessions, setSessions] = useState([]);
+  const [sessionsDraggingId, setSessionsDraggingId] = useState(null);
+  const [sessionsDragIndicator, setSessionsDragIndicator] = useState(null);
+  const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState(null);
+  const [newSessionName, setNewSessionName] = useState("");
   const pinnedRef = useRef([]);
+  const sessionsRef = useRef([]);
   const listRef = useRef(null);
+  const sessionsListRef = useRef(null);
   const dragCleanupRef = useRef(null);
+  const sessionsDragCleanupRef = useRef(null);
   const pinnedSearchRef = useRef(null);
   const historySearchRef = useRef(null);
 
@@ -74,6 +90,9 @@ function App() {
       const p = await getPinned();
       setPinned(p);
       pinnedRef.current = p;
+      const s = await getSessions();
+      setSessions(s);
+      sessionsRef.current = s;
     } catch (e) {
       console.error("Failed to load data", e);
       await logError("error", `Failed to load data: ${e}`);
@@ -103,6 +122,12 @@ function App() {
       await logError("warn", `Failed to load tab shortcut history: ${e}`);
     }
     try {
+      const v = await getSetting("tab_shortcut_sessions");
+      setTabShortcutSessions(v);
+    } catch (e) {
+      await logError("warn", `Failed to load tab shortcut sessions: ${e}`);
+    }
+    try {
       const v = await getSetting("tab_shortcut_find");
       setTabShortcutFind(v);
     } catch (e) {
@@ -115,10 +140,18 @@ function App() {
   }, [pinned]);
 
   useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
+
+  useEffect(() => {
     return () => {
       if (dragCleanupRef.current) {
         dragCleanupRef.current();
         dragCleanupRef.current = null;
+      }
+      if (sessionsDragCleanupRef.current) {
+        sessionsDragCleanupRef.current();
+        sessionsDragCleanupRef.current = null;
       }
     };
   }, []);
@@ -193,12 +226,15 @@ function App() {
       } else if (matchesShortcut(e, tabShortcutHistory)) {
         e.preventDefault();
         setActiveTab("history");
+      } else if (matchesShortcut(e, tabShortcutSessions)) {
+        e.preventDefault();
+        setActiveTab("sessions");
       }
     };
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tabShortcutPinned, tabShortcutHistory]);
+  }, [tabShortcutPinned, tabShortcutHistory, tabShortcutSessions]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -263,6 +299,135 @@ function App() {
   const handleCopy = async (text) => {
     await writeText(text);
     await getCurrentWindow().hide();
+  };
+
+  const handleActivateSession = async (id) => {
+    try {
+      await activateSession(id);
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to activate session: ${e}`);
+    }
+  };
+
+  const handleCreateSession = async () => {
+    const name = newSessionName.trim();
+    if (!name) return;
+    try {
+      await createSession(name);
+      setNewSessionName("");
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to create session: ${e}`);
+    }
+  };
+
+  const handleDeleteSession = async (id) => {
+    try {
+      await deleteSession(id);
+      setConfirmDeleteSessionId(null);
+      await loadData();
+    } catch (e) {
+      await logError("error", `Failed to delete session: ${e}`);
+    }
+  };
+
+  const handlePinToSession = async (content, sessionId) => {
+    try {
+      await pinItemToSession(content, sessionId);
+    } catch (e) {
+      await logError("error", `Failed to pin to session: ${e}`);
+    }
+  };
+
+  const handleSessionMouseDown = (e, id) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSessionsDraggingId(id);
+    let currentIndicator = null;
+
+    const onMouseMove = (ev) => {
+      if (!sessionsListRef.current) return;
+      const listRect = sessionsListRef.current.getBoundingClientRect();
+      const relY = ev.clientY - listRect.top + sessionsListRef.current.scrollTop;
+
+      const children = Array.from(sessionsListRef.current.children);
+      let closest = null;
+      let closestPos = "after";
+      let minDist = Infinity;
+
+      for (const child of children) {
+        const rect = child.getBoundingClientRect();
+        const childTop = rect.top - listRect.top + sessionsListRef.current.scrollTop;
+        const childCenter = childTop + rect.height / 2;
+        const dist = Math.abs(relY - childCenter);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = child;
+          closestPos = relY < childCenter ? "before" : "after";
+        }
+      }
+
+      if (closest) {
+        const targetId = Number(closest.dataset.id);
+        if (targetId !== id) {
+          currentIndicator = { targetId, position: closestPos };
+          setSessionsDragIndicator(currentIndicator);
+        } else {
+          currentIndicator = null;
+          setSessionsDragIndicator(null);
+        }
+      }
+    };
+
+    const onMouseUp = async () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+      sessionsDragCleanupRef.current = null;
+
+      const currentSessions = sessionsRef.current;
+      const draggedIndex = currentSessions.findIndex((s) => s.id === id);
+      if (draggedIndex === -1) {
+        setSessionsDraggingId(null);
+        setSessionsDragIndicator(null);
+        return;
+      }
+
+      let targetIndex = draggedIndex;
+      if (currentIndicator) {
+        targetIndex = currentSessions.findIndex((s) => s.id === currentIndicator.targetId);
+        if (targetIndex !== -1 && currentIndicator.position === "after") {
+          targetIndex += 1;
+        }
+      }
+
+      if (targetIndex !== draggedIndex && targetIndex !== -1) {
+        const newSessions = [...currentSessions];
+        const [draggedItem] = newSessions.splice(draggedIndex, 1);
+        const insertIndex = draggedIndex < targetIndex ? targetIndex - 1 : targetIndex;
+        newSessions.splice(insertIndex, 0, draggedItem);
+
+        setSessions(newSessions);
+        sessionsRef.current = newSessions;
+
+        try {
+          const ids = newSessions.map((s) => s.id);
+          await reorderSessions(ids);
+        } catch (e) {
+          await logError("error", `Failed to reorder sessions: ${e}`);
+        }
+      }
+
+      setSessionsDraggingId(null);
+      setSessionsDragIndicator(null);
+    };
+
+    sessionsDragCleanupRef.current = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   };
 
   useEffect(() => {
@@ -466,6 +631,12 @@ function App() {
         >
           History
         </button>
+        <button
+          className={activeTab === "sessions" ? "active" : ""}
+          onClick={() => setActiveTab("sessions")}
+        >
+          Sessions
+        </button>
       </div>
       {activeTab === "pinned" && (
         <div className="search-bar">
@@ -551,13 +722,60 @@ function App() {
                 isPinned={pinnedSet.has(item.content)}
                 isHidden={pinnedHiddenSet.has(item.content)}
                 confirmDeleteId={confirmDeleteHistoryId}
+                sessions={sessions}
                 onCopy={handleCopy}
                 onPin={handlePin}
+                onPinToSession={handlePinToSession}
                 onRequestDelete={setConfirmDeleteHistoryId}
                 onConfirmDelete={handleDeleteHistory}
                 onCancelDelete={() => setConfirmDeleteHistoryId(null)}
               />
             ))}
+          </>
+        )}
+        {activeTab === "sessions" && (
+          <>
+            <div className="session-create">
+              <input
+                className="session-create-input"
+                type="text"
+                placeholder="New session name..."
+                value={newSessionName}
+                onChange={(e) => setNewSessionName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateSession();
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    e.target.blur();
+                  }
+                }}
+              />
+              <button
+                className="session-create-btn"
+                onClick={handleCreateSession}
+                title="Create session"
+              >
+                +
+              </button>
+            </div>
+            <div className="list" ref={sessionsListRef}>
+              {sessions.length === 0 && <div className="empty">No sessions</div>}
+              {sessions.map((item) => (
+                <SessionItem
+                  key={item.id}
+                  item={item}
+                  isActive={item.is_active}
+                  isDragging={sessionsDraggingId === item.id}
+                  dragIndicator={sessionsDragIndicator}
+                  confirmDeleteId={confirmDeleteSessionId}
+                  onActivate={handleActivateSession}
+                  onMouseDown={handleSessionMouseDown}
+                  onRequestDelete={setConfirmDeleteSessionId}
+                  onConfirmDelete={handleDeleteSession}
+                  onCancelDelete={() => setConfirmDeleteSessionId(null)}
+                />
+              ))}
+            </div>
           </>
         )}
       </div>

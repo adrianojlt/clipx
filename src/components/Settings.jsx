@@ -14,6 +14,7 @@ function Settings() {
   const [recording, setRecording] = useState(null);
   const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
   const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
+  const [tabShortcutSessions, setTabShortcutSessions] = useState("Command+3");
   const [tabShortcutFind, setTabShortcutFind] = useState("Command+F");
   const [historyLimit, setHistoryLimit] = useState(20);
   const [windowWidth, setWindowWidth] = useState(400);
@@ -60,6 +61,7 @@ function Settings() {
       if (recording === "hotkey") setHotkey(shortcut);
       else if (recording === "tab_pinned") setTabShortcutPinned(shortcut);
       else if (recording === "tab_history") setTabShortcutHistory(shortcut);
+      else if (recording === "tab_sessions") setTabShortcutSessions(shortcut);
       else if (recording === "tab_find") setTabShortcutFind(shortcut);
 
       setRecording(null);
@@ -90,6 +92,12 @@ function Settings() {
         setTabShortcutHistory(value);
       } catch (e) {
         await logError("warn", `Failed to load tab shortcut history: ${e}`);
+      }
+      try {
+        const value = await getSetting("tab_shortcut_sessions");
+        setTabShortcutSessions(value);
+      } catch (e) {
+        await logError("warn", `Failed to load tab shortcut sessions: ${e}`);
       }
       try {
         const value = await getSetting("tab_shortcut_find");
@@ -128,6 +136,7 @@ function Settings() {
       await updateShortcut(hotkey);
       await setSetting("tab_shortcut_pinned", tabShortcutPinned);
       await setSetting("tab_shortcut_history", tabShortcutHistory);
+      await setSetting("tab_shortcut_sessions", tabShortcutSessions);
       await setSetting("tab_shortcut_find", tabShortcutFind);
       await setSetting("history_limit", String(historyLimit));
       await setSetting("window_width", String(windowWidth));
@@ -205,6 +214,27 @@ function Settings() {
           </button>
         </div>
         <p className="hint">In-app shortcut to switch to the History tab</p>
+      </div>
+      <div className="field">
+        <label htmlFor="tab-sessions">Switch to Sessions Tab</label>
+        <div className="hotkey-row">
+          <input
+            id="tab-sessions"
+            type="text"
+            readOnly
+            value={recording === "tab_sessions" ? "" : tabShortcutSessions}
+            placeholder={recording === "tab_sessions" ? "Press shortcut..." : "Click Record"}
+            className={recording === "tab_sessions" ? "recording" : ""}
+          />
+          <button
+            type="button"
+            className={`record-btn${recording === "tab_sessions" ? " active" : ""}`}
+            onClick={() => setRecording((r) => (r === "tab_sessions" ? null : "tab_sessions"))}
+          >
+            {recording === "tab_sessions" ? "Cancel" : "Record"}
+          </button>
+        </div>
+        <p className="hint">In-app shortcut to switch to the Sessions tab</p>
       </div>
       <div className="field">
         <label htmlFor="tab-find">Focus Search Box</label>

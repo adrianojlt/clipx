@@ -27,3 +27,15 @@ export const updateShortcut = (shortcut) => invoke("update_shortcut", { shortcut
 export const applyWindowSize = () => invoke("apply_window_size");
 
 export const logError = (level, message) => invoke("log_frontend_error", { level, message });
+
+export const getSessions = () => invoke("get_sessions");
+
+export const createSession = (name) => invoke("create_session", { name });
+
+export const deleteSession = (id) => invoke("delete_session", { id });
+
+export const activateSession = (id) => invoke("activate_session", { id });
+
+export const reorderSessions = (items) => invoke("reorder_sessions", { items });
+
+export const pinItemToSession = (content, sessionId) => invoke("pin_item_to_session", { content, sessionId });
