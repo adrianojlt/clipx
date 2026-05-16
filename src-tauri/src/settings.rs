@@ -13,6 +13,7 @@ pub struct Settings {
     pub window_height: f64,
     pub tab_shortcut_pinned: String,
     pub tab_shortcut_history: String,
+    pub tab_shortcut_sessions: String,
     pub tab_shortcut_find: String,
 }
 
@@ -25,6 +26,7 @@ impl Default for Settings {
             window_height: 600.0,
             tab_shortcut_pinned: "Command+1".to_string(),
             tab_shortcut_history: "Command+2".to_string(),
+            tab_shortcut_sessions: "Command+3".to_string(),
             tab_shortcut_find: "Command+F".to_string(),
         }
     }
@@ -59,6 +61,9 @@ impl Settings {
         }
         if let Some(v) = map.get("tab_shortcut_history") {
             s.tab_shortcut_history = v.clone();
+        }
+        if let Some(v) = map.get("tab_shortcut_sessions") {
+            s.tab_shortcut_sessions = v.clone();
         }
         if let Some(v) = map.get("tab_shortcut_find") {
             s.tab_shortcut_find = v.clone();
@@ -341,6 +346,7 @@ mod tests {
             window_height: 5000.0,
             tab_shortcut_pinned: "A".to_string(),
             tab_shortcut_history: "B".to_string(),
+            tab_shortcut_sessions: "D".to_string(),
             tab_shortcut_find: "C".to_string(),
         };
 

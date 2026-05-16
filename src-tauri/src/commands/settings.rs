@@ -30,6 +30,7 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
         }
         "tab_shortcut_pinned" => s.tab_shortcut_pinned = value.to_string(),
         "tab_shortcut_history" => s.tab_shortcut_history = value.to_string(),
+        "tab_shortcut_sessions" => s.tab_shortcut_sessions = value.to_string(),
         "tab_shortcut_find" => s.tab_shortcut_find = value.to_string(),
         _ => return Err(AppError::Settings(format!("Unknown setting: {key}"))),
     }
