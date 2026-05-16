@@ -132,20 +132,23 @@ function Settings() {
 
   const handleSave = async () => {
     setError("");
-    try {
-      await updateShortcut(hotkey);
-      await setSetting("tab_shortcut_pinned", tabShortcutPinned);
-      await setSetting("tab_shortcut_history", tabShortcutHistory);
-      await setSetting("tab_shortcut_sessions", tabShortcutSessions);
-      await setSetting("tab_shortcut_find", tabShortcutFind);
-      await setSetting("history_limit", String(historyLimit));
-      await setSetting("window_width", String(windowWidth));
-      await setSetting("window_height", String(windowHeight));
-      await applyWindowSize();
+    const errors = [];
+    const attempt = async (fn) => { try { await fn(); } catch (e) { errors.push(String(e)); } };
+    await attempt(() => updateShortcut(hotkey));
+    await attempt(() => setSetting("tab_shortcut_pinned", tabShortcutPinned));
+    await attempt(() => setSetting("tab_shortcut_history", tabShortcutHistory));
+    await attempt(() => setSetting("tab_shortcut_sessions", tabShortcutSessions));
+    await attempt(() => setSetting("tab_shortcut_find", tabShortcutFind));
+    await attempt(() => setSetting("history_limit", String(historyLimit)));
+    await attempt(() => setSetting("window_width", String(windowWidth)));
+    await attempt(() => setSetting("window_height", String(windowHeight)));
+    await attempt(() => applyWindowSize());
+    if (errors.length > 0) {
+      const msg = errors.join("; ");
+      setError(`Failed to save settings: ${msg}`);
+      await logError("error", `Failed to save settings: ${msg}`);
+    } else {
       await getCurrentWindow().hide();
-    } catch (e) {
-      setError(`Failed to update settings: ${e}`);
-      await logError("error", `Failed to save settings: ${e}`);
     }
   };
 

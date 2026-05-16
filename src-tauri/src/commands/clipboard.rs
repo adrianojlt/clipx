@@ -53,14 +53,12 @@ pub fn get_clipboard(app: AppHandle) -> Result<String, AppError> {
     read_clipboard_on_main_thread(&app)
 }
 
-#[tauri::command]
-pub fn delete_history_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
+pub(crate) fn delete_history_item_impl(conn: &rusqlite::Connection, id: i64) -> Result<(), AppError> {
 
     if id <= 0 {
         return Err(AppError::Validation("Invalid id".into()));
     }
 
-    let conn = lock_db(&state)?;
     let n = conn.execute("DELETE FROM clipboard_history WHERE id = ?1", [id])?;
 
     if n == 0 {
@@ -68,4 +66,47 @@ pub fn delete_history_item(id: i64, state: State<AppState>) -> Result<(), AppErr
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn delete_history_item(id: i64, state: State<AppState>) -> Result<(), AppError> {
+    let conn = lock_db(&state)?;
+    delete_history_item_impl(&conn, id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn setup() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::db::init_db(&mut conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn delete_history_item_invalid_id() {
+        let conn = setup();
+        assert!(matches!(delete_history_item_impl(&conn, 0), Err(AppError::Validation(_))));
+        assert!(matches!(delete_history_item_impl(&conn, -1), Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn delete_history_item_not_found() {
+        let conn = setup();
+        assert!(matches!(delete_history_item_impl(&conn, 999), Err(AppError::NotFound(999))));
+    }
+
+    #[test]
+    fn delete_history_item_success() {
+        let conn = setup();
+        conn.execute("INSERT INTO clipboard_history (content) VALUES ('hello')", []).unwrap();
+        let id = conn.last_insert_rowid();
+        assert!(delete_history_item_impl(&conn, id).is_ok());
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM clipboard_history WHERE id = ?1", [id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+    }
 }

@@ -19,6 +19,7 @@ export function useAppEvents({
   historySearchRef,
   sessionsSearchRef,
   onLoadData,
+  onLoadHistory,
   onLoadClipboard,
   onLoadTabShortcuts,
   onClearSearch,
@@ -33,32 +34,42 @@ export function useAppEvents({
     const unlisteners = [];
 
     const setupListeners = async () => {
+
       await onLoadClipboard();
+
       if (cancelled) return;
 
       const u1 = await listen(EVENTS.CLIPBOARD_CHANGED, async () => {
-        onLoadData();
+        onLoadHistory();
         await onLoadClipboard();
       });
+
       if (cancelled) { u1(); return; }
+
       unlisteners.push(u1);
 
       const u2 = await listen("tauri://window-focus", async () => {
         await onLoadClipboard();
       });
+
       if (cancelled) { u2(); return; }
+
       unlisteners.push(u2);
 
       const u3 = await listen("main-window-shown", () => {
         onClearSearch();
       });
+
       if (cancelled) { u3(); return; }
+
       unlisteners.push(u3);
 
       const u4 = await listen("settings-changed", () => {
         onLoadTabShortcuts();
       });
+
       if (cancelled) { u4(); return; }
+
       unlisteners.push(u4);
     };
 
@@ -68,7 +79,7 @@ export function useAppEvents({
       cancelled = true;
       unlisteners.forEach((fn) => fn());
     };
-  }, [onLoadData, onLoadClipboard, onLoadTabShortcuts, onClearSearch]);
+  }, [onLoadData, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch]);
 
   useEffect(() => {
     const onKey = async (e) => {
@@ -79,9 +90,13 @@ export function useAppEvents({
   }, []);
 
   useEffect(() => {
+
     const onKey = (e) => {
+
       const tag = e.target.tagName;
+
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+
       if (matchesShortcut(e, tabShortcutPinned)) {
         e.preventDefault();
         setActiveTab("pinned");
@@ -99,24 +114,33 @@ export function useAppEvents({
 
   useEffect(() => {
     const onKey = (e) => {
+
       if (!matchesShortcut(e, tabShortcutFind)) return;
+
       e.preventDefault();
+
       const ref =
         activeTab === "pinned"
           ? pinnedSearchRef
           : activeTab === "sessions"
           ? sessionsSearchRef
           : historySearchRef;
+
       ref.current?.focus();
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [tabShortcutFind, activeTab, pinnedSearchRef, historySearchRef, sessionsSearchRef]);
 
   useEffect(() => {
+
     let timeout;
+
     const onResize = () => {
+
       clearTimeout(timeout);
+
       timeout = setTimeout(async () => {
         try {
           await setSetting("window_width", String(window.innerWidth));
@@ -126,6 +150,7 @@ export function useAppEvents({
         }
       }, 300);
     };
+
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("resize", onResize);
@@ -134,8 +159,11 @@ export function useAppEvents({
   }, []);
 
   useEffect(() => {
+
     const titleBar = document.querySelector(".title-bar");
+
     if (!titleBar) return;
+
     const onMouseDown = async () => {
       try {
         await getCurrentWindow().startDragging();
@@ -143,29 +171,39 @@ export function useAppEvents({
         await logError("warn", `Failed to start dragging: ${e}`);
       }
     };
+
     titleBar.addEventListener("mousedown", onMouseDown);
     return () => titleBar.removeEventListener("mousedown", onMouseDown);
   }, []);
 
   useEffect(() => {
     const onKey = (e) => {
+
       const tag = e.target.tagName;
+
       if (tag === "INPUT" || tag === "TEXTAREA") return;
+
       const num = parseInt(e.key);
+
       if (num >= 1 && num <= 5 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+
         const index = num - 1;
+
         if (activeTab === "sessions" && index < filteredSessions.length) {
           e.preventDefault();
           onActivateSession(filteredSessions[index].id);
           return;
         }
+
         const list = activeTab === "pinned" ? filteredPinned : filteredHistory;
+
         if (index < list.length) {
           e.preventDefault();
           onCopy(list[index].content);
         }
       }
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [activeTab, filteredPinned, filteredHistory, filteredSessions, onCopy, onActivateSession]);

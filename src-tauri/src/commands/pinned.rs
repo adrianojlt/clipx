@@ -31,16 +31,8 @@ pub fn get_pinned(state: State<AppState>) -> Result<Vec<PinnedItem>, AppError> {
     Ok(items)
 }
 
-#[tauri::command]
-pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError> {
+pub(crate) fn pin_item_impl(conn: &mut rusqlite::Connection, content: &str) -> Result<(), AppError> {
 
-    if content.len() > MAX_CLIP_BYTES {
-        return Err(AppError::Validation(format!(
-            "Content exceeds {MAX_CLIP_BYTES}-byte limit"
-        )));
-    }
-
-    let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
     tx.execute(
@@ -65,6 +57,19 @@ pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError>
 
     tx.commit()?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError> {
+
+    if content.len() > MAX_CLIP_BYTES {
+        return Err(AppError::Validation(format!(
+            "Content exceeds {MAX_CLIP_BYTES}-byte limit"
+        )));
+    }
+
+    let mut conn = lock_db(&state)?;
+    pin_item_impl(&mut conn, &content)
 }
 
 #[tauri::command]
@@ -181,5 +186,60 @@ pub fn toggle_pinned_hidden(id: i64, state: State<AppState>) -> Result<bool, App
     match new_val {
         Some(v) => Ok(v),
         None => Err(AppError::NotFound(id)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn setup() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::db::init_db(&mut conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn pin_item_success() {
+        let mut conn = setup();
+        pin_item_impl(&mut conn, "hello").unwrap();
+        let row: (String, i64) = conn
+            .query_row(
+                "SELECT content, sort_order FROM clipboard_pinned WHERE content = 'hello'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(row.0, "hello");
+        assert_eq!(row.1, 0);
+    }
+
+    #[test]
+    fn pin_item_duplicate_does_not_increment_sort_order() {
+        let mut conn = setup();
+        pin_item_impl(&mut conn, "hello").unwrap();
+        pin_item_impl(&mut conn, "world").unwrap();
+        // "world" inserted second: sort_order should be 0 ("hello" bumped to 1)
+        let world_order: i64 = conn
+            .query_row(
+                "SELECT sort_order FROM clipboard_pinned WHERE content = 'world'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(world_order, 0);
+
+        // pin "world" again (duplicate) - sort_order of existing items must not change
+        pin_item_impl(&mut conn, "world").unwrap();
+        let hello_order: i64 = conn
+            .query_row(
+                "SELECT sort_order FROM clipboard_pinned WHERE content = 'hello'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        // rollback restored sort_order after failed insert, so "hello" stays at 1
+        assert_eq!(hello_order, 1);
     }
 }

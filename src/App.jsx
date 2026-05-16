@@ -74,6 +74,15 @@ function App() {
     }
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const h = await getHistory();
+      setHistory(h);
+    } catch (e) {
+      await logError("error", `Failed to load history: ${e}`);
+    }
+  }, []);
+
   const loadClipboard = useCallback(async () => {
     try {
       const text = await getClipboard();
@@ -144,6 +153,7 @@ function App() {
     historySearchRef,
     sessionsSearchRef,
     onLoadData: loadData,
+    onLoadHistory: loadHistory,
     onLoadClipboard: loadClipboard,
     onLoadTabShortcuts: loadTabShortcuts,
     onClearSearch: clearSearch,

@@ -32,8 +32,7 @@ pub fn get_sessions(state: State<AppState>) -> Result<Vec<Session>, AppError> {
     Ok(items)
 }
 
-#[tauri::command]
-pub fn create_session(name: String, state: State<AppState>) -> Result<Session, AppError> {
+pub(crate) fn create_session_impl(conn: &rusqlite::Connection, name: &str) -> Result<Session, AppError> {
 
     if name.trim().is_empty() {
         return Err(AppError::Validation("Session name cannot be empty".into()));
@@ -45,8 +44,6 @@ pub fn create_session(name: String, state: State<AppState>) -> Result<Session, A
             crate::MAX_DESC_BYTES
         )));
     }
-
-    let conn = lock_db(&state)?;
 
     let max_sort: i64 = conn.query_row(
         "SELECT COALESCE(MAX(sort_order), 0) FROM sessions",
@@ -84,13 +81,16 @@ pub fn create_session(name: String, state: State<AppState>) -> Result<Session, A
 }
 
 #[tauri::command]
-pub fn delete_session(id: i64, state: State<AppState>) -> Result<(), AppError> {
+pub fn create_session(name: String, state: State<AppState>) -> Result<Session, AppError> {
+    let conn = lock_db(&state)?;
+    create_session_impl(&conn, &name)
+}
+
+pub(crate) fn delete_session_impl(conn: &mut rusqlite::Connection, id: i64) -> Result<(), AppError> {
 
     if id <= 0 {
         return Err(AppError::Validation("Invalid id".into()));
     }
-
-    let mut conn = lock_db(&state)?;
 
     let is_global: i64 = conn
         .query_row(
@@ -128,6 +128,12 @@ pub fn delete_session(id: i64, state: State<AppState>) -> Result<(), AppError> {
 }
 
 #[tauri::command]
+pub fn delete_session(id: i64, state: State<AppState>) -> Result<(), AppError> {
+    let mut conn = lock_db(&state)?;
+    delete_session_impl(&mut conn, id)
+}
+
+#[tauri::command]
 pub fn activate_session(id: i64, state: State<AppState>) -> Result<(), AppError> {
 
     if id <= 0 {
@@ -148,14 +154,12 @@ pub fn activate_session(id: i64, state: State<AppState>) -> Result<(), AppError>
     Ok(())
 }
 
-#[tauri::command]
-pub fn reorder_sessions(items: Vec<i64>, state: State<AppState>) -> Result<(), AppError> {
+pub(crate) fn reorder_sessions_impl(conn: &mut rusqlite::Connection, items: Vec<i64>) -> Result<(), AppError> {
 
     if items.len() > 500 {
         return Err(AppError::Validation("Too many items in reorder_sessions".into()));
     }
 
-    let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
     let mut expected: Vec<i64> = {
@@ -184,6 +188,97 @@ pub fn reorder_sessions(items: Vec<i64>, state: State<AppState>) -> Result<(), A
 
     tx.commit()?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn reorder_sessions(items: Vec<i64>, state: State<AppState>) -> Result<(), AppError> {
+    let mut conn = lock_db(&state)?;
+    reorder_sessions_impl(&mut conn, items)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn setup() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::db::init_db(&mut conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn create_session_empty_name_rejected() {
+        let conn = setup();
+        assert!(matches!(
+            create_session_impl(&conn, ""),
+            Err(AppError::Validation(_))
+        ));
+        assert!(matches!(
+            create_session_impl(&conn, "   "),
+            Err(AppError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn create_session_success() {
+        let conn = setup();
+        let s = create_session_impl(&conn, "Work").unwrap();
+        assert_eq!(s.name, "Work");
+        assert!(!s.is_global);
+        assert!(!s.is_active);
+    }
+
+    #[test]
+    fn delete_session_global_rejected() {
+        let mut conn = setup();
+        // global session has id=1 from init_db
+        assert!(matches!(
+            delete_session_impl(&mut conn, 1),
+            Err(AppError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn delete_session_not_found() {
+        let mut conn = setup();
+        assert!(matches!(
+            delete_session_impl(&mut conn, 999),
+            Err(AppError::NotFound(999))
+        ));
+    }
+
+    #[test]
+    fn delete_active_session_activates_global() {
+        let mut conn = setup();
+        let s = create_session_impl(&conn, "Work").unwrap();
+        // activate the new session
+        {
+            let tx = conn.transaction().unwrap();
+            tx.execute("UPDATE sessions SET is_active = 0", []).unwrap();
+            tx.execute("UPDATE sessions SET is_active = 1 WHERE id = ?1", [s.id]).unwrap();
+            tx.commit().unwrap();
+        }
+        delete_session_impl(&mut conn, s.id).unwrap();
+        let global_active: i64 = conn
+            .query_row(
+                "SELECT is_active FROM sessions WHERE is_global = 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(global_active, 1);
+    }
+
+    #[test]
+    fn reorder_sessions_id_mismatch_rejected() {
+        let mut conn = setup();
+        // only global session (id=1) exists; passing [1, 99] is a mismatch
+        assert!(matches!(
+            reorder_sessions_impl(&mut conn, vec![1, 99]),
+            Err(AppError::Validation(_))
+        ));
+    }
 }
 
 #[tauri::command]

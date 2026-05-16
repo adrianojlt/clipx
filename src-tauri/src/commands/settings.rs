@@ -100,6 +100,47 @@ pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppH
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::settings::Settings;
+
+    #[test]
+    fn apply_field_invalid_history_limit() {
+        let mut s = Settings::default();
+        assert!(matches!(apply_field(&mut s, "history_limit", "abc"), Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn apply_field_invalid_window_width() {
+        let mut s = Settings::default();
+        assert!(matches!(apply_field(&mut s, "window_width", "not_a_float"), Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn apply_field_invalid_window_height() {
+        let mut s = Settings::default();
+        assert!(matches!(apply_field(&mut s, "window_height", "not_a_float"), Err(AppError::Validation(_))));
+    }
+
+    #[test]
+    fn apply_field_unknown_key() {
+        let mut s = Settings::default();
+        assert!(matches!(apply_field(&mut s, "bogus_key", "value"), Err(AppError::Settings(_))));
+    }
+
+    #[test]
+    fn apply_field_valid_values() {
+        let mut s = Settings::default();
+        apply_field(&mut s, "history_limit", "42").unwrap();
+        assert_eq!(s.history_limit, 42);
+        apply_field(&mut s, "window_width", "500.0").unwrap();
+        assert_eq!(s.window_width, 500.0);
+        apply_field(&mut s, "tab_shortcut_pinned", "Command+P").unwrap();
+        assert_eq!(s.tab_shortcut_pinned, "Command+P");
+    }
+}
+
 #[tauri::command]
 pub fn update_shortcut(
     shortcut: String,

@@ -49,6 +49,13 @@ export default function HistoryItem({
     };
   }, [showSessionPicker]);
 
+  useEffect(() => {
+    return () => {
+      clearTimeout(timerRef.current);
+      clearTimeout(hideRef.current);
+    };
+  }, []);
+
   function handleMouseEnter() {
 
     clearTimeout(hideRef.current);
