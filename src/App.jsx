@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -89,7 +89,7 @@ function App() {
     [pinned]
   );
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const h = await getHistory();
       setHistory(h);
@@ -103,7 +103,7 @@ function App() {
       console.error("Failed to load data", e);
       await logError("error", `Failed to load data: ${e}`);
     }
-  };
+  }, []);
 
   const loadClipboard = async () => {
     try {
@@ -214,7 +214,7 @@ function App() {
       cancelled = true;
       unlisteners.forEach((fn) => fn());
     };
-  }, []);
+  }, [loadData]);
 
   useEffect(() => {
 
@@ -320,14 +320,14 @@ function App() {
     await getCurrentWindow().hide();
   };
 
-  const handleActivateSession = async (id) => {
+  const handleActivateSession = useCallback(async (id) => {
     try {
       await activateSession(id);
       await loadData();
     } catch (e) {
       await logError("error", `Failed to activate session: ${e}`);
     }
-  };
+  }, [loadData]);
 
   const handleCreateSession = async () => {
     const name = newSessionName.trim();
@@ -457,13 +457,22 @@ function App() {
       const tag = e.target.tagName;
 
       // if it's in a field ... ignore
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (tag === "INPUT" || tag === "TEXTAREA") {
+        return; 
+      }
 
       const num = parseInt(e.key);
 
       if (num >= 1 && num <= 5 && !e.metaKey && !e.ctrlKey && !e.altKey) {
 
         const index = num - 1;
+
+        if (activeTab === "sessions" && index < filteredSessions.length) {
+            e.preventDefault();
+            handleActivateSession(filteredSessions[index].id);
+            return;
+        }
+
         const list = activeTab === "pinned" ? filteredPinned : filteredHistory;
 
         if (index < list.length) {
@@ -477,7 +486,7 @@ function App() {
 
     return () => window.removeEventListener("keydown", onKey);
 
-  }, [activeTab, filteredPinned, filteredHistory]);
+  }, [activeTab, filteredPinned, filteredHistory, filteredSessions, handleActivateSession]);
 
   const handlePin = async (content) => {
     try {
