@@ -1,0 +1,128 @@
+import { useState, useRef, useEffect } from "react";
+import {
+  reorderPinned,
+  unpinItem,
+  updatePinnedDescription,
+  togglePinnedHidden,
+  logError,
+} from "../services/clipboardService";
+import { useDragReorder } from "../hooks/useDragReorder";
+import PinnedItem from "./PinnedItem";
+
+export default function PinnedTab({
+  pinned,
+  pinnedSearch,
+  setPinnedSearch,
+  pinnedSearchRef,
+  currentClipboard,
+  onCopy,
+  onDataChanged,
+}) {
+  const [items, setItems] = useState(pinned);
+  const [editingId, setEditingId] = useState(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [confirmUnpinId, setConfirmUnpinId] = useState(null);
+  const listRef = useRef(null);
+  const itemsRef = useRef(pinned);
+
+  useEffect(() => {
+    setItems(pinned);
+    itemsRef.current = pinned;
+  }, [pinned]);
+
+  const { draggingId, dragIndicator, handleMouseDown } = useDragReorder({
+    listRef,
+    itemsRef,
+    setItems,
+    reorderFn: reorderPinned,
+  });
+
+  const filteredItems = items.filter(
+    (item) =>
+      item.content.toLowerCase().includes(pinnedSearch.toLowerCase()) ||
+      item.description.toLowerCase().includes(pinnedSearch.toLowerCase())
+  );
+
+  const handleUnpin = async (id) => {
+    try {
+      await unpinItem(id);
+      await onDataChanged();
+    } catch (e) {
+      await logError("error", `Failed to unpin item: ${e}`);
+    }
+  };
+
+  const handleSaveDescription = async (id) => {
+    try {
+      await updatePinnedDescription(id, editingValue);
+      setEditingId(null);
+      await onDataChanged();
+    } catch (e) {
+      await logError("error", `Failed to save description: ${e}`);
+    }
+  };
+
+  const handleToggleHidden = async (id) => {
+    try {
+      await togglePinnedHidden(id);
+      await onDataChanged();
+    } catch (e) {
+      await logError("error", `Failed to toggle hidden: ${e}`);
+    }
+  };
+
+  return (
+    <>
+      <div className="search-bar">
+        <input
+          ref={pinnedSearchRef}
+          className="search-input"
+          type="text"
+          placeholder="Search pinned..."
+          value={pinnedSearch}
+          onChange={(e) => setPinnedSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              e.target.blur();
+            }
+          }}
+        />
+      </div>
+      <div className="list" ref={listRef}>
+        {filteredItems.length === 0 && <div className="empty">No pinned items</div>}
+        {filteredItems.map((item) => (
+          <PinnedItem
+            key={item.id}
+            item={item}
+            isCurrentClipboard={item.content === currentClipboard}
+            isDragging={draggingId === item.id}
+            dragIndicator={dragIndicator}
+            editingId={editingId}
+            editingValue={editingValue}
+            confirmUnpinId={confirmUnpinId}
+            onCopy={onCopy}
+            onMouseDown={handleMouseDown}
+            onToggleHidden={handleToggleHidden}
+            onStartEdit={(id, desc) => {
+              setEditingId(id);
+              setEditingValue(desc);
+            }}
+            onEditChange={setEditingValue}
+            onSaveEdit={handleSaveDescription}
+            onCancelEdit={() => {
+              setEditingId(null);
+              setEditingValue("");
+            }}
+            onRequestUnpin={setConfirmUnpinId}
+            onConfirmUnpin={(id) => {
+              handleUnpin(id);
+              setConfirmUnpinId(null);
+            }}
+            onCancelUnpin={() => setConfirmUnpinId(null)}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
