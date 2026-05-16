@@ -191,12 +191,21 @@ function App() {
       if (cancelled) { u2(); return; }
       unlisteners.push(u2);
 
-      const u3 = await listen("settings-changed", () => {
-        loadTabShortcuts();
+      const u3 = await listen("main-window-shown", () => {
+        setHistorySearch("");
+        setPinnedSearch("");
+        setSessionsSearch("");
       });
 
       if (cancelled) { u3(); return; }
       unlisteners.push(u3);
+
+      const u4 = await listen("settings-changed", () => {
+        loadTabShortcuts();
+      });
+
+      if (cancelled) { u4(); return; }
+      unlisteners.push(u4);
     };
 
     setupListeners();

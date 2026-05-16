@@ -18,7 +18,7 @@ use rusqlite::Connection;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Manager,
+    AppHandle, Emitter, Manager,
 };
 
 use crate::settings::Settings;
@@ -224,6 +224,9 @@ fn show_window(app: &AppHandle, label: &str) {
     if let Some(win) = app.get_webview_window(label) {
         let _ = win.show();
         let _ = win.set_focus();
+        if label == "main" {
+            let _ = app.emit("main-window-shown", ());
+        }
     }
 }
 

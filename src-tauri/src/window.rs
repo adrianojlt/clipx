@@ -1,5 +1,5 @@
 use crate::AppState;
-use tauri::{Manager, Monitor, PhysicalPosition, WebviewWindow};
+use tauri::{Emitter, Manager, Monitor, PhysicalPosition, WebviewWindow};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutEvent, ShortcutState};
 
 pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: ShortcutEvent) {
@@ -40,6 +40,7 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
     let _ = win.set_position(tauri::Position::Physical(PhysicalPosition { x, y }));
     let _ = win.show();
     let _ = win.set_focus();
+    let _ = app.emit("main-window-shown", ());
 }
 
 pub(crate) fn monitor_under_point(win: &WebviewWindow, x: i32, y: i32) -> Option<Monitor> {
