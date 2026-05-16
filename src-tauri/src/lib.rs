@@ -56,6 +56,7 @@ pub struct Session {
     pub(crate) is_global: bool,
     pub(crate) is_active: bool,
     pub(crate) sort_order: i64,
+    pub(crate) item_count: i64,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

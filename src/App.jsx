@@ -47,6 +47,7 @@ function App() {
   const [tabShortcutSessions, setTabShortcutSessions] = useState("Command+3");
   const [tabShortcutFind, setTabShortcutFind] = useState("Command+F");
   const [sessions, setSessions] = useState([]);
+  const [sessionsSearch, setSessionsSearch] = useState("");
   const [sessionsDraggingId, setSessionsDraggingId] = useState(null);
   const [sessionsDragIndicator, setSessionsDragIndicator] = useState(null);
   const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState(null);
@@ -54,11 +55,11 @@ function App() {
   const pinnedRef = useRef([]);
   const sessionsRef = useRef([]);
   const listRef = useRef(null);
-  const sessionsListRef = useRef(null);
   const dragCleanupRef = useRef(null);
   const sessionsDragCleanupRef = useRef(null);
   const pinnedSearchRef = useRef(null);
   const historySearchRef = useRef(null);
+  const sessionsSearchRef = useRef(null);
 
   const filteredHistory = useMemo(
     () =>
@@ -74,6 +75,11 @@ function App() {
           item.description.toLowerCase().includes(pinnedSearch.toLowerCase())
       ),
     [pinned, pinnedSearch]
+  );
+
+  const filteredSessions = useMemo(
+    () => sessions.filter((s) => s.name.toLowerCase().includes(sessionsSearch.toLowerCase())),
+    [sessions, sessionsSearch]
   );
 
   const pinnedSet = useMemo(() => new Set(pinned.map((p) => p.content)), [pinned]);
@@ -243,7 +249,11 @@ function App() {
 
       e.preventDefault();
 
-      const ref = activeTab === "pinned" ? pinnedSearchRef : historySearchRef;
+      const ref = activeTab === "pinned"
+        ? pinnedSearchRef
+        : activeTab === "sessions"
+          ? sessionsSearchRef
+          : historySearchRef;
 
       ref.current?.focus();
     };
@@ -335,6 +345,7 @@ function App() {
   const handlePinToSession = async (content, sessionId) => {
     try {
       await pinItemToSession(content, sessionId);
+      await loadData();
     } catch (e) {
       await logError("error", `Failed to pin to session: ${e}`);
     }
@@ -347,18 +358,18 @@ function App() {
     let currentIndicator = null;
 
     const onMouseMove = (ev) => {
-      if (!sessionsListRef.current) return;
-      const listRect = sessionsListRef.current.getBoundingClientRect();
-      const relY = ev.clientY - listRect.top + sessionsListRef.current.scrollTop;
+      if (!listRef.current) return;
+      const listRect = listRef.current.getBoundingClientRect();
+      const relY = ev.clientY - listRect.top + listRef.current.scrollTop;
 
-      const children = Array.from(sessionsListRef.current.children);
+      const children = Array.from(listRef.current.children);
       let closest = null;
       let closestPos = "after";
       let minDist = Infinity;
 
       for (const child of children) {
         const rect = child.getBoundingClientRect();
-        const childTop = rect.top - listRect.top + sessionsListRef.current.scrollTop;
+        const childTop = rect.top - listRect.top + listRef.current.scrollTop;
         const childCenter = childTop + rect.height / 2;
         const dist = Math.abs(relY - childCenter);
         if (dist < minDist) {
@@ -674,6 +685,38 @@ function App() {
           />
         </div>
       )}
+      {activeTab === "sessions" && (
+        <div className="search-bar sessions-bar">
+          <input
+            ref={sessionsSearchRef}
+            className="search-input"
+            type="text"
+            placeholder="Search sessions..."
+            value={sessionsSearch}
+            onChange={(e) => setSessionsSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                e.target.blur();
+              }
+            }}
+          />
+          <input
+            className="session-create-input"
+            type="text"
+            placeholder="New session..."
+            value={newSessionName}
+            onChange={(e) => setNewSessionName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreateSession();
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                e.target.blur();
+              }
+            }}
+          />
+        </div>
+      )}
       <div className="list" ref={listRef}>
         {activeTab === "pinned" && (
           <>
@@ -735,47 +778,22 @@ function App() {
         )}
         {activeTab === "sessions" && (
           <>
-            <div className="session-create">
-              <input
-                className="session-create-input"
-                type="text"
-                placeholder="New session name..."
-                value={newSessionName}
-                onChange={(e) => setNewSessionName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateSession();
-                  if (e.key === "Escape") {
-                    e.stopPropagation();
-                    e.target.blur();
-                  }
-                }}
+            {filteredSessions.length === 0 && <div className="empty">No sessions</div>}
+            {filteredSessions.map((item) => (
+              <SessionItem
+                key={item.id}
+                item={item}
+                isActive={item.is_active}
+                isDragging={sessionsDraggingId === item.id}
+                dragIndicator={sessionsDragIndicator}
+                confirmDeleteId={confirmDeleteSessionId}
+                onActivate={handleActivateSession}
+                onMouseDown={handleSessionMouseDown}
+                onRequestDelete={setConfirmDeleteSessionId}
+                onConfirmDelete={handleDeleteSession}
+                onCancelDelete={() => setConfirmDeleteSessionId(null)}
               />
-              <button
-                className="session-create-btn"
-                onClick={handleCreateSession}
-                title="Create session"
-              >
-                +
-              </button>
-            </div>
-            <div className="list" ref={sessionsListRef}>
-              {sessions.length === 0 && <div className="empty">No sessions</div>}
-              {sessions.map((item) => (
-                <SessionItem
-                  key={item.id}
-                  item={item}
-                  isActive={item.is_active}
-                  isDragging={sessionsDraggingId === item.id}
-                  dragIndicator={sessionsDragIndicator}
-                  confirmDeleteId={confirmDeleteSessionId}
-                  onActivate={handleActivateSession}
-                  onMouseDown={handleSessionMouseDown}
-                  onRequestDelete={setConfirmDeleteSessionId}
-                  onConfirmDelete={handleDeleteSession}
-                  onCancelDelete={() => setConfirmDeleteSessionId(null)}
-                />
-              ))}
-            </div>
+            ))}
           </>
         )}
       </div>

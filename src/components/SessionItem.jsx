@@ -18,7 +18,11 @@ export default function SessionItem({
         <div className="drop-indicator" />
       )}
       <div className={`item${isActive ? " session-active" : ""}`}>
-        {!item.is_global && (
+        {item.is_global ? (
+          <span className="drag-handle inert" title="Favorites cannot be reordered">
+            &#x2630;
+          </span>
+        ) : (
           <span
             className="drag-handle"
             onMouseDown={(e) => onMouseDown(e, item.id)}
@@ -27,8 +31,8 @@ export default function SessionItem({
             &#x2630;
           </span>
         )}
-        {item.is_global && <span className="drag-handle-placeholder" />}
         <span className="session-name">{item.name}</span>
+        <span className="session-count">{item.item_count}</span>
         {isConfirming ? (
           <span className="delete-confirm" onClick={(e) => e.stopPropagation()}>
             Remove?
@@ -65,7 +69,16 @@ export default function SessionItem({
             >
               &#x25B6;
             </button>
-            {!item.is_global && (
+            {item.is_global ? (
+              <button
+                className="action inert"
+                tabIndex={-1}
+                onClick={(e) => e.stopPropagation()}
+                title="Favorites cannot be deleted"
+              >
+                &#x2715;
+              </button>
+            ) : (
               <button
                 className="action"
                 onClick={(e) => {

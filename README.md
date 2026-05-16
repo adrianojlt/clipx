@@ -13,9 +13,10 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Tray menu** - Open the app, change settings, or quit from the tray icon.
 - **Configurable hotkey** - Record your own keyboard shortcut to summon the popup via Settings.
 - **Pin items** - Pin frequently used entries so they stay at the top, reorder them, and give each one a custom label. Hide sensitive content with the eye toggle.
+- **Sessions** - Group pinned items into named sessions and switch between them. The Pinned tab shows only the active session's items. The default "Favorites" session is permanent.
 - **Search** - Filter both pinned items and clipboard history instantly with the search box. Press `Command+F` (configurable) to jump to the search box from anywhere in the popup.
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
-- **Tab shortcuts** - Switch between Pinned and History tabs with configurable keyboard shortcuts (default Command+1 / Command+2).
+- **Tab shortcuts** - Switch between Pinned, History, and Sessions tabs with configurable keyboard shortcuts (default Command+1 / Command+2 / Command+3).
 - **Resizable window** - Adjust the popup width and height in Settings.
 - **Local only** - All clipboard history stays on your machine.
 

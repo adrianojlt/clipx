@@ -22,6 +22,7 @@ export default function HistoryItem({
   const hideRef = useRef(null);
   const itemRef = useRef(null);
   const pickerRef = useRef(null);
+  const sessionOptions = sessions.filter((s) => !s.is_global);
 
   useEffect(() => {
 
@@ -33,8 +34,19 @@ export default function HistoryItem({
       }
     }
 
+    function handleKey(e) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setShowSessionPicker(false);
+      }
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey, true);
+    };
   }, [showSessionPicker]);
 
   function handleMouseEnter() {
@@ -105,35 +117,40 @@ export default function HistoryItem({
         </span>
       ) : (
         <>
-          <button
-            className="action"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowSessionPicker((v) => !v);
-            }}
-            title="Pin to session"
-          >
-            &#x2B67;
-          </button>
-          {showSessionPicker && (
-            <div
-              ref={pickerRef}
-              className="session-picker"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {sessions.filter((s) => !s.is_global).map((s) => (
+          {sessionOptions.length > 0 && (
+            <>
+              <button
+                className="action"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowSessionPicker((v) => !v);
+                }}
+                title="Pin to session"
+              >
+                &#x2B67;
+              </button>
+              {showSessionPicker && (
                 <div
-                  key={s.id}
-                  className="session-picker-item"
-                  onClick={() => {
-                    onPinToSession(item.content, s.id);
-                    setShowSessionPicker(false);
-                  }}
+                  ref={pickerRef}
+                  className="session-picker"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  {s.name}
+                  {sessionOptions.map((s) => (
+                    <div
+                      key={s.id}
+                      className="session-picker-item"
+                      onClick={() => {
+                        onPinToSession(item.content, s.id);
+                        setShowSessionPicker(false);
+                      }}
+                    >
+                      {s.name}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
           <button
             className={`action${isPinned ? " starred" : ""}`}

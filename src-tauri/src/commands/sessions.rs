@@ -9,7 +9,11 @@ pub fn get_sessions(state: State<AppState>) -> Result<Vec<Session>, AppError> {
     let conn = lock_db(&state)?;
 
     let mut stmt = conn.prepare(
-        "SELECT id, name, is_global, is_active, sort_order FROM sessions ORDER BY sort_order ASC",
+        "SELECT s.id, s.name, s.is_global, s.is_active, s.sort_order, COUNT(p.id) AS item_count \
+         FROM sessions s \
+         LEFT JOIN clipboard_pinned p ON p.session_id = s.id \
+         GROUP BY s.id \
+         ORDER BY s.sort_order ASC",
     )?;
 
     let items = stmt
@@ -20,6 +24,7 @@ pub fn get_sessions(state: State<AppState>) -> Result<Vec<Session>, AppError> {
                 is_global: row.get::<_, i64>(2)? != 0,
                 is_active: row.get::<_, i64>(3)? != 0,
                 sort_order: row.get(4)?,
+                item_count: row.get(5)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -57,7 +62,11 @@ pub fn create_session(name: String, state: State<AppState>) -> Result<Session, A
     let id = conn.last_insert_rowid();
 
     let session = conn.query_row(
-        "SELECT id, name, is_global, is_active, sort_order FROM sessions WHERE id = ?1",
+        "SELECT s.id, s.name, s.is_global, s.is_active, s.sort_order, COUNT(p.id) AS item_count \
+         FROM sessions s \
+         LEFT JOIN clipboard_pinned p ON p.session_id = s.id \
+         WHERE s.id = ?1 \
+         GROUP BY s.id",
         [id],
         |row| {
             Ok(Session {
@@ -66,6 +75,7 @@ pub fn create_session(name: String, state: State<AppState>) -> Result<Session, A
                 is_global: row.get::<_, i64>(2)? != 0,
                 is_active: row.get::<_, i64>(3)? != 0,
                 sort_order: row.get(4)?,
+                item_count: row.get(5)?,
             })
         },
     )?;

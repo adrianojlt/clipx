@@ -323,28 +323,48 @@
   margin-right: 0.5rem;
 }
 
-.drag-handle-placeholder {
-  display: inline-block;
-  width: 1.4rem;
+.session-count {
+  font-size: 0.75rem;
+  color: #666;
   margin-right: 0.5rem;
+  flex-shrink: 0;
 }
 
-.session-create {
+.drag-handle.inert {
+  cursor: default;
+  color: #555;
+}
+
+.drag-handle.inert:active {
+  cursor: default;
+}
+
+.action.inert {
+  cursor: default;
+  color: #555;
+}
+
+.action.inert:hover {
+  color: #555;
+}
+
+.sessions-bar {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid #333;
-  background: #252525;
+  gap: 0.4rem;
+}
+
+.sessions-bar .search-input {
+  flex: 1;
 }
 
 .session-create-input {
-  flex: 1;
+  flex: 0 0 38%;
   background: #2a2a2a;
   border: 1px solid #444;
-  border-radius: 3px;
+  border-radius: 4px;
   color: #e0e0e0;
-  padding: 0.3rem 0.5rem;
   font-size: 0.82rem;
+  padding: 0.3rem 0.5rem;
   outline: none;
 }
 
@@ -354,22 +374,6 @@
 
 .session-create-input:focus {
   border-color: #555;
-}
-
-.session-create-btn {
-  background: #3a3a3a;
-  border: 1px solid #555;
-  border-radius: 3px;
-  color: #e0e0e0;
-  cursor: pointer;
-  padding: 0.3rem 0.7rem;
-  font-size: 1rem;
-  line-height: 1;
-  transition: background 0.15s;
-}
-
-.session-create-btn:hover {
-  background: #444;
 }
 
 .session-picker {
