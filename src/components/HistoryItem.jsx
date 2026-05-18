@@ -2,6 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import ContextMenu from "./ContextMenu";
 
+const TOOLTIP_EST_HEIGHT = 120;
+const TOOLTIP_EST_WIDTH = 328;
+const TOOLTIP_GAP = 4;
+
 export default function HistoryItem({
   item,
   isCurrentClipboard,
@@ -44,11 +48,10 @@ export default function HistoryItem({
       if (!itemRef.current) return;
 
       const rect = itemRef.current.getBoundingClientRect();
-      const estimatedHeight = 120;
-      const top = rect.bottom + estimatedHeight > window.innerHeight
-        ? rect.top - estimatedHeight - 4
-        : rect.bottom + 4;
-      const left = Math.min(rect.left, window.innerWidth - 328);
+      const top = rect.bottom + TOOLTIP_EST_HEIGHT > window.innerHeight
+        ? rect.top - TOOLTIP_EST_HEIGHT - TOOLTIP_GAP
+        : rect.bottom + TOOLTIP_GAP;
+      const left = Math.min(rect.left, window.innerWidth - TOOLTIP_EST_WIDTH);
 
       setTooltip({ top, left });
     }, 2000);

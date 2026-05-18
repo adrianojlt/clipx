@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ContextMenu from "./ContextMenu";
 
 export default function PinnedItem({
@@ -6,26 +6,23 @@ export default function PinnedItem({
   isCurrentClipboard,
   isDragging,
   dragIndicator,
-  editingId,
-  editingValue,
-  confirmUnpinId,
   sessions,
   onCopy,
   onMouseDown,
   onToggleHidden,
-  onStartEdit,
-  onEditChange,
-  onSaveEdit,
-  onCancelEdit,
-  onRequestUnpin,
-  onConfirmUnpin,
-  onCancelUnpin,
+  onSaveDescription,
+  onUnpin,
   onPinToSession,
 }) {
-  const isEditing = editingId === item.id;
-  const isConfirming = confirmUnpinId === item.id;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(item.description);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const sessionOptions = (sessions || []).filter((s) => !s.is_global);
+
+  useEffect(() => {
+    setEditValue(item.description);
+  }, [item.description]);
 
   return (
     <>
@@ -56,14 +53,18 @@ export default function PinnedItem({
           {isEditing ? (
             <input
               className="description-edit"
-              value={editingValue}
+              value={editValue}
               autoFocus
-              onChange={(e) => onEditChange(e.target.value)}
+              onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") onSaveEdit(item.id);
+                if (e.key === "Enter") {
+                  onSaveDescription(item.id, editValue);
+                  setIsEditing(false);
+                }
                 if (e.key === "Escape") {
                   e.stopPropagation();
-                  onCancelEdit();
+                  setEditValue(item.description);
+                  setIsEditing(false);
                 }
               }}
               onClick={(e) => e.stopPropagation()}
@@ -82,7 +83,7 @@ export default function PinnedItem({
             }}
             title={item.hidden ? "Show content" : "Hide content"}
           >
-            {item.hidden ? "\u25CB" : "\u25C9"}
+            {item.hidden ? "○" : "◉"}
           </button>
         )}
         {!isConfirming && (
@@ -90,11 +91,12 @@ export default function PinnedItem({
             className="action"
             onClick={(e) => {
               e.stopPropagation();
-              onStartEdit(item.id, item.description);
+              setEditValue(item.description);
+              setIsEditing(true);
             }}
             title="Edit description"
           >
-            {"\u270E"}
+            {"✎"}
           </button>
         )}
         {isConfirming ? (
@@ -104,7 +106,8 @@ export default function PinnedItem({
               className="action confirm-yes"
               onClick={(e) => {
                 e.stopPropagation();
-                onConfirmUnpin(item.id);
+                onUnpin(item.id);
+                setIsConfirming(false);
               }}
               title="Confirm remove"
             >
@@ -114,7 +117,7 @@ export default function PinnedItem({
               className="action confirm-no"
               onClick={(e) => {
                 e.stopPropagation();
-                onCancelUnpin();
+                setIsConfirming(false);
               }}
               title="Cancel"
             >
@@ -126,7 +129,7 @@ export default function PinnedItem({
             className="action"
             onClick={(e) => {
               e.stopPropagation();
-              onRequestUnpin(item.id);
+              setIsConfirming(true);
             }}
             title="Unpin"
           >

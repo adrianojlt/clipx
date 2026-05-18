@@ -189,7 +189,7 @@ pub fn apply_window_size(state: State<AppState>, app: AppHandle) -> Result<(), A
         .settings
         .lock()
         .map(|s| (s.window_width, s.window_height))
-        .unwrap_or((400.0, 600.0));
+        .map_err(|_| AppError::State("settings mutex poisoned".into()))?;
 
     let Some(win) = app.get_webview_window("main") else {
         return Ok(());

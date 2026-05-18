@@ -21,9 +21,6 @@ export default function PinnedTab({
   onDataChanged,
 }) {
   const [items, setItems] = useState(pinned);
-  const [editingId, setEditingId] = useState(null);
-  const [editingValue, setEditingValue] = useState("");
-  const [confirmUnpinId, setConfirmUnpinId] = useState(null);
   const listRef = useRef(null);
   const itemsRef = useRef(pinned);
 
@@ -54,10 +51,9 @@ export default function PinnedTab({
     }
   };
 
-  const handleSaveDescription = async (id) => {
+  const handleSaveDescription = async (id, value) => {
     try {
-      await updatePinnedDescription(id, editingValue);
-      setEditingId(null);
+      await updatePinnedDescription(id, value);
       await onDataChanged();
     } catch (e) {
       await logError("error", `Failed to save description: ${e}`);
@@ -109,29 +105,12 @@ export default function PinnedTab({
             isCurrentClipboard={item.content === currentClipboard}
             isDragging={draggingId === item.id}
             dragIndicator={dragIndicator}
-            editingId={editingId}
-            editingValue={editingValue}
-            confirmUnpinId={confirmUnpinId}
+            sessions={sessions}
             onCopy={onCopy}
             onMouseDown={handleMouseDown}
             onToggleHidden={handleToggleHidden}
-            onStartEdit={(id, desc) => {
-              setEditingId(id);
-              setEditingValue(desc);
-            }}
-            onEditChange={setEditingValue}
-            onSaveEdit={handleSaveDescription}
-            onCancelEdit={() => {
-              setEditingId(null);
-              setEditingValue("");
-            }}
-            onRequestUnpin={setConfirmUnpinId}
-            onConfirmUnpin={(id) => {
-              handleUnpin(id);
-              setConfirmUnpinId(null);
-            }}
-            onCancelUnpin={() => setConfirmUnpinId(null)}
-            sessions={sessions}
+            onSaveDescription={handleSaveDescription}
+            onUnpin={handleUnpin}
             onPinToSession={handlePinToSession}
           />
         ))}

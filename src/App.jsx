@@ -60,17 +60,20 @@ function App() {
     [pinned]
   );
 
+  const loadingRef = useRef(false);
   const loadData = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
-      const h = await getHistory();
+      const [h, p, s] = await Promise.all([getHistory(), getPinned(), getSessions()]);
       setHistory(h);
-      const p = await getPinned();
       setPinned(p);
-      const s = await getSessions();
       setSessions(s);
     } catch (e) {
       console.error("Failed to load data", e);
       await logError("error", `Failed to load data: ${e}`);
+    } finally {
+      loadingRef.current = false;
     }
   }, []);
 
@@ -94,28 +97,18 @@ function App() {
 
   const loadTabShortcuts = useCallback(async () => {
     try {
-      const v = await getSetting("tab_shortcut_pinned");
-      setTabShortcutPinned(v);
+      const [pinned, history, sessions, find] = await Promise.all([
+        getSetting("tab_shortcut_pinned"),
+        getSetting("tab_shortcut_history"),
+        getSetting("tab_shortcut_sessions"),
+        getSetting("tab_shortcut_find"),
+      ]);
+      setTabShortcutPinned(pinned);
+      setTabShortcutHistory(history);
+      setTabShortcutSessions(sessions);
+      setTabShortcutFind(find);
     } catch (e) {
-      await logError("warn", `Failed to load tab shortcut pinned: ${e}`);
-    }
-    try {
-      const v = await getSetting("tab_shortcut_history");
-      setTabShortcutHistory(v);
-    } catch (e) {
-      await logError("warn", `Failed to load tab shortcut history: ${e}`);
-    }
-    try {
-      const v = await getSetting("tab_shortcut_sessions");
-      setTabShortcutSessions(v);
-    } catch (e) {
-      await logError("warn", `Failed to load tab shortcut sessions: ${e}`);
-    }
-    try {
-      const v = await getSetting("tab_shortcut_find");
-      setTabShortcutFind(v);
-    } catch (e) {
-      await logError("warn", `Failed to load tab shortcut find: ${e}`);
+      await logError("warn", `Failed to load tab shortcuts: ${e}`);
     }
   }, []);
 
