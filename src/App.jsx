@@ -194,6 +194,7 @@ function App() {
           setPinnedSearch={setPinnedSearch}
           pinnedSearchRef={pinnedSearchRef}
           currentClipboard={currentClipboard}
+          sessions={sessions}
           onCopy={handleCopy}
           onDataChanged={loadData}
         />

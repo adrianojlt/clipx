@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
+import ContextMenu from "./ContextMenu";
 
 export default function HistoryItem({
   item,
@@ -17,37 +18,11 @@ export default function HistoryItem({
 }) {
   const isConfirming = confirmDeleteId === item.id;
   const [tooltip, setTooltip] = useState(null);
-  const [showSessionPicker, setShowSessionPicker] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
   const timerRef = useRef(null);
   const hideRef = useRef(null);
   const itemRef = useRef(null);
-  const pickerRef = useRef(null);
   const sessionOptions = sessions.filter((s) => !s.is_global);
-
-  useEffect(() => {
-
-    if (!showSessionPicker) return;
-
-    function handleClickOutside(e) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
-        setShowSessionPicker(false);
-      }
-    }
-
-    function handleKey(e) {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setShowSessionPicker(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKey, true);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKey, true);
-    };
-  }, [showSessionPicker]);
 
   useEffect(() => {
     return () => {
@@ -96,6 +71,12 @@ export default function HistoryItem({
       onClick={() => onCopy(item.content)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onContextMenu={(e) => {
+        if (sessionOptions.length === 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ x: e.clientX, y: e.clientY });
+      }}
     >
       <span className={`text${isHidden ? " hidden" : ""}`}>{item.content}</span>
       {isConfirming ? (
@@ -124,41 +105,6 @@ export default function HistoryItem({
         </span>
       ) : (
         <>
-          {sessionOptions.length > 0 && (
-            <>
-              <button
-                className="action"
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowSessionPicker((v) => !v);
-                }}
-                title="Pin to session"
-              >
-                &#x2B67;
-              </button>
-              {showSessionPicker && (
-                <div
-                  ref={pickerRef}
-                  className="session-picker"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {sessionOptions.map((s) => (
-                    <div
-                      key={s.id}
-                      className="session-picker-item"
-                      onClick={() => {
-                        onPinToSession(item.content, s.id);
-                        setShowSessionPicker(false);
-                      }}
-                    >
-                      {s.name}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
           <button
             className={`action${isPinned ? " starred" : ""}`}
             onClick={(e) => {
@@ -182,6 +128,20 @@ export default function HistoryItem({
         </>
       )}
     </div>
+    {contextMenu && (
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={sessionOptions.map((s) => ({
+          label: s.name,
+          onClick: () => {
+            onPinToSession(item.content, s.id);
+            setContextMenu(null);
+          },
+        }))}
+        onClose={() => setContextMenu(null)}
+      />
+    )}
     {tooltip && ReactDOM.createPortal(
       <div
         className="hover-tooltip"

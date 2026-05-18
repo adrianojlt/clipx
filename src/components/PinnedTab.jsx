@@ -4,6 +4,7 @@ import {
   unpinItem,
   updatePinnedDescription,
   togglePinnedHidden,
+  pinItemToSession,
   logError,
 } from "../services/clipboardService";
 import { useDragReorder } from "../hooks/useDragReorder";
@@ -15,6 +16,7 @@ export default function PinnedTab({
   setPinnedSearch,
   pinnedSearchRef,
   currentClipboard,
+  sessions,
   onCopy,
   onDataChanged,
 }) {
@@ -59,6 +61,15 @@ export default function PinnedTab({
       await onDataChanged();
     } catch (e) {
       await logError("error", `Failed to save description: ${e}`);
+    }
+  };
+
+  const handlePinToSession = async (content, sessionId) => {
+    try {
+      await pinItemToSession(content, sessionId);
+      await onDataChanged();
+    } catch (e) {
+      await logError("error", `Failed to pin to session: ${e}`);
     }
   };
 
@@ -120,6 +131,8 @@ export default function PinnedTab({
               setConfirmUnpinId(null);
             }}
             onCancelUnpin={() => setConfirmUnpinId(null)}
+            sessions={sessions}
+            onPinToSession={handlePinToSession}
           />
         ))}
       </div>

@@ -1,3 +1,6 @@
+import { useState } from "react";
+import ContextMenu from "./ContextMenu";
+
 export default function PinnedItem({
   item,
   isCurrentClipboard,
@@ -6,6 +9,7 @@ export default function PinnedItem({
   editingId,
   editingValue,
   confirmUnpinId,
+  sessions,
   onCopy,
   onMouseDown,
   onToggleHidden,
@@ -16,11 +20,15 @@ export default function PinnedItem({
   onRequestUnpin,
   onConfirmUnpin,
   onCancelUnpin,
+  onPinToSession,
 }) {
   const isEditing = editingId === item.id;
   const isConfirming = confirmUnpinId === item.id;
+  const [contextMenu, setContextMenu] = useState(null);
+  const sessionOptions = (sessions || []).filter((s) => !s.is_global);
 
   return (
+    <>
     <div data-id={item.id} className={`item-wrapper${isDragging ? " dragging" : ""}`}>
       {dragIndicator?.targetId === item.id && dragIndicator.position === "before" && (
         <div className="drop-indicator" />
@@ -28,6 +36,12 @@ export default function PinnedItem({
       <div
         className={`item${isCurrentClipboard ? " current-clipboard" : ""}`}
         onClick={() => onCopy(item.content)}
+        onContextMenu={(e) => {
+          if (sessionOptions.length === 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setContextMenu({ x: e.clientX, y: e.clientY });
+        }}
       >
         <span
           className="drag-handle"
@@ -122,5 +136,20 @@ export default function PinnedItem({
         <div className="drop-indicator" />
       )}
     </div>
+    {contextMenu && (
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={sessionOptions.map((s) => ({
+          label: s.name,
+          onClick: () => {
+            onPinToSession(item.content, s.id);
+            setContextMenu(null);
+          },
+        }))}
+        onClose={() => setContextMenu(null)}
+      />
+    )}
+    </>
   );
 }
