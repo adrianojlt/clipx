@@ -92,25 +92,19 @@ pub(crate) fn delete_session_impl(conn: &mut rusqlite::Connection, id: i64) -> R
         return Err(AppError::Validation("Invalid id".into()));
     }
 
-    let is_global: i64 = conn
+    let tx = conn.transaction()?;
+
+    let (is_global, was_active): (i64, i64) = tx
         .query_row(
-            "SELECT is_global FROM sessions WHERE id = ?1",
+            "SELECT is_global, is_active FROM sessions WHERE id = ?1",
             [id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|_| AppError::NotFound(id))?;
 
     if is_global != 0 {
         return Err(AppError::Validation("Cannot delete the Global session".into()));
     }
-
-    let was_active: i64 = conn.query_row(
-        "SELECT is_active FROM sessions WHERE id = ?1",
-        [id],
-        |row| row.get(0),
-    )?;
-
-    let tx = conn.transaction()?;
 
     tx.execute("DELETE FROM clipboard_pinned WHERE session_id = ?1", [id])?;
     tx.execute("DELETE FROM sessions WHERE id = ?1", [id])?;
@@ -285,6 +279,7 @@ mod tests {
 pub fn pin_item_to_session(
     content: String,
     session_id: i64,
+    description: Option<String>,
     state: State<AppState>,
 ) -> Result<(), AppError> {
 
@@ -298,6 +293,8 @@ pub fn pin_item_to_session(
         return Err(AppError::Validation("Invalid session_id".into()));
     }
 
+    let desc = description.unwrap_or_else(|| content.clone());
+
     let mut conn = lock_db(&state)?;
     let tx = conn.transaction()?;
 
@@ -308,8 +305,8 @@ pub fn pin_item_to_session(
 
     tx.execute(
         "INSERT OR IGNORE INTO clipboard_pinned (content, session_id, description, sort_order) \
-         VALUES (?1, ?2, ?1, 0)",
-        rusqlite::params![content, session_id],
+         VALUES (?1, ?2, ?3, 0)",
+        rusqlite::params![content, session_id, desc],
     )?;
 
     if tx.changes() == 0 {

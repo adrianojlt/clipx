@@ -64,9 +64,9 @@ export default function PinnedTab({
     }
   };
 
-  const handlePinToSession = async (content, sessionId) => {
+  const handlePinToSession = async (content, sessionId, description) => {
     try {
-      await pinItemToSession(content, sessionId);
+      await pinItemToSession(content, sessionId, description);
       await onDataChanged();
     } catch (e) {
       await logError("error", `Failed to pin to session: ${e}`);

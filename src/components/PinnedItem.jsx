@@ -145,7 +145,7 @@ export default function PinnedItem({
         items={sessionOptions.map((s) => ({
           label: s.name,
           onClick: () => {
-            onPinToSession(item.content, s.id);
+            onPinToSession(item.content, s.id, item.description);
             setContextMenu(null);
           },
         }))}

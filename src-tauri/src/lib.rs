@@ -127,12 +127,7 @@ pub fn run() {
 
                 state.monitor_tx.lock().ok().map(|mut g| g.take());
 
-                if let Some((poll_h, writer_h)) =
-                    state.monitor_handles.lock().ok().and_then(|mut g| g.take())
-                {
-                    let _ = poll_h.join();
-                    let _ = writer_h.join();
-                }
+                drop(state.monitor_handles.lock().ok().and_then(|mut g| g.take()));
             }
         });
 }

@@ -15,8 +15,11 @@ pub fn start_clipboard_monitor(app: AppHandle) {
     let shutdown = state.shutdown.clone();
 
     {
-        let mut guard = state.monitor_tx.lock().unwrap();
-        *guard = Some(tx.clone());
+        if let Ok(mut guard) = state.monitor_tx.lock() {
+            *guard = Some(tx.clone());
+        } else {
+            log::error!("monitor_tx mutex poisoned");
+        }
     }
 
     let shutdown_poll = shutdown.clone();
@@ -104,7 +107,10 @@ pub fn start_clipboard_monitor(app: AppHandle) {
 
     let state = app.state::<AppState>();
     {
-        let mut guard = state.monitor_handles.lock().unwrap();
-        *guard = Some((poll_handle, writer_handle));
+        if let Ok(mut guard) = state.monitor_handles.lock() {
+            *guard = Some((poll_handle, writer_handle));
+        } else {
+            log::error!("monitor_handles mutex poisoned; thread handles leaked");
+        };
     }
 }
