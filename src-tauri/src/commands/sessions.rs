@@ -3,6 +3,17 @@ use crate::error::AppError;
 use crate::{AppState, Session, MAX_CLIP_BYTES};
 use tauri::State;
 
+fn row_to_session(row: &rusqlite::Row) -> rusqlite::Result<Session> {
+    Ok(Session {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        is_global: row.get::<_, i64>(2)? != 0,
+        is_active: row.get::<_, i64>(3)? != 0,
+        sort_order: row.get(4)?,
+        item_count: row.get(5)?,
+    })
+}
+
 #[tauri::command]
 pub fn get_sessions(state: State<AppState>) -> Result<Vec<Session>, AppError> {
 
@@ -17,16 +28,7 @@ pub fn get_sessions(state: State<AppState>) -> Result<Vec<Session>, AppError> {
     )?;
 
     let items = stmt
-        .query_map([], |row| {
-            Ok(Session {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                is_global: row.get::<_, i64>(2)? != 0,
-                is_active: row.get::<_, i64>(3)? != 0,
-                sort_order: row.get(4)?,
-                item_count: row.get(5)?,
-            })
-        })?
+        .query_map([], row_to_session)?
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(items)
@@ -65,16 +67,7 @@ pub(crate) fn create_session_impl(conn: &rusqlite::Connection, name: &str) -> Re
          WHERE s.id = ?1 \
          GROUP BY s.id",
         [id],
-        |row| {
-            Ok(Session {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                is_global: row.get::<_, i64>(2)? != 0,
-                is_active: row.get::<_, i64>(3)? != 0,
-                sort_order: row.get(4)?,
-                item_count: row.get(5)?,
-            })
-        },
+        row_to_session,
     )?;
 
     Ok(session)

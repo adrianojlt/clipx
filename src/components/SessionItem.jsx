@@ -72,7 +72,8 @@ export default function SessionItem({
             {item.is_global ? (
               <button
                 className="action inert"
-                tabIndex={-1}
+                disabled
+                aria-label="Favorites cannot be deleted"
                 onClick={(e) => e.stopPropagation()}
                 title="Favorites cannot be deleted"
               >

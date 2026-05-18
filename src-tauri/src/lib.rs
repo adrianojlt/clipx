@@ -133,7 +133,6 @@ pub fn run() {
 }
 
 fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
-
     let data_dir = app
         .path()
         .app_data_dir()
@@ -162,7 +161,6 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
 }
 
 fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
-
     let state = app.state::<AppState>();
     let hotkey_str = state
         .settings
@@ -185,7 +183,6 @@ fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
 }
 
 fn build_tray(app: &tauri::App) -> Result<(), AppError> {
-
     let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)
         .map_err(|e| AppError::Window(e.to_string()))?;
     let settings_i = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)

@@ -85,7 +85,7 @@ pub fn start_clipboard_monitor(app: AppHandle) {
                         [&text],
                     )?;
 
-                    // keep the most recent, exclude the others ...
+                    // enforce history_limit: delete oldest entries beyond the cap
                     tx.execute(
                         "DELETE FROM clipboard_history WHERE id NOT IN ( \
                              SELECT id FROM clipboard_history ORDER BY created_at DESC LIMIT ?1 \
