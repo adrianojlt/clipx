@@ -126,6 +126,7 @@
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.15s;
+  user-select: none;
 }
 
 .item:hover {
@@ -160,6 +161,7 @@
   margin-right: 0.75rem;
   font-size: 0.85rem;
   color: #e0e0e0;
+  user-select: none;
 }
 
 .hover-tooltip {

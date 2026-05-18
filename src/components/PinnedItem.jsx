@@ -36,10 +36,12 @@ export default function PinnedItem({
       <div
         className={`item${isCurrentClipboard ? " current-clipboard" : ""}`}
         onClick={() => onCopy(item.content)}
+        onMouseDown={(e) => { if (e.button === 2) e.preventDefault(); }}
         onContextMenu={(e) => {
           if (sessionOptions.length === 0) return;
           e.preventDefault();
           e.stopPropagation();
+          window.getSelection()?.removeAllRanges();
           setContextMenu({ x: e.clientX, y: e.clientY });
         }}
       >

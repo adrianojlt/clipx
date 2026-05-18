@@ -69,12 +69,14 @@ export default function HistoryItem({
       className={`item${isCurrentClipboard ? " current-clipboard" : ""}`}
       style={{ position: "relative" }}
       onClick={() => onCopy(item.content)}
+      onMouseDown={(e) => { if (e.button === 2) e.preventDefault(); }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onContextMenu={(e) => {
         if (sessionOptions.length === 0) return;
         e.preventDefault();
         e.stopPropagation();
+        window.getSelection()?.removeAllRanges();
         setContextMenu({ x: e.clientX, y: e.clientY });
       }}
     >
