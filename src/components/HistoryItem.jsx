@@ -1,10 +1,7 @@
-import { useState, useRef, useEffect } from "react";
-import ReactDOM from "react-dom";
+import { useRef } from "react";
 import ContextMenu from "./ContextMenu";
-
-const TOOLTIP_EST_HEIGHT = 120;
-const TOOLTIP_EST_WIDTH = 328;
-const TOOLTIP_GAP = 4;
+import { useItemTooltip } from "../hooks/useItemTooltip";
+import { useContextMenu } from "../hooks/useContextMenu";
 
 export default function HistoryItem({
   item,
@@ -21,50 +18,10 @@ export default function HistoryItem({
   onCancelDelete,
 }) {
   const isConfirming = confirmDeleteId === item.id;
-  const [tooltip, setTooltip] = useState(null);
-  const [contextMenu, setContextMenu] = useState(null);
-  const timerRef = useRef(null);
-  const hideRef = useRef(null);
   const itemRef = useRef(null);
-  const sessionOptions = sessions.filter((s) => !s.is_global);
-
-  useEffect(() => {
-    return () => {
-      clearTimeout(timerRef.current);
-      clearTimeout(hideRef.current);
-    };
-  }, []);
-
-  function handleMouseEnter() {
-
-    clearTimeout(hideRef.current);
-
-    if (timerRef.current) return;
-
-    timerRef.current = setTimeout(() => {
-
-      timerRef.current = null;
-
-      if (!itemRef.current) return;
-
-      const rect = itemRef.current.getBoundingClientRect();
-      const top = rect.bottom + TOOLTIP_EST_HEIGHT > window.innerHeight
-        ? rect.top - TOOLTIP_EST_HEIGHT - TOOLTIP_GAP
-        : rect.bottom + TOOLTIP_GAP;
-
-      const left = Math.min(rect.left, window.innerWidth - TOOLTIP_EST_WIDTH);
-
-      setTooltip({ top, left });
-    }, 2000);
-  }
-
-  function handleMouseLeave() {
-    hideRef.current = setTimeout(() => {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-      setTooltip(null);
-    }, 100);
-  }
+  const sessionOptions = (sessions || []).filter((s) => !s.is_global);
+  const { handleMouseEnter, handleMouseLeave, tooltipPortal } = useItemTooltip(itemRef, item.content);
+  const { contextMenu, setContextMenu, onContextMenu } = useContextMenu(sessionOptions);
 
   return (
     <>
@@ -76,13 +33,7 @@ export default function HistoryItem({
       onMouseDown={(e) => { if (e.button === 2) e.preventDefault(); }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onContextMenu={(e) => {
-        if (sessionOptions.length === 0) return;
-        e.preventDefault();
-        e.stopPropagation();
-        window.getSelection()?.removeAllRanges();
-        setContextMenu({ x: e.clientX, y: e.clientY });
-      }}
+      onContextMenu={onContextMenu}
     >
       <span className={`text${isHidden ? " hidden" : ""}`}>{item.content}</span>
       {isConfirming ? (
@@ -148,17 +99,7 @@ export default function HistoryItem({
         onClose={() => setContextMenu(null)}
       />
     )}
-    {tooltip && ReactDOM.createPortal(
-      <div
-        className="hover-tooltip"
-        style={{ top: tooltip.top, left: tooltip.left }}
-        onMouseEnter={() => clearTimeout(hideRef.current)}
-        onMouseLeave={() => setTooltip(null)}
-      >
-        {item.content}
-      </div>,
-      document.body
-    )}
+    {tooltipPortal}
     </>
   );
 }
