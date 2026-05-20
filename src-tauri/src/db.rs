@@ -12,7 +12,7 @@ pub fn db_path(app: &AppHandle) -> Result<PathBuf, AppError> {
 
 pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
 
-    conn.execute_batch("PRAGMA journal_mode=WAL;")?;
+    conn.execute_batch("PRAGMA journal_mode=DELETE; PRAGMA busy_timeout=5000;")?;
 
     let tx = conn.transaction()?;
 
@@ -38,8 +38,9 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
     )?;
 
     tx.execute(
-        "INSERT OR IGNORE INTO sessions (id, name, is_global, is_active, sort_order) \
-         VALUES (1, 'Favorites', 1, 1, 0)",
+        "INSERT INTO sessions (name, is_global, is_active, sort_order) \
+         SELECT 'Favorites', 1, 1, 0 \
+         WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE is_global = 1)",
         [],
     )?;
 

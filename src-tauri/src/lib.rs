@@ -150,6 +150,17 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     let mut conn = Connection::open(crate::db::db_path(app.handle())?)?;
     crate::db::init_db(&mut conn)?;
 
+    if let Ok(p) = crate::db::db_path(app.handle()) {
+        log::info!("db path: {}", p.display());
+    }
+    let session_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
+        .unwrap_or(-1);
+    let history_count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM clipboard_history", [], |r| r.get(0))
+        .unwrap_or(-1);
+    log::info!("startup row counts: sessions={session_count} history={history_count}");
+
     let conn_monitor = Connection::open(crate::db::db_path(app.handle())?)?;
     conn_monitor.execute_batch("PRAGMA busy_timeout = 5000;")?;
 
