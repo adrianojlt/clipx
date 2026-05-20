@@ -15,6 +15,8 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Pin items** - Pin frequently used entries so they stay at the top, reorder them, and give each one a custom label. Hide sensitive content with the eye toggle.
 - **Sessions** - Group pinned items into named sessions and switch between them. The Pinned tab shows only the active session's items. The default "Favorites" session is permanent.
 - **Search** - Filter both pinned items and clipboard history instantly with the search box. Press `Command+F` (configurable) to jump to the search box from anywhere in the popup.
+- **Context menus** - Right-click a history or pinned item to pin it directly to a specific session.
+- **Quick copy keys** - Press `1` through `5` to copy the Nth item in the current tab (or activate a session in the Sessions tab) without touching the mouse.
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
 - **Tab shortcuts** - Switch between Pinned, History, and Sessions tabs with configurable keyboard shortcuts (default Command+1 / Command+2 / Command+3).
 - **Resizable window** - Adjust the popup width and height in Settings.
@@ -91,7 +93,7 @@ If something goes wrong, check the log file for details.
 
 ## Creating a release
 
-1. Bump the version in all three places (replace `0.1.9` with the new version):
+1. Bump the version in all three places (replace `0.1.11` with the new version):
    - `package.json` - `"version"` field
    - `src-tauri/tauri.conf.json` - `"version"` field
    - `src-tauri/Cargo.toml` - `version` field
@@ -113,7 +115,7 @@ git push origin vX.Y.Z
 
 Pushing the tag triggers the GitHub Actions workflow, which builds installers for all platforms and publishes them as a new release.
 
-> The artifact filenames (e.g. `ClipX_0.1.9_aarch64.dmg`) come from the version in `tauri.conf.json`, not the git tag - so all three files must be bumped before tagging.
+> The artifact filenames (e.g. `ClipX_0.1.11_aarch64.dmg`) come from the version in `tauri.conf.json`, not the git tag - so all three files must be bumped before tagging.
 
 ## Running in development
 

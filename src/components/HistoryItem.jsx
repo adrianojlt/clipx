@@ -51,6 +51,7 @@ export default function HistoryItem({
       const top = rect.bottom + TOOLTIP_EST_HEIGHT > window.innerHeight
         ? rect.top - TOOLTIP_EST_HEIGHT - TOOLTIP_GAP
         : rect.bottom + TOOLTIP_GAP;
+
       const left = Math.min(rect.left, window.innerWidth - TOOLTIP_EST_WIDTH);
 
       setTooltip({ top, left });
