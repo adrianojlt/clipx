@@ -109,7 +109,6 @@ pub fn run() {
 
             init_app_state(app)?;
             crate::monitor::start_clipboard_monitor(app.handle().clone());
-            register_initial_shortcut(app)?;
             build_tray(app)?;
 
             for label in ["main", "settings", "about"] {
@@ -120,8 +119,13 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
-        .run(|app, event| {
-            if let tauri::RunEvent::Exit = event {
+        .run(|app, event| match event {
+            tauri::RunEvent::Ready => {
+                if let Err(e) = register_initial_shortcut(app) {
+                    log::error!("failed to register initial global shortcut: {e}");
+                }
+            }
+            tauri::RunEvent::Exit => {
                 let state = app.state::<AppState>();
                 state.shutdown.store(true, Ordering::SeqCst);
 
@@ -129,6 +133,7 @@ pub fn run() {
 
                 drop(state.monitor_handles.lock().ok().and_then(|mut g| g.take()));
             }
+            _ => {}
         });
 }
 
@@ -160,7 +165,7 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     Ok(())
 }
 
-fn register_initial_shortcut(app: &tauri::App) -> Result<(), AppError> {
+fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
     let state = app.state::<AppState>();
     let hotkey_str = state
         .settings
