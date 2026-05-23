@@ -7,15 +7,18 @@ import {
   applyWindowSize,
   logError,
 } from "../services/clipboardService";
+import { IS_MAC } from "../utils/shortcuts";
 import "./Settings.css";
+
+const TAB_MOD = IS_MAC ? "Command" : "Alt";
 
 function Settings() {
   const [hotkey, setHotkey] = useState("");
   const [recording, setRecording] = useState(null);
-  const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
-  const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
-  const [tabShortcutSessions, setTabShortcutSessions] = useState("Command+3");
-  const [tabShortcutFind, setTabShortcutFind] = useState("Command+F");
+  const [tabShortcutPinned, setTabShortcutPinned] = useState(`${TAB_MOD}+1`);
+  const [tabShortcutHistory, setTabShortcutHistory] = useState(`${TAB_MOD}+2`);
+  const [tabShortcutSessions, setTabShortcutSessions] = useState(`${TAB_MOD}+3`);
+  const [tabShortcutFind, setTabShortcutFind] = useState(`${TAB_MOD}+F`);
   const [historyLimit, setHistoryLimit] = useState(20);
   const [windowWidth, setWindowWidth] = useState(400);
   const [windowHeight, setWindowHeight] = useState(600);

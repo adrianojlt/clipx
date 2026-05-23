@@ -19,15 +19,16 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
+        let tab_mod = if cfg!(target_os = "windows") { "Alt" } else { "Command" };
         Self {
             hotkey: "Option+Space".to_string(),
             history_limit: 20,
             window_width: 400.0,
             window_height: 600.0,
-            tab_shortcut_pinned: "Command+1".to_string(),
-            tab_shortcut_history: "Command+2".to_string(),
-            tab_shortcut_sessions: "Command+3".to_string(),
-            tab_shortcut_find: "Command+F".to_string(),
+            tab_shortcut_pinned: format!("{tab_mod}+1"),
+            tab_shortcut_history: format!("{tab_mod}+2"),
+            tab_shortcut_sessions: format!("{tab_mod}+3"),
+            tab_shortcut_find: format!("{tab_mod}+F"),
         }
     }
 }

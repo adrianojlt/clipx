@@ -10,10 +10,16 @@ import {
   activateSession,
   logError,
 } from "./services/clipboardService";
+
 import { useAppEvents } from "./hooks/useAppEvents";
+import { IS_MAC } from "./utils/shortcuts";
+
+const TAB_MOD = IS_MAC ? "Command" : "Alt";
+
 import PinnedTab from "./components/PinnedTab";
 import HistoryTab from "./components/HistoryTab";
 import SessionsTab from "./components/SessionsTab";
+
 import "./App.css";
 
 function App() {
@@ -25,10 +31,10 @@ function App() {
   const [historySearch, setHistorySearch] = useState("");
   const [pinnedSearch, setPinnedSearch] = useState("");
   const [sessionsSearch, setSessionsSearch] = useState("");
-  const [tabShortcutPinned, setTabShortcutPinned] = useState("Command+1");
-  const [tabShortcutHistory, setTabShortcutHistory] = useState("Command+2");
-  const [tabShortcutSessions, setTabShortcutSessions] = useState("Command+3");
-  const [tabShortcutFind, setTabShortcutFind] = useState("Command+F");
+  const [tabShortcutPinned, setTabShortcutPinned] = useState(`${TAB_MOD}+1`);
+  const [tabShortcutHistory, setTabShortcutHistory] = useState(`${TAB_MOD}+2`);
+  const [tabShortcutSessions, setTabShortcutSessions] = useState(`${TAB_MOD}+3`);
+  const [tabShortcutFind, setTabShortcutFind] = useState(`${TAB_MOD}+F`);
   const pinnedSearchRef = useRef(null);
   const historySearchRef = useRef(null);
   const sessionsSearchRef = useRef(null);
