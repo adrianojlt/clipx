@@ -191,6 +191,36 @@ mod tests {
     }
 
     #[test]
+    fn test_favorites_session_created_on_fresh_db() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        init_db(&mut conn).unwrap();
+
+        let (name, is_global, is_active): (String, i64, i64) = conn
+            .query_row(
+                "SELECT name, is_global, is_active FROM sessions WHERE is_global = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+
+        assert_eq!(name, "Favorites");
+        assert_eq!(is_global, 1);
+        assert_eq!(is_active, 1);
+    }
+
+    #[test]
+    fn test_favorites_not_duplicated_on_reinit() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        init_db(&mut conn).unwrap();
+        init_db(&mut conn).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM sessions WHERE is_global = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
     fn test_session_id_migration_idempotent() {
         let mut conn = Connection::open_in_memory().unwrap();
         init_db(&mut conn).unwrap();

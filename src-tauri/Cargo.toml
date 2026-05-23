@@ -1,6 +1,6 @@
 [package]
 name = "clipx-scaffold"
-version = "0.1.16"
+version = "0.1.17"
 description = "Desktop clipboard manager with history and pinned items"
 authors = ["adrianojlt"]
 license = "MIT"

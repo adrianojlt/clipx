@@ -30,6 +30,8 @@ export function useAppEvents({
     onLoadData();
     onLoadTabShortcuts();
 
+    const retryTimer = setTimeout(() => onLoadData(), 500);
+
     let cancelled = false;
     const unlisteners = [];
 
@@ -58,6 +60,7 @@ export function useAppEvents({
 
       const u3 = await listen("main-window-shown", () => {
         onClearSearch();
+        onLoadData();
       });
 
       if (cancelled) { u3(); return; }
@@ -77,6 +80,7 @@ export function useAppEvents({
 
     return () => {
       cancelled = true;
+      clearTimeout(retryTimer);
       unlisteners.forEach((fn) => fn());
     };
   }, [onLoadData, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch]);
