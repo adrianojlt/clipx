@@ -36,7 +36,7 @@ impl Default for Settings {
 impl Settings {
 
     pub fn validate(&mut self) {
-        self.history_limit = self.history_limit.clamp(1, 50);
+        self.history_limit = self.history_limit.clamp(1, 500);
         self.window_width = self.window_width.clamp(300.0, 800.0);
         self.window_height = self.window_height.clamp(400.0, 900.0);
     }
@@ -361,7 +361,7 @@ mod tests {
         };
 
         s.validate();
-        assert_eq!(s.history_limit, 50);
+        assert_eq!(s.history_limit, 200);
         assert_eq!(s.window_width, 300.0);
         assert_eq!(s.window_height, 900.0);
     }

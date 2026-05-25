@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   getSetting,
@@ -12,17 +12,312 @@ import "./Settings.css";
 
 const TAB_MOD = IS_MAC ? "Command" : "Alt";
 
+const SYM = {
+  Command: "⌘", Ctrl: "⌃", Control: "⌃", Option: "⌥", Alt: "⌥",
+  Shift: "⇧", Space: "␣", Enter: "⏎", Escape: "⎋", Tab: "⇥",
+  ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→",
+};
+
+const KeyboardIcon = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+    <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+    <path d="M4 6h.5M7 6h.5M10 6h.5M12 6h.5M4 8.5h.5M7 8.5h.5M10 8.5h.5M12 8.5h.5M5 11h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+  </svg>
+);
+
+const LayoutIcon = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+    <rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+    <path d="M2 6h12M6 6v7.5" stroke="currentColor" strokeWidth="1.2" />
+  </svg>
+);
+
+const SlidersIcon = () => (
+  <svg viewBox="0 0 16 16" width="14" height="14" fill="none">
+    <path d="M2 4.5h8M12 4.5h2M2 11.5h2M6 11.5h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    <circle cx="11" cy="4.5" r="1.5" fill="currentColor" />
+    <circle cx="5" cy="11.5" r="1.5" fill="currentColor" />
+  </svg>
+);
+
+function KeyChips({ value }) {
+  if (!value) return <span className="kbd-placeholder">Not set</span>;
+  const parts = value.split("+");
+  return (
+    <div className="kbd-row">
+      {parts.map((p, i) => (
+        <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          {i > 0 && <span className="kbd-plus">+</span>}
+          <span className="kbd">
+            {SYM[p] && <span className="kbd-sym">{SYM[p]}</span>}
+            <span className="kbd-name">{p}</span>
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function HotkeyField({ label, hint, value, onChange }) {
+  const [recording, setRecording] = useState(false);
+  const [draft, setDraft] = useState([]);
+  const wrapRef = useRef(null);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; });
+
+  useEffect(() => {
+    if (!recording) return;
+    const down = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape") {
+        setRecording(false);
+        setDraft([]);
+        return;
+      }
+      if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) return;
+      const keys = [];
+      if (e.metaKey) keys.push("Command");
+      if (e.ctrlKey) keys.push("Ctrl");
+      if (e.altKey) keys.push("Option");
+      if (e.shiftKey) keys.push("Shift");
+      const k = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+      keys.push(k);
+      setDraft(keys);
+      onChangeRef.current(keys.join("+"));
+      setTimeout(() => { setRecording(false); setDraft([]); }, 120);
+    };
+    window.addEventListener("keydown", down, true);
+    return () => window.removeEventListener("keydown", down, true);
+  }, [recording]);
+
+  useEffect(() => {
+    if (!recording) return;
+    const onClick = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setRecording(false);
+        setDraft([]);
+      }
+    };
+    window.addEventListener("mousedown", onClick);
+    return () => window.removeEventListener("mousedown", onClick);
+  }, [recording]);
+
+  const display = recording && draft.length ? draft.join("+") : value;
+
+  return (
+    <div className="field" ref={wrapRef}>
+      <div className="field-label">{label}</div>
+      <div className={`hotkey${recording ? " is-recording" : ""}`}>
+        <div className="hotkey-display">
+          {recording && !draft.length ? (
+            <span className="hotkey-prompt">
+              <span className="rec-dot" /> Press keys...
+            </span>
+          ) : (
+            <KeyChips value={display} />
+          )}
+        </div>
+        <button
+          type="button"
+          className={`btn-record${recording ? " is-active" : ""}`}
+          onClick={() => { setRecording((r) => !r); setDraft([]); }}
+        >
+          {recording ? "Cancel" : "Record"}
+        </button>
+      </div>
+      {hint && <div className="field-hint">{hint}</div>}
+    </div>
+  );
+}
+
+function NumberField({ label, hint, value, onChange, min, max, step = 1 }) {
+  const clamp = (v) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
+  return (
+    <div className="field">
+      <div className="field-label">{label}</div>
+      <div className="num">
+        <input
+          type="number"
+          value={value}
+          min={min}
+          max={max}
+          step={step}
+          onChange={(e) => onChange(clamp(Number(e.target.value)))}
+        />
+        <div className="num-steppers">
+          <button type="button" onClick={() => onChange(clamp(value + step))} aria-label="Increase">
+            <svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
+          </button>
+          <button type="button" onClick={() => onChange(clamp(value - step))} aria-label="Decrease">
+            <svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
+          </button>
+        </div>
+      </div>
+      {hint && <div className="field-hint">{hint}</div>}
+    </div>
+  );
+}
+
+const TABS = [
+  { id: "hotkeys", label: "Hotkeys", Icon: KeyboardIcon },
+  { id: "ui", label: "UI", Icon: LayoutIcon },
+  { id: "others", label: "Others", Icon: SlidersIcon },
+];
+
+function TabStrip({ active, onChange }) {
+  const stripRef = useRef(null);
+  const btnRefs = useRef({});
+  const [indicator, setIndicator] = useState({ left: 0, width: 0 });
+
+  useEffect(() => {
+    const el = btnRefs.current[active];
+    const wrap = stripRef.current;
+    if (!el || !wrap) return;
+    const er = el.getBoundingClientRect();
+    const wr = wrap.getBoundingClientRect();
+    setIndicator({ left: er.left - wr.left, width: er.width });
+  }, [active]);
+
+  return (
+    <div className="tabs" ref={stripRef}>
+      <div
+        className="tab-indicator"
+        style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }}
+      />
+      {TABS.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          ref={(el) => (btnRefs.current[id] = el)}
+          className={`tab${active === id ? " is-active" : ""}`}
+          onClick={() => onChange(id)}
+          type="button"
+        >
+          <Icon />
+          <span>{label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function HotkeysPanel({ s, set }) {
+  return (
+    <>
+      <div className="section-header">
+        <h3>Global Shortcut</h3>
+        <p>System-wide hotkey to open ClipX from anywhere.</p>
+      </div>
+      <HotkeyField
+        label="Open ClipX"
+        hint="Click Record then press your desired key combination."
+        value={s.hotkey}
+        onChange={(v) => set("hotkey", v)}
+      />
+      <div className="section-header">
+        <h3>In-app Shortcuts</h3>
+        <p>Used when ClipX is focused.</p>
+      </div>
+      <HotkeyField label="Switch to Pinned" hint="Jump to the Pinned tab." value={s.tabShortcutPinned} onChange={(v) => set("tabShortcutPinned", v)} />
+      <HotkeyField label="Switch to History" hint="Jump to the History tab." value={s.tabShortcutHistory} onChange={(v) => set("tabShortcutHistory", v)} />
+      <HotkeyField label="Switch to Sessions" hint="Jump to the Sessions tab." value={s.tabShortcutSessions} onChange={(v) => set("tabShortcutSessions", v)} />
+      <HotkeyField label="Focus Search Box" hint="Focus search of the active tab." value={s.tabShortcutFind} onChange={(v) => set("tabShortcutFind", v)} />
+    </>
+  );
+}
+
+function UIPanel({ s, set }) {
+  return (
+    <>
+      <div className="section-header">
+        <h3>Popup Window</h3>
+        <p>Size of the ClipX popup when it appears.</p>
+      </div>
+      <div className="grid-2">
+        <NumberField label="Width" hint="Pixels (300-800)." min={300} max={800} value={s.windowWidth} onChange={(v) => set("windowWidth", v)} />
+        <NumberField label="Height" hint="Pixels (400-900)." min={400} max={900} value={s.windowHeight} onChange={(v) => set("windowHeight", v)} />
+      </div>
+      <div className="preview">
+        <div className="preview-label">
+          <span>Preview</span>
+          <span className="preview-dim">{s.windowWidth} x {s.windowHeight}</span>
+        </div>
+        <div className="preview-stage">
+          <div
+            className="preview-window"
+            style={{
+              width: `${(s.windowWidth / 800) * 100}%`,
+              height: `${(s.windowHeight / 900) * 100}%`,
+            }}
+          >
+            <div className="pw-titlebar">
+              <span className="pw-dot pw-dot-r" />
+              <span className="pw-dot pw-dot-y" />
+              <span className="pw-dot pw-dot-g" />
+              <span className="pw-title">ClipX</span>
+            </div>
+            <div className="pw-tabs">
+              <span className="pw-tab is-active">Pinned</span>
+              <span className="pw-tab">History</span>
+              <span className="pw-tab">Sessions</span>
+            </div>
+            <div className="pw-list">
+              <div className="pw-row" /><div className="pw-row" /><div className="pw-row" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function OthersPanel({ s, set }) {
+  return (
+    <>
+      <div className="section-header">
+        <h3>Clipboard History</h3>
+        <p>Storage behavior for captured entries.</p>
+      </div>
+      <NumberField
+        label="History Limit"
+        hint="Number of clipboard entries to keep (max 500)."
+        min={1}
+        max={500}
+        value={s.historyLimit}
+        onChange={(v) => set("historyLimit", v)}
+      />
+      <div className="meter">
+        <div className="meter-bar">
+          <div className="meter-fill" style={{ width: `${(s.historyLimit / 500) * 100}%` }} />
+        </div>
+        <div className="meter-labels"><span>1</span><span>50</span></div>
+      </div>
+    </>
+  );
+}
+
 function Settings() {
-  const [hotkey, setHotkey] = useState("");
-  const [recording, setRecording] = useState(null);
-  const [tabShortcutPinned, setTabShortcutPinned] = useState(`${TAB_MOD}+1`);
-  const [tabShortcutHistory, setTabShortcutHistory] = useState(`${TAB_MOD}+2`);
-  const [tabShortcutSessions, setTabShortcutSessions] = useState(`${TAB_MOD}+3`);
-  const [tabShortcutFind, setTabShortcutFind] = useState(`${TAB_MOD}+F`);
-  const [historyLimit, setHistoryLimit] = useState(20);
-  const [windowWidth, setWindowWidth] = useState(400);
-  const [windowHeight, setWindowHeight] = useState(600);
+  const [activeTab, setActiveTab] = useState("hotkeys");
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+
+  const [s, setS] = useState({
+    hotkey: "",
+    tabShortcutPinned: `${TAB_MOD}+1`,
+    tabShortcutHistory: `${TAB_MOD}+2`,
+    tabShortcutSessions: `${TAB_MOD}+3`,
+    tabShortcutFind: `${TAB_MOD}+F`,
+    historyLimit: 20,
+    windowWidth: 400,
+    windowHeight: 600,
+  });
+
+  const set = (k, v) => {
+    setS((p) => ({ ...p, [k]: v }));
+    setDirty(true);
+    setSaved(false);
+  };
 
   useEffect(() => {
     const onKey = async (e) => {
@@ -33,102 +328,26 @@ function Settings() {
   }, []);
 
   useEffect(() => {
-
-    if (!recording) return;
-
-    const onKeyDown = (e) => {
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (e.key === "Escape") {
-        setRecording(null);
-        return;
-      }
-
-      if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) return;
-
-      const parts = [];
-
-      if (e.metaKey) parts.push("Command");
-      if (e.ctrlKey) parts.push("Ctrl");
-      if (e.altKey) parts.push("Option");
-      if (e.shiftKey) parts.push("Shift");
-
-      const key = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
-
-      parts.push(key);
-
-      const shortcut = parts.join("+");
-
-      if (recording === "hotkey") setHotkey(shortcut);
-      else if (recording === "tab_pinned") setTabShortcutPinned(shortcut);
-      else if (recording === "tab_history") setTabShortcutHistory(shortcut);
-      else if (recording === "tab_sessions") setTabShortcutSessions(shortcut);
-      else if (recording === "tab_find") setTabShortcutFind(shortcut);
-
-      setRecording(null);
-    };
-
-    window.addEventListener("keydown", onKeyDown, true);
-
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [recording]);
-
-  useEffect(() => {
     const load = async () => {
-      try {
-        const value = await getSetting("hotkey");
-        setHotkey(value);
-      } catch (e) {
-        setHotkey("Option+Space");
-        await logError("warn", `Failed to load hotkey setting: ${e}`);
-      }
-      try {
-        const value = await getSetting("tab_shortcut_pinned");
-        setTabShortcutPinned(value);
-      } catch (e) {
-        await logError("warn", `Failed to load tab shortcut pinned: ${e}`);
-      }
-      try {
-        const value = await getSetting("tab_shortcut_history");
-        setTabShortcutHistory(value);
-      } catch (e) {
-        await logError("warn", `Failed to load tab shortcut history: ${e}`);
-      }
-      try {
-        const value = await getSetting("tab_shortcut_sessions");
-        setTabShortcutSessions(value);
-      } catch (e) {
-        await logError("warn", `Failed to load tab shortcut sessions: ${e}`);
-      }
-      try {
-        const value = await getSetting("tab_shortcut_find");
-        setTabShortcutFind(value);
-      } catch (e) {
-        await logError("warn", `Failed to load tab shortcut find: ${e}`);
-      }
-      try {
-        const value = await getSetting("history_limit");
-        setHistoryLimit(Number(value));
-      } catch (e) {
-        setHistoryLimit(20);
-        await logError("warn", `Failed to load history limit: ${e}`);
-      }
-      try {
-        const w = await getSetting("window_width");
-        setWindowWidth(Number(w) || 400);
-      } catch (e) {
-        setWindowWidth(400);
-        await logError("warn", `Failed to load window width: ${e}`);
-      }
-      try {
-        const h = await getSetting("window_height");
-        setWindowHeight(Number(h) || 600);
-      } catch (e) {
-        setWindowHeight(600);
-        await logError("warn", `Failed to load window height: ${e}`);
-      }
+      const safeGet = async (key, fallback, transform = (v) => v) => {
+        try {
+          return transform(await getSetting(key));
+        } catch (e) {
+          await logError("warn", `Failed to load setting ${key}: ${e}`);
+          return fallback;
+        }
+      };
+      const [hotkey, pinned, history, sessions, find, limit, width, height] = await Promise.all([
+        safeGet("hotkey", "Option+Space"),
+        safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
+        safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
+        safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
+        safeGet("tab_shortcut_find", `${TAB_MOD}+F`),
+        safeGet("history_limit", 20, Number),
+        safeGet("window_width", 400, (v) => Number(v) || 400),
+        safeGet("window_height", 600, (v) => Number(v) || 600),
+      ]);
+      setS({ hotkey, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height });
     };
     load();
   }, []);
@@ -137,174 +356,60 @@ function Settings() {
     setError("");
     const errors = [];
     const attempt = async (fn) => { try { await fn(); } catch (e) { errors.push(String(e)); } };
-    await attempt(() => updateShortcut(hotkey));
-    await attempt(() => setSetting("tab_shortcut_pinned", tabShortcutPinned));
-    await attempt(() => setSetting("tab_shortcut_history", tabShortcutHistory));
-    await attempt(() => setSetting("tab_shortcut_sessions", tabShortcutSessions));
-    await attempt(() => setSetting("tab_shortcut_find", tabShortcutFind));
-    await attempt(() => setSetting("history_limit", String(historyLimit)));
-    await attempt(() => setSetting("window_width", String(windowWidth)));
-    await attempt(() => setSetting("window_height", String(windowHeight)));
+    await attempt(() => updateShortcut(s.hotkey));
+    await attempt(() => setSetting("tab_shortcut_pinned", s.tabShortcutPinned));
+    await attempt(() => setSetting("tab_shortcut_history", s.tabShortcutHistory));
+    await attempt(() => setSetting("tab_shortcut_sessions", s.tabShortcutSessions));
+    await attempt(() => setSetting("tab_shortcut_find", s.tabShortcutFind));
+    await attempt(() => setSetting("history_limit", String(s.historyLimit)));
+    await attempt(() => setSetting("window_width", String(s.windowWidth)));
+    await attempt(() => setSetting("window_height", String(s.windowHeight)));
     await attempt(() => applyWindowSize());
     if (errors.length > 0) {
       const msg = errors.join("; ");
       setError(`Failed to save settings: ${msg}`);
       await logError("error", `Failed to save settings: ${msg}`);
     } else {
+      setDirty(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
       await getCurrentWindow().hide();
     }
   };
 
   return (
     <div className="settings">
-      <h2>Settings</h2>
-      <div className="field">
-        <label htmlFor="hotkey">Global Hotkey</label>
-        <div className="hotkey-row">
-          <input
-            id="hotkey"
-            type="text"
-            readOnly
-            value={recording === "hotkey" ? "" : hotkey}
-            placeholder={recording === "hotkey" ? "Press shortcut..." : "Click Record"}
-            className={recording === "hotkey" ? "recording" : ""}
-          />
-          <button
-            type="button"
-            className={`record-btn${recording === "hotkey" ? " active" : ""}`}
-            onClick={() => setRecording((r) => (r === "hotkey" ? null : "hotkey"))}
-          >
-            {recording === "hotkey" ? "Cancel" : "Record"}
-          </button>
+      <TabStrip active={activeTab} onChange={setActiveTab} />
+      <div className="settings-content">
+        <div className="content-scroll" key={activeTab}>
+          {activeTab === "hotkeys" && <HotkeysPanel s={s} set={set} />}
+          {activeTab === "ui" && <UIPanel s={s} set={set} />}
+          {activeTab === "others" && <OthersPanel s={s} set={set} />}
         </div>
-        <p className="hint">Click Record then press your desired key combination</p>
-      </div>
-      <div className="field">
-        <label htmlFor="tab-pinned">Switch to Pinned Tab</label>
-        <div className="hotkey-row">
-          <input
-            id="tab-pinned"
-            type="text"
-            readOnly
-            value={recording === "tab_pinned" ? "" : tabShortcutPinned}
-            placeholder={recording === "tab_pinned" ? "Press shortcut..." : "Click Record"}
-            className={recording === "tab_pinned" ? "recording" : ""}
-          />
-          <button
-            type="button"
-            className={`record-btn${recording === "tab_pinned" ? " active" : ""}`}
-            onClick={() => setRecording((r) => (r === "tab_pinned" ? null : "tab_pinned"))}
-          >
-            {recording === "tab_pinned" ? "Cancel" : "Record"}
-          </button>
-        </div>
-        <p className="hint">In-app shortcut to switch to the Pinned tab</p>
-      </div>
-      <div className="field">
-        <label htmlFor="tab-history">Switch to History Tab</label>
-        <div className="hotkey-row">
-          <input
-            id="tab-history"
-            type="text"
-            readOnly
-            value={recording === "tab_history" ? "" : tabShortcutHistory}
-            placeholder={recording === "tab_history" ? "Press shortcut..." : "Click Record"}
-            className={recording === "tab_history" ? "recording" : ""}
-          />
-          <button
-            type="button"
-            className={`record-btn${recording === "tab_history" ? " active" : ""}`}
-            onClick={() => setRecording((r) => (r === "tab_history" ? null : "tab_history"))}
-          >
-            {recording === "tab_history" ? "Cancel" : "Record"}
-          </button>
-        </div>
-        <p className="hint">In-app shortcut to switch to the History tab</p>
-      </div>
-      <div className="field">
-        <label htmlFor="tab-sessions">Switch to Sessions Tab</label>
-        <div className="hotkey-row">
-          <input
-            id="tab-sessions"
-            type="text"
-            readOnly
-            value={recording === "tab_sessions" ? "" : tabShortcutSessions}
-            placeholder={recording === "tab_sessions" ? "Press shortcut..." : "Click Record"}
-            className={recording === "tab_sessions" ? "recording" : ""}
-          />
-          <button
-            type="button"
-            className={`record-btn${recording === "tab_sessions" ? " active" : ""}`}
-            onClick={() => setRecording((r) => (r === "tab_sessions" ? null : "tab_sessions"))}
-          >
-            {recording === "tab_sessions" ? "Cancel" : "Record"}
-          </button>
-        </div>
-        <p className="hint">In-app shortcut to switch to the Sessions tab</p>
-      </div>
-      <div className="field">
-        <label htmlFor="tab-find">Focus Search Box</label>
-        <div className="hotkey-row">
-          <input
-            id="tab-find"
-            type="text"
-            readOnly
-            value={recording === "tab_find" ? "" : tabShortcutFind}
-            placeholder={recording === "tab_find" ? "Press shortcut..." : "Click Record"}
-            className={recording === "tab_find" ? "recording" : ""}
-          />
-          <button
-            type="button"
-            className={`record-btn${recording === "tab_find" ? " active" : ""}`}
-            onClick={() => setRecording((r) => (r === "tab_find" ? null : "tab_find"))}
-          >
-            {recording === "tab_find" ? "Cancel" : "Record"}
-          </button>
-        </div>
-        <p className="hint">In-app shortcut to focus the search box of the active tab</p>
-      </div>
-      <div className="field">
-        <label htmlFor="history-limit">History Limit</label>
-        <input
-          id="history-limit"
-          type="number"
-          min={1}
-          max={50}
-          value={historyLimit}
-          onChange={(e) => setHistoryLimit(Math.min(50, Math.max(1, Number(e.target.value))))}
-        />
-        <p className="hint">Number of clipboard entries to keep (max 50)</p>
-      </div>
-      <div className="field">
-        <label htmlFor="window-width">Window Width</label>
-        <input
-          id="window-width"
-          type="number"
-          min={300}
-          max={800}
-          value={windowWidth}
-          onChange={(e) => setWindowWidth(Math.min(800, Math.max(300, Number(e.target.value))))}
-        />
-        <p className="hint">Popup window width in pixels (300-800)</p>
-      </div>
-      <div className="field">
-        <label htmlFor="window-height">Window Height</label>
-        <input
-          id="window-height"
-          type="number"
-          min={400}
-          max={900}
-          value={windowHeight}
-          onChange={(e) => setWindowHeight(Math.min(900, Math.max(400, Number(e.target.value))))}
-        />
-        <p className="hint">Popup window height in pixels (400-900)</p>
       </div>
       {error && <p className="error">{error}</p>}
-      <div className="actions">
-        <button onClick={handleSave}>Save</button>
-        <button className="secondary" onClick={async () => await getCurrentWindow().hide()}>
-          Cancel
-        </button>
+      <div className="settings-footer">
+        <div className="footer-status">
+          {saved && (
+            <span className="status status-ok">
+              <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 6.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              {" "}Saved
+            </span>
+          )}
+          {dirty && !saved && <span className="status status-dirty"><span className="dot" /> Unsaved changes</span>}
+          {!dirty && !saved && <span className="status status-idle">All changes saved</span>}
+        </div>
+        <div className="footer-actions">
+          <button className="btn btn-ghost" type="button" onClick={async () => await getCurrentWindow().hide()}>Cancel</button>
+          <button
+            className={`btn btn-primary${dirty ? "" : " is-disabled"}`}
+            type="button"
+            onClick={handleSave}
+            disabled={!dirty}
+          >
+            Save Changes
+          </button>
+        </div>
       </div>
     </div>
   );
