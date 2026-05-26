@@ -73,6 +73,33 @@ pub fn pin_item(content: String, state: State<AppState>) -> Result<(), AppError>
 }
 
 #[tauri::command]
+pub fn get_global_pinned(state: State<AppState>) -> Result<Vec<PinnedItem>, AppError> {
+
+    let conn = lock_db(&state)?;
+
+    let mut stmt = conn.prepare(
+        "SELECT id, content, COALESCE(description, content), COALESCE(hidden, 0), created_at \
+         FROM clipboard_pinned \
+         WHERE session_id = (SELECT id FROM sessions WHERE is_global = 1 LIMIT 1) \
+         ORDER BY sort_order ASC",
+    )?;
+
+    let items = stmt
+        .query_map([], |row| {
+            Ok(PinnedItem {
+                id: row.get(0)?,
+                content: row.get(1)?,
+                description: row.get(2)?,
+                hidden: row.get::<_, i64>(3)? != 0,
+                created_at: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(items)
+}
+
+#[tauri::command]
 pub fn reorder_pinned(items: Vec<i64>, state: State<AppState>) -> Result<(), AppError> {
 
     if items.len() > 500 {

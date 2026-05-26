@@ -75,6 +75,7 @@ pub fn run() {
             commands::settings::apply_window_size,
             commands::clipboard::get_history,
             commands::pinned::get_pinned,
+            commands::pinned::get_global_pinned,
             commands::pinned::pin_item,
             commands::pinned::unpin_item,
             commands::clipboard::delete_history_item,

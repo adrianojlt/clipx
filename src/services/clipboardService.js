@@ -4,6 +4,8 @@ export const getHistory = () => invoke("get_history");
 
 export const getPinned = () => invoke("get_pinned");
 
+export const getGlobalPinned = () => invoke("get_global_pinned");
+
 export const getClipboard = () => invoke("get_clipboard");
 
 export const getSetting = (key) => invoke("get_setting", { key });

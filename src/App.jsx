@@ -4,6 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
   getHistory,
   getPinned,
+  getGlobalPinned,
   getSessions,
   getClipboard,
   getSetting,
@@ -26,6 +27,7 @@ function App() {
   const [activeTab, setActiveTab] = useState("pinned");
   const [history, setHistory] = useState([]);
   const [pinned, setPinned] = useState([]);
+  const [globalPinned, setGlobalPinned] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [currentClipboard, setCurrentClipboard] = useState("");
   const [historySearch, setHistorySearch] = useState("");
@@ -59,11 +61,11 @@ function App() {
     [sessions, sessionsSearch]
   );
 
-  const pinnedSet = useMemo(() => new Set(pinned.map((p) => p.content)), [pinned]);
+  const pinnedSet = useMemo(() => new Set(globalPinned.map((p) => p.content)), [globalPinned]);
 
   const pinnedHiddenSet = useMemo(
-    () => new Set(pinned.filter((p) => p.hidden).map((p) => p.content)),
-    [pinned]
+    () => new Set(globalPinned.filter((p) => p.hidden).map((p) => p.content)),
+    [globalPinned]
   );
 
   const loadingRef = useRef(false);
@@ -71,9 +73,10 @@ function App() {
     if (loadingRef.current) return;
     loadingRef.current = true;
     try {
-      const [h, p, s] = await Promise.all([getHistory(), getPinned(), getSessions()]);
+      const [h, p, gp, s] = await Promise.all([getHistory(), getPinned(), getGlobalPinned(), getSessions()]);
       setHistory(h);
       setPinned(p);
+      setGlobalPinned(gp);
       setSessions(s);
     } catch (e) {
       console.error("Failed to load data", e);
