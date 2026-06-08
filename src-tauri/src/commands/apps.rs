@@ -22,94 +22,80 @@ pub async fn focus_app(id: String) -> Result<(), AppError> {
 mod platform {
     use super::OpenApp;
     use crate::error::AppError;
-    use core_foundation::array::{CFArray, CFArrayRef};
-    use core_foundation::base::{TCFType, ToVoid};
-    use core_foundation::dictionary::CFDictionary;
-    use core_foundation::number::CFNumber;
-    use core_foundation::string::CFString;
     use std::collections::HashSet;
     use std::process::Command;
 
     // Separator packed into `id` to carry both process name and window title.
     const SEP: char = '\u{1f}';
 
-    // CGWindowListOption flags.
-    const ON_SCREEN_ONLY: u32 = 1 << 0;
-    const EXCLUDE_DESKTOP_ELEMENTS: u32 = 1 << 4;
-    const NULL_WINDOW_ID: u32 = 0;
-
-    #[link(name = "CoreGraphics", kind = "framework")]
-    extern "C" {
-        fn CGWindowListCopyWindowInfo(option: u32, relative_to_window: u32) -> CFArrayRef;
-    }
-
-    fn dict_string(dict: &CFDictionary, key: &CFString) -> Option<String> {
-        let raw = dict.find(key.to_void())?;
-        let value = unsafe { core_foundation::base::CFType::wrap_under_get_rule(*raw) };
-        value.downcast::<CFString>().map(|s| s.to_string())
-    }
-
-    fn dict_i64(dict: &CFDictionary, key: &CFString) -> Option<i64> {
-        let raw = dict.find(key.to_void())?;
-        let value = unsafe { core_foundation::base::CFType::wrap_under_get_rule(*raw) };
-        value.downcast::<CFNumber>().and_then(|n| n.to_i64())
-    }
-
-    // One entry per on-screen window via CoreGraphics (in-process, fast).
-    // Window titles (kCGWindowName) need Screen Recording permission; without
-    // it the title is empty and entries collapse to one per app.
+    // List windows via each app's Window menu (Accessibility). An app's open
+    // windows are the last N items of its Window menu (N = AX window count),
+    // which are exactly the strings focus_app clicks - so list and focus always
+    // agree, including for Chromium/Electron apps. Needs Accessibility only.
+    // Output lines: "<process name>\t<window title>" (title empty if none).
     pub fn list_open_apps() -> Result<Vec<OpenApp>, AppError> {
+        let script = "set output to \"\"\n\
+            tell application \"System Events\"\n\
+            repeat with p in (every process whose background only is false)\n\
+            set pname to name of p\n\
+            set emitted to false\n\
+            try\n\
+            set allItems to name of every menu item of menu 1 of (menu bar item \"Window\" of menu bar 1 of p)\n\
+            set total to count of allItems\n\
+            set sepIndex to 0\n\
+            repeat with i from 1 to total\n\
+            if item i of allItems is missing value then set sepIndex to i\n\
+            end repeat\n\
+            if sepIndex > 0 and sepIndex < total then\n\
+            repeat with i from (sepIndex + 1) to total\n\
+            set t to item i of allItems\n\
+            if t is not missing value then\n\
+            set output to output & pname & tab & (t as text) & linefeed\n\
+            set emitted to true\n\
+            end if\n\
+            end repeat\n\
+            end if\n\
+            end try\n\
+            if not emitted then\n\
+            set output to output & pname & tab & \"\" & linefeed\n\
+            end if\n\
+            end repeat\n\
+            end tell\n\
+            return output";
 
-        let key_owner = CFString::from_static_string("kCGWindowOwnerName");
-        let key_name = CFString::from_static_string("kCGWindowName");
-        let key_layer = CFString::from_static_string("kCGWindowLayer");
+        let out = Command::new("osascript")
+            .arg("-e")
+            .arg(script)
+            .output()
+            .map_err(|e| AppError::State(format!("osascript failed: {e}")))?;
 
-        let array_ref = unsafe {
-            CGWindowListCopyWindowInfo(
-                ON_SCREEN_ONLY | EXCLUDE_DESKTOP_ELEMENTS,
-                NULL_WINDOW_ID,
-            )
-        };
-
-        if array_ref.is_null() {
-            return Err(AppError::State(
-                "CGWindowListCopyWindowInfo returned null".into(),
-            ));
+        if !out.status.success() {
+            return Err(AppError::State(format!(
+                "osascript error: {}",
+                String::from_utf8_lossy(&out.stderr)
+            )));
         }
 
-        let windows: CFArray<CFDictionary> = unsafe { CFArray::wrap_under_create_rule(array_ref) };
-
+        let stdout = String::from_utf8_lossy(&out.stdout);
         let mut seen: HashSet<String> = HashSet::new();
         let mut apps: Vec<OpenApp> = Vec::new();
 
-        for dict in windows.iter() {
-
-            // Layer 0 = normal app windows; skip menubar/dock/overlays.
-            if dict_i64(&dict, &key_layer).unwrap_or(-1) != 0 {
+        for line in stdout.lines() {
+            let (app, title) = line.split_once('\t').unwrap_or((line, ""));
+            let app = app.trim();
+            let title = title.trim();
+            if app.is_empty() {
                 continue;
             }
-
-            let app = match dict_string(&dict, &key_owner) {
-                Some(a) if !a.trim().is_empty() => a.trim().to_string(),
-                _ => continue,
-            };
-
-            let title = dict_string(&dict, &key_name)
-                .map(|t| t.trim().to_string())
-                .unwrap_or_default();
-
             let id = format!("{app}{SEP}{title}");
-
             if !seen.insert(id.clone()) {
                 continue;
             }
-
             let name = if title.is_empty() {
-                app
+                app.to_string()
             } else {
                 format!("{app} - {title}")
             };
-
             apps.push(OpenApp { name, id });
         }
 
@@ -126,17 +112,33 @@ mod platform {
             return Err(AppError::Validation("invalid app id".into()));
         }
 
-        let raise = if title.is_empty() {
-            String::new()
+        // Raise the window via the app's own Window menu item. AXRaise/AXMain
+        // are ignored by Chromium/Electron apps (Chrome, VS Code) for real
+        // focus, but clicking the Window-menu entry is honored everywhere.
+        // Exact title match first, then substring (Chrome decorates titles).
+        // Select the target window via the Window menu BEFORE activating the
+        // app, so the app comes forward already showing the right window (no
+        // flash of the previously-active window).
+        let inner = if title.is_empty() {
+            "set frontmost to true".to_string()
         } else {
             format!(
-                "\nperform action \"AXRaise\" of (first window of process \"{app}\" whose name is \"{title}\")"
+                "try\n\
+                click (first menu item of menu 1 of menu bar item \"Window\" of menu bar 1 whose name is \"{title}\")\n\
+                on error\n\
+                try\n\
+                click (first menu item of menu 1 of menu bar item \"Window\" of menu bar 1 whose name contains \"{title}\")\n\
+                end try\n\
+                end try\n\
+                set frontmost to true"
             )
         };
 
         let script = format!(
             "tell application \"System Events\"\n\
-            set frontmost of process \"{app}\" to true{raise}\n\
+            tell process \"{app}\"\n\
+            {inner}\n\
+            end tell\n\
             end tell"
         );
 
