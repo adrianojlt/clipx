@@ -41,3 +41,7 @@ export const activateSession = (id) => invoke("activate_session", { id });
 export const reorderSessions = (items) => invoke("reorder_sessions", { items });
 
 export const pinItemToSession = (content, sessionId, description) => invoke("pin_item_to_session", { content, sessionId, description });
+
+export const listOpenApps = () => invoke("list_open_apps");
+
+export const focusApp = (id) => invoke("focus_app", { id });

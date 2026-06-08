@@ -90,6 +90,8 @@ pub fn run() {
             commands::sessions::activate_session,
             commands::sessions::reorder_sessions,
             commands::sessions::pin_item_to_session,
+            commands::apps::list_open_apps,
+            commands::apps::focus_app,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

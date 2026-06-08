@@ -218,6 +218,7 @@ function HotkeysPanel({ s, set }) {
         <h3>In-app Shortcuts</h3>
         <p>Used when ClipX is focused.</p>
       </div>
+      <HotkeyField label="Switch to Apps" hint="Jump to the Apps tab." value={s.tabShortcutApps} onChange={(v) => set("tabShortcutApps", v)} />
       <HotkeyField label="Switch to Pinned" hint="Jump to the Pinned tab." value={s.tabShortcutPinned} onChange={(v) => set("tabShortcutPinned", v)} />
       <HotkeyField label="Switch to History" hint="Jump to the History tab." value={s.tabShortcutHistory} onChange={(v) => set("tabShortcutHistory", v)} />
       <HotkeyField label="Switch to Sessions" hint="Jump to the Sessions tab." value={s.tabShortcutSessions} onChange={(v) => set("tabShortcutSessions", v)} />
@@ -304,9 +305,10 @@ function Settings() {
 
   const [s, setS] = useState({
     hotkey: "",
-    tabShortcutPinned: `${TAB_MOD}+1`,
-    tabShortcutHistory: `${TAB_MOD}+2`,
-    tabShortcutSessions: `${TAB_MOD}+3`,
+    tabShortcutApps: `${TAB_MOD}+1`,
+    tabShortcutPinned: `${TAB_MOD}+2`,
+    tabShortcutHistory: `${TAB_MOD}+3`,
+    tabShortcutSessions: `${TAB_MOD}+4`,
     tabShortcutFind: `${TAB_MOD}+F`,
     historyLimit: 20,
     windowWidth: 400,
@@ -337,17 +339,18 @@ function Settings() {
           return fallback;
         }
       };
-      const [hotkey, pinned, history, sessions, find, limit, width, height] = await Promise.all([
+      const [hotkey, apps, pinned, history, sessions, find, limit, width, height] = await Promise.all([
         safeGet("hotkey", "Option+Space"),
-        safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
-        safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
-        safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
+        safeGet("tab_shortcut_apps", `${TAB_MOD}+1`),
+        safeGet("tab_shortcut_pinned", `${TAB_MOD}+2`),
+        safeGet("tab_shortcut_history", `${TAB_MOD}+3`),
+        safeGet("tab_shortcut_sessions", `${TAB_MOD}+4`),
         safeGet("tab_shortcut_find", `${TAB_MOD}+F`),
         safeGet("history_limit", 20, Number),
         safeGet("window_width", 400, (v) => Number(v) || 400),
         safeGet("window_height", 600, (v) => Number(v) || 600),
       ]);
-      setS({ hotkey, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height });
+      setS({ hotkey, tabShortcutApps: apps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height });
     };
     load();
   }, []);
@@ -357,6 +360,7 @@ function Settings() {
     const errors = [];
     const attempt = async (fn) => { try { await fn(); } catch (e) { errors.push(String(e)); } };
     await attempt(() => updateShortcut(s.hotkey));
+    await attempt(() => setSetting("tab_shortcut_apps", s.tabShortcutApps));
     await attempt(() => setSetting("tab_shortcut_pinned", s.tabShortcutPinned));
     await attempt(() => setSetting("tab_shortcut_history", s.tabShortcutHistory));
     await attempt(() => setSetting("tab_shortcut_sessions", s.tabShortcutSessions));

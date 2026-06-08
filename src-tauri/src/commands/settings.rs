@@ -28,6 +28,7 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
                 .parse::<f64>()
                 .map_err(|_| AppError::Validation(format!("Invalid window_height: {value}")))?;
         }
+        "tab_shortcut_apps" => s.tab_shortcut_apps = value.to_string(),
         "tab_shortcut_pinned" => s.tab_shortcut_pinned = value.to_string(),
         "tab_shortcut_history" => s.tab_shortcut_history = value.to_string(),
         "tab_shortcut_sessions" => s.tab_shortcut_sessions = value.to_string(),

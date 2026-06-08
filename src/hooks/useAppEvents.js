@@ -8,23 +8,28 @@ import { EVENTS } from "../constants/events";
 export function useAppEvents({
   activeTab,
   setActiveTab,
+  tabShortcutApps,
   tabShortcutPinned,
   tabShortcutHistory,
   tabShortcutSessions,
   tabShortcutFind,
+  filteredApps,
   filteredPinned,
   filteredHistory,
   filteredSessions,
   pinnedSearchRef,
   historySearchRef,
   sessionsSearchRef,
+  appsSearchRef,
   onLoadData,
+  onLoadApps,
   onLoadHistory,
   onLoadClipboard,
   onLoadTabShortcuts,
   onClearSearch,
   onCopy,
   onActivateSession,
+  onFocusApp,
 }) {
   useEffect(() => {
     onLoadData();
@@ -61,6 +66,7 @@ export function useAppEvents({
       const u3 = await listen("main-window-shown", () => {
         onClearSearch();
         onLoadData();
+        onLoadApps();
       });
 
       if (cancelled) { u3(); return; }
@@ -83,7 +89,7 @@ export function useAppEvents({
       clearTimeout(retryTimer);
       unlisteners.forEach((fn) => fn());
     };
-  }, [onLoadData, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch]);
+  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch]);
 
   useEffect(() => {
     const onKey = async (e) => {
@@ -101,7 +107,10 @@ export function useAppEvents({
 
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      if (matchesShortcut(e, tabShortcutPinned)) {
+      if (matchesShortcut(e, tabShortcutApps)) {
+        e.preventDefault();
+        setActiveTab("apps");
+      } else if (matchesShortcut(e, tabShortcutPinned)) {
         e.preventDefault();
         setActiveTab("pinned");
       } else if (matchesShortcut(e, tabShortcutHistory)) {
@@ -114,7 +123,7 @@ export function useAppEvents({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tabShortcutPinned, tabShortcutHistory, tabShortcutSessions, setActiveTab]);
+  }, [tabShortcutApps, tabShortcutPinned, tabShortcutHistory, tabShortcutSessions, setActiveTab]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -128,6 +137,8 @@ export function useAppEvents({
           ? pinnedSearchRef
           : activeTab === "sessions"
           ? sessionsSearchRef
+          : activeTab === "apps"
+          ? appsSearchRef
           : historySearchRef;
 
       ref.current?.focus();
@@ -135,7 +146,7 @@ export function useAppEvents({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tabShortcutFind, activeTab, pinnedSearchRef, historySearchRef, sessionsSearchRef]);
+  }, [tabShortcutFind, activeTab, pinnedSearchRef, historySearchRef, sessionsSearchRef, appsSearchRef]);
 
   useEffect(() => {
 
@@ -193,6 +204,12 @@ export function useAppEvents({
 
         const index = num - 1;
 
+        if (activeTab === "apps" && index < filteredApps.length) {
+          e.preventDefault();
+          onFocusApp(filteredApps[index].id);
+          return;
+        }
+
         if (activeTab === "sessions" && index < filteredSessions.length) {
           e.preventDefault();
           onActivateSession(filteredSessions[index].id);
@@ -210,5 +227,5 @@ export function useAppEvents({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeTab, filteredPinned, filteredHistory, filteredSessions, onCopy, onActivateSession]);
+  }, [activeTab, filteredApps, filteredPinned, filteredHistory, filteredSessions, onCopy, onActivateSession, onFocusApp]);
 }

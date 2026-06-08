@@ -11,6 +11,7 @@ pub struct Settings {
     pub history_limit: u32,
     pub window_width: f64,
     pub window_height: f64,
+    pub tab_shortcut_apps: String,
     pub tab_shortcut_pinned: String,
     pub tab_shortcut_history: String,
     pub tab_shortcut_sessions: String,
@@ -25,9 +26,10 @@ impl Default for Settings {
             history_limit: 20,
             window_width: 400.0,
             window_height: 600.0,
-            tab_shortcut_pinned: format!("{tab_mod}+1"),
-            tab_shortcut_history: format!("{tab_mod}+2"),
-            tab_shortcut_sessions: format!("{tab_mod}+3"),
+            tab_shortcut_apps: format!("{tab_mod}+1"),
+            tab_shortcut_pinned: format!("{tab_mod}+2"),
+            tab_shortcut_history: format!("{tab_mod}+3"),
+            tab_shortcut_sessions: format!("{tab_mod}+4"),
             tab_shortcut_find: format!("{tab_mod}+F"),
         }
     }
@@ -65,6 +67,9 @@ impl Settings {
                 Ok(n) => s.window_height = n,
                 Err(_) => log::warn!("settings migration: invalid window_height {:?}, using default", raw),
             }
+        }
+        if let Some(v) = map.get("tab_shortcut_apps") {
+            s.tab_shortcut_apps = v.clone();
         }
         if let Some(v) = map.get("tab_shortcut_pinned") {
             s.tab_shortcut_pinned = v.clone();
@@ -354,6 +359,7 @@ mod tests {
             history_limit: 200,
             window_width: 50.0,
             window_height: 5000.0,
+            tab_shortcut_apps: "E".to_string(),
             tab_shortcut_pinned: "A".to_string(),
             tab_shortcut_history: "B".to_string(),
             tab_shortcut_sessions: "D".to_string(),

@@ -26,5 +26,8 @@ thiserror = "1"
 log = "0.4"
 simplelog = { version = "0.12", features = ["paris"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+
 [dev-dependencies]
 tempfile = "3"
