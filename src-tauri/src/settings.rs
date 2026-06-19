@@ -24,8 +24,8 @@ impl Default for Settings {
         Self {
             hotkey: "Option+Space".to_string(),
             history_limit: 20,
-            window_width: 400.0,
-            window_height: 600.0,
+            window_width: 600.0,
+            window_height: 700.0,
             tab_shortcut_pinned: format!("{tab_mod}+1"),
             tab_shortcut_history: format!("{tab_mod}+2"),
             tab_shortcut_sessions: format!("{tab_mod}+3"),

@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "ClipX",
-        "width": 400,
-        "height": 600,
+        "width": 600,
+        "height": 700,
         "decorations": false,
         "visible": false,
         "backgroundColor": [30, 30, 30, 255],
