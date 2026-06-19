@@ -11,11 +11,11 @@ pub struct Settings {
     pub history_limit: u32,
     pub window_width: f64,
     pub window_height: f64,
-    pub tab_shortcut_apps: String,
     pub tab_shortcut_pinned: String,
     pub tab_shortcut_history: String,
     pub tab_shortcut_sessions: String,
     pub tab_shortcut_find: String,
+    pub open_apps_hotkey: String,
 }
 
 impl Default for Settings {
@@ -26,11 +26,11 @@ impl Default for Settings {
             history_limit: 20,
             window_width: 400.0,
             window_height: 600.0,
-            tab_shortcut_apps: format!("{tab_mod}+1"),
-            tab_shortcut_pinned: format!("{tab_mod}+2"),
-            tab_shortcut_history: format!("{tab_mod}+3"),
-            tab_shortcut_sessions: format!("{tab_mod}+4"),
+            tab_shortcut_pinned: format!("{tab_mod}+1"),
+            tab_shortcut_history: format!("{tab_mod}+2"),
+            tab_shortcut_sessions: format!("{tab_mod}+3"),
             tab_shortcut_find: format!("{tab_mod}+F"),
+            open_apps_hotkey: "Control+Option+Esc".to_string(),
         }
     }
 }
@@ -68,9 +68,6 @@ impl Settings {
                 Err(_) => log::warn!("settings migration: invalid window_height {:?}, using default", raw),
             }
         }
-        if let Some(v) = map.get("tab_shortcut_apps") {
-            s.tab_shortcut_apps = v.clone();
-        }
         if let Some(v) = map.get("tab_shortcut_pinned") {
             s.tab_shortcut_pinned = v.clone();
         }
@@ -82,6 +79,9 @@ impl Settings {
         }
         if let Some(v) = map.get("tab_shortcut_find") {
             s.tab_shortcut_find = v.clone();
+        }
+        if let Some(v) = map.get("open_apps_hotkey") {
+            s.open_apps_hotkey = v.clone();
         }
         s
     }
@@ -270,6 +270,18 @@ mod tests {
     }
 
     #[test]
+    fn open_apps_hotkey_default_present_and_missing() {
+        assert_eq!(Settings::default().open_apps_hotkey, "Control+Option+Esc");
+
+        let mut present = HashMap::new();
+        present.insert("open_apps_hotkey".to_string(), "Control+Shift+A".to_string());
+        assert_eq!(Settings::from_map(present).open_apps_hotkey, "Control+Shift+A");
+
+        let missing = HashMap::new();
+        assert_eq!(Settings::from_map(missing).open_apps_hotkey, "Control+Option+Esc");
+    }
+
+    #[test]
     fn settings_round_trip() {
         use tempfile::TempDir;
 
@@ -359,11 +371,11 @@ mod tests {
             history_limit: 200,
             window_width: 50.0,
             window_height: 5000.0,
-            tab_shortcut_apps: "E".to_string(),
             tab_shortcut_pinned: "A".to_string(),
             tab_shortcut_history: "B".to_string(),
             tab_shortcut_sessions: "D".to_string(),
             tab_shortcut_find: "C".to_string(),
+            open_apps_hotkey: "F".to_string(),
         };
 
         s.validate();

@@ -72,6 +72,7 @@ pub fn run() {
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::update_shortcut,
+            commands::settings::update_open_apps_shortcut,
             commands::settings::apply_window_size,
             commands::clipboard::get_history,
             commands::pinned::get_pinned,
@@ -204,18 +205,8 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     Ok(())
 }
 
-fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
-
-    let state = app.state::<AppState>();
-
-    let hotkey_str = state
-        .settings
-        .lock()
-        .map_err(|_| AppError::State("settings poisoned".into()))?
-        .hotkey
-        .clone();
-
-    let normalized = crate::settings::normalize_shortcut(&hotkey_str);
+fn register_shortcut(app: &AppHandle, hotkey_str: &str) -> Result<(), AppError> {
+    let normalized = crate::settings::normalize_shortcut(hotkey_str);
 
     let shortcut = normalized
         .parse::<Shortcut>()
@@ -224,6 +215,28 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
     app.global_shortcut()
         .on_shortcut(shortcut, crate::window::shortcut_handler)
         .map_err(|e| AppError::Shortcut(e.to_string()))?;
+
+    Ok(())
+}
+
+fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
+
+    let state = app.state::<AppState>();
+
+    let (hotkey_str, open_apps_str) = {
+        let s = state
+            .settings
+            .lock()
+            .map_err(|_| AppError::State("settings poisoned".into()))?;
+        (s.hotkey.clone(), s.open_apps_hotkey.clone())
+    };
+
+    register_shortcut(app, &hotkey_str)?;
+
+    // the open-apps shortcut is best-effort: a failure here must not break the clipboard hotkey
+    if let Err(e) = register_shortcut(app, &open_apps_str) {
+        log::error!("failed to register open-apps global shortcut: {e}");
+    }
 
     Ok(())
 }

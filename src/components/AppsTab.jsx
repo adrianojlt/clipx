@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 export default function AppsTab({
   filteredApps,
   appsSearch,
@@ -5,6 +7,10 @@ export default function AppsTab({
   appsSearchRef,
   onSelect,
 }) {
+  useEffect(() => {
+    appsSearchRef.current?.focus();
+  }, [appsSearchRef]);
+
   return (
     <>
       <div className="search-bar">
@@ -32,8 +38,9 @@ export default function AppsTab({
       </div>
       <div className="list">
         {filteredApps.length === 0 && <div className="empty">No apps</div>}
-        {filteredApps.map((app) => (
-          <div key={app.id} className="item" onClick={() => onSelect(app.id)}>
+        {filteredApps.map((app, i) => (
+          <div key={app.id} className="item app-item" onClick={() => onSelect(app.id)}>
+            <span className="app-index">{i < 9 ? i + 1 : ""}</span>
             <span className="session-name">{app.name}</span>
           </div>
         ))}

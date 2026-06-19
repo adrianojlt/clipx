@@ -27,7 +27,8 @@ import SessionsTab from "./components/SessionsTab";
 import "./App.css";
 
 function App() {
-  const [activeTab, setActiveTab] = useState("apps");
+  const [mode, setMode] = useState("clipboard");
+  const [activeTab, setActiveTab] = useState("pinned");
   const [history, setHistory] = useState([]);
   const [pinned, setPinned] = useState([]);
   const [globalPinned, setGlobalPinned] = useState([]);
@@ -38,10 +39,9 @@ function App() {
   const [pinnedSearch, setPinnedSearch] = useState("");
   const [sessionsSearch, setSessionsSearch] = useState("");
   const [appsSearch, setAppsSearch] = useState("");
-  const [tabShortcutApps, setTabShortcutApps] = useState(`${TAB_MOD}+1`);
-  const [tabShortcutPinned, setTabShortcutPinned] = useState(`${TAB_MOD}+2`);
-  const [tabShortcutHistory, setTabShortcutHistory] = useState(`${TAB_MOD}+3`);
-  const [tabShortcutSessions, setTabShortcutSessions] = useState(`${TAB_MOD}+4`);
+  const [tabShortcutPinned, setTabShortcutPinned] = useState(`${TAB_MOD}+1`);
+  const [tabShortcutHistory, setTabShortcutHistory] = useState(`${TAB_MOD}+2`);
+  const [tabShortcutSessions, setTabShortcutSessions] = useState(`${TAB_MOD}+3`);
   const [tabShortcutFind, setTabShortcutFind] = useState(`${TAB_MOD}+F`);
   const pinnedSearchRef = useRef(null);
   const historySearchRef = useRef(null);
@@ -121,14 +121,12 @@ function App() {
 
   const loadTabShortcuts = useCallback(async () => {
     try {
-      const [apps, pinned, history, sessions, find] = await Promise.all([
-        getSetting("tab_shortcut_apps"),
+      const [pinned, history, sessions, find] = await Promise.all([
         getSetting("tab_shortcut_pinned"),
         getSetting("tab_shortcut_history"),
         getSetting("tab_shortcut_sessions"),
         getSetting("tab_shortcut_find"),
       ]);
-      setTabShortcutApps(apps);
       setTabShortcutPinned(pinned);
       setTabShortcutHistory(history);
       setTabShortcutSessions(sessions);
@@ -184,7 +182,8 @@ function App() {
   useAppEvents({
     activeTab,
     setActiveTab,
-    tabShortcutApps,
+    mode,
+    onSetMode: setMode,
     tabShortcutPinned,
     tabShortcutHistory,
     tabShortcutSessions,
@@ -214,13 +213,18 @@ function App() {
         <img src="/icon.png" alt="ClipX" className="app-icon" />
         <h1>ClipX</h1>
       </div>
+      {mode === "apps" && (
+        <AppsTab
+          filteredApps={filteredApps}
+          appsSearch={appsSearch}
+          setAppsSearch={setAppsSearch}
+          appsSearchRef={appsSearchRef}
+          onSelect={handleSelectApp}
+        />
+      )}
+      {mode === "clipboard" && (
+        <>
       <div className="tabs">
-        <button
-          className={activeTab === "apps" ? "active" : ""}
-          onClick={() => setActiveTab("apps")}
-        >
-          Apps
-        </button>
         <button
           className={activeTab === "pinned" ? "active" : ""}
           onClick={() => setActiveTab("pinned")}
@@ -240,15 +244,6 @@ function App() {
           Sessions
         </button>
       </div>
-      {activeTab === "apps" && (
-        <AppsTab
-          filteredApps={filteredApps}
-          appsSearch={appsSearch}
-          setAppsSearch={setAppsSearch}
-          appsSearchRef={appsSearchRef}
-          onSelect={handleSelectApp}
-        />
-      )}
       {activeTab === "pinned" && (
         <PinnedTab
           pinned={pinned}
@@ -283,6 +278,8 @@ function App() {
           sessionsSearchRef={sessionsSearchRef}
           onDataChanged={loadData}
         />
+      )}
+        </>
       )}
     </main>
   );
