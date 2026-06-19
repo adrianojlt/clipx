@@ -108,7 +108,9 @@ mod platform {
     pub fn focus_app(id: &str) -> Result<(), AppError> {
         let (app, title) = id.split_once(SEP).unwrap_or((id, ""));
 
-        if app.contains('"') || title.contains('"') {
+        if app.chars().any(|c| matches!(c, '"' | '\\' | '\0' | '\r' | '\n' | '\t'))
+            || title.chars().any(|c| matches!(c, '"' | '\\' | '\0' | '\r' | '\n' | '\t'))
+        {
             return Err(AppError::Validation("invalid app id".into()));
         }
 
