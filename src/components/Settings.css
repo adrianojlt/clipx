@@ -253,26 +253,7 @@ body {
   padding: 10px 12px;
   color: var(--text);
   font: 500 14px var(--font-mono);
-  -moz-appearance: textfield;
 }
-.num input::-webkit-outer-spin-button,
-.num input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-
-.num-steppers { display: flex; flex-direction: column; gap: 1px; }
-.num-steppers button {
-  width: 22px;
-  height: 16px;
-  background: var(--bg-3);
-  border: 1px solid var(--border-2);
-  color: var(--text-2);
-  border-radius: 4px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 120ms;
-}
-.num-steppers button:hover { background: var(--bg-hover); color: var(--text); }
-.num-steppers button:active { transform: translateY(0.5px); }
 
 /* ── METER ───────────────────────────────────────────── */
 .meter { margin-top: 4px; }

@@ -141,6 +141,32 @@ mod tests {
     }
 }
 
+fn swap_global_shortcut(app: &AppHandle, old: &str, new: &str) -> Result<(), AppError> {
+
+    let normalized_new = normalize_shortcut(new);
+    let normalized_old = normalize_shortcut(old);
+
+    if normalized_new == normalized_old {
+        return Ok(());
+    }
+
+    let new_shortcut = normalized_new
+        .parse::<Shortcut>()
+        .map_err(|e| AppError::Shortcut(e.to_string()))?;
+
+    app.global_shortcut()
+        .on_shortcut(new_shortcut, shortcut_handler)
+        .map_err(|e| AppError::Shortcut(e.to_string()))?;
+
+    if let Ok(old_shortcut) = normalized_old.parse::<Shortcut>() {
+        if let Err(e) = app.global_shortcut().unregister(old_shortcut) {
+            log::warn!("swap_global_shortcut: failed to unregister '{}': {e}", normalized_old);
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn update_shortcut(
     shortcut: String,
@@ -155,27 +181,32 @@ pub fn update_shortcut(
             .lock()
             .map_err(|e| AppError::State(format!("settings mutex poisoned: {e}")))?;
 
-        let normalized_new = normalize_shortcut(&shortcut);
-        let normalized_old = normalize_shortcut(&s.hotkey);
-
-        if normalized_new != normalized_old {
-
-            let new_shortcut = normalized_new
-                .parse::<Shortcut>()
-                .map_err(|e| AppError::Shortcut(e.to_string()))?;
-
-            app.global_shortcut()
-                .on_shortcut(new_shortcut, shortcut_handler)
-                .map_err(|e| AppError::Shortcut(e.to_string()))?;
-
-            if let Ok(old) = normalized_old.parse::<Shortcut>() {
-                if let Err(e) = app.global_shortcut().unregister(old) {
-                    log::warn!("update_shortcut: failed to unregister '{}': {e}", normalized_old);
-                }
-            }
-        }
+        swap_global_shortcut(&app, &s.hotkey, &shortcut)?;
 
         s.hotkey = shortcut;
+        s.clone()
+    };
+
+    save_settings(&app, &settings)
+}
+
+#[tauri::command]
+pub fn update_open_apps_shortcut(
+    shortcut: String,
+    state: State<AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), AppError> {
+
+    let settings = {
+
+        let mut s = state
+            .settings
+            .lock()
+            .map_err(|e| AppError::State(format!("settings mutex poisoned: {e}")))?;
+
+        swap_global_shortcut(&app, &s.open_apps_hotkey, &shortcut)?;
+
+        s.open_apps_hotkey = shortcut;
         s.clone()
     };
 

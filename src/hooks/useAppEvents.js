@@ -8,23 +8,29 @@ import { EVENTS } from "../constants/events";
 export function useAppEvents({
   activeTab,
   setActiveTab,
+  mode,
+  onSetMode,
   tabShortcutPinned,
   tabShortcutHistory,
   tabShortcutSessions,
   tabShortcutFind,
+  filteredApps,
   filteredPinned,
   filteredHistory,
   filteredSessions,
   pinnedSearchRef,
   historySearchRef,
   sessionsSearchRef,
+  appsSearchRef,
   onLoadData,
+  onLoadApps,
   onLoadHistory,
   onLoadClipboard,
   onLoadTabShortcuts,
   onClearSearch,
   onCopy,
   onActivateSession,
+  onFocusApp,
 }) {
   useEffect(() => {
     onLoadData();
@@ -58,9 +64,15 @@ export function useAppEvents({
 
       unlisteners.push(u2);
 
-      const u3 = await listen("main-window-shown", () => {
+      const u3 = await listen("main-window-shown", (event) => {
+        const nextMode = event.payload === "apps" ? "apps" : "clipboard";
+        onSetMode(nextMode);
         onClearSearch();
         onLoadData();
+        onLoadApps();
+        if (nextMode === "apps") {
+          setTimeout(() => appsSearchRef.current?.focus(), 0);
+        }
       });
 
       if (cancelled) { u3(); return; }
@@ -83,7 +95,7 @@ export function useAppEvents({
       clearTimeout(retryTimer);
       unlisteners.forEach((fn) => fn());
     };
-  }, [onLoadData, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch]);
+  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch, onSetMode, appsSearchRef]);
 
   useEffect(() => {
     const onKey = async (e) => {
@@ -96,6 +108,8 @@ export function useAppEvents({
   useEffect(() => {
 
     const onKey = (e) => {
+
+      if (mode !== "clipboard") return;
 
       const tag = e.target.tagName;
 
@@ -114,10 +128,12 @@ export function useAppEvents({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tabShortcutPinned, tabShortcutHistory, tabShortcutSessions, setActiveTab]);
+  }, [mode, tabShortcutPinned, tabShortcutHistory, tabShortcutSessions, setActiveTab]);
 
   useEffect(() => {
     const onKey = (e) => {
+
+      if (mode !== "clipboard") return;
 
       if (!matchesShortcut(e, tabShortcutFind)) return;
 
@@ -135,7 +151,7 @@ export function useAppEvents({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tabShortcutFind, activeTab, pinnedSearchRef, historySearchRef, sessionsSearchRef]);
+  }, [mode, tabShortcutFind, activeTab, pinnedSearchRef, historySearchRef, sessionsSearchRef]);
 
   useEffect(() => {
 
@@ -185,6 +201,8 @@ export function useAppEvents({
 
       const tag = e.target.tagName;
 
+      if (mode !== "clipboard") return;
+
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
       const num = parseInt(e.key);
@@ -210,5 +228,33 @@ export function useAppEvents({
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeTab, filteredPinned, filteredHistory, filteredSessions, onCopy, onActivateSession]);
+  }, [mode, activeTab, filteredPinned, filteredHistory, filteredSessions, onCopy, onActivateSession]);
+
+  useEffect(() => {
+
+    const onKey = (e) => {
+
+      if (mode !== "apps") return;
+
+      const tag = e.target.tagName;
+
+      // number keys only act once the search box has been blurred (via Esc)
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      const num = parseInt(e.key);
+
+      if (num >= 1 && num <= 9 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+
+        const index = num - 1;
+
+        if (index < filteredApps.length) {
+          e.preventDefault();
+          onFocusApp(filteredApps[index].id);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mode, filteredApps, onFocusApp]);
 }

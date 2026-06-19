@@ -2,7 +2,7 @@ use crate::AppState;
 use tauri::{Emitter, Manager, Monitor, PhysicalPosition, WebviewWindow};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutEvent, ShortcutState};
 
-pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, event: ShortcutEvent) {
+pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
 
     // ignore key-up events
     if event.state() != ShortcutState::Pressed {
@@ -13,13 +13,24 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
         return;
     };
 
+    // ignore when the window is already visible (the other shortcut is a no-op)
+    if win.is_visible().unwrap_or(false) {
+        return;
+    }
+
     // get cursor position
     let state = app.state::<AppState>();
-    let (width, height) = state
+    let (width, height, open_apps_hotkey) = state
         .settings
         .lock()
-        .map(|s| (s.window_width, s.window_height))
-        .unwrap_or((400.0, 600.0));
+        .map(|s| (s.window_width, s.window_height, s.open_apps_hotkey.clone()))
+        .unwrap_or((400.0, 600.0, String::new()));
+
+    // decide which mode the frontend should render based on which shortcut fired
+    let mode = match crate::settings::normalize_shortcut(&open_apps_hotkey).parse::<Shortcut>() {
+        Ok(apps_shortcut) if shortcut == &apps_shortcut => "apps",
+        _ => "clipboard",
+    };
 
     let Ok(cursor) = app.cursor_position() else {
         return;
@@ -40,7 +51,7 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, _shortcut: &Shortcut, eve
     let _ = win.set_position(tauri::Position::Physical(PhysicalPosition { x, y }));
     let _ = win.show();
     let _ = win.set_focus();
-    let _ = app.emit("main-window-shown", ());
+    let _ = app.emit("main-window-shown", mode);
 }
 
 pub(crate) fn monitor_under_point(win: &WebviewWindow, x: i32, y: i32) -> Option<Monitor> {

@@ -26,6 +26,8 @@ export const reorderPinned = (items) => invoke("reorder_pinned", { items });
 
 export const updateShortcut = (shortcut) => invoke("update_shortcut", { shortcut });
 
+export const updateOpenAppsShortcut = (shortcut) => invoke("update_open_apps_shortcut", { shortcut });
+
 export const applyWindowSize = () => invoke("apply_window_size");
 
 export const logError = (level, message) => invoke("log_frontend_error", { level, message });
@@ -41,3 +43,7 @@ export const activateSession = (id) => invoke("activate_session", { id });
 export const reorderSessions = (items) => invoke("reorder_sessions", { items });
 
 export const pinItemToSession = (content, sessionId, description) => invoke("pin_item_to_session", { content, sessionId, description });
+
+export const listOpenApps = () => invoke("list_open_apps");
+
+export const focusApp = (id) => invoke("focus_app", { id });

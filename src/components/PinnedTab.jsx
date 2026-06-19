@@ -85,6 +85,9 @@ export default function PinnedTab({
           ref={pinnedSearchRef}
           className="search-input"
           type="text"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="Search pinned..."
           value={pinnedSearch}
           onChange={(e) => setPinnedSearch(e.target.value)}

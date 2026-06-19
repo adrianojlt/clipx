@@ -72,6 +72,7 @@ pub fn run() {
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::update_shortcut,
+            commands::settings::update_open_apps_shortcut,
             commands::settings::apply_window_size,
             commands::clipboard::get_history,
             commands::pinned::get_pinned,
@@ -90,6 +91,8 @@ pub fn run() {
             commands::sessions::activate_session,
             commands::sessions::reorder_sessions,
             commands::sessions::pin_item_to_session,
+            commands::apps::list_open_apps,
+            commands::apps::focus_app,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -121,24 +124,45 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| match event {
+
             tauri::RunEvent::Ready => {
                 if let Err(e) = register_initial_shortcut(app) {
                     log::error!("failed to register initial global shortcut: {e}");
                 }
             }
+
             tauri::RunEvent::Exit => {
+
                 let state = app.state::<AppState>();
+
                 state.shutdown.store(true, Ordering::SeqCst);
 
                 state.monitor_tx.lock().ok().map(|mut g| g.take());
 
-                drop(state.monitor_handles.lock().ok().and_then(|mut g| g.take()));
+                let handles = state.monitor_handles.lock().ok().and_then(|mut g| g.take());
+
+                if let Some((h1, h2)) = handles {
+
+                    let (tx, rx) = std::sync::mpsc::channel::<()>();
+
+                    std::thread::spawn(move || {
+                        let _ = h1.join();
+                        let _ = h2.join();
+                        let _ = tx.send(());
+                    });
+
+                    if rx.recv_timeout(std::time::Duration::from_secs(2)).is_err() {
+                        log::warn!("monitor threads did not exit in 2 s; forcing exit");
+                        std::process::exit(0);
+                    }
+                }
             }
             _ => {}
         });
 }
 
 fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
+
     let data_dir = app
         .path()
         .app_data_dir()
@@ -154,15 +178,19 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     if let Ok(p) = crate::db::db_path(app.handle()) {
         log::info!("db path: {}", p.display());
     }
+
     let session_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM sessions", [], |r| r.get(0))
         .unwrap_or(-1);
+
     let history_count: i64 = conn
         .query_row("SELECT COUNT(*) FROM clipboard_history", [], |r| r.get(0))
         .unwrap_or(-1);
+
     log::info!("startup row counts: sessions={session_count} history={history_count}");
 
     let conn_monitor = Connection::open(crate::db::db_path(app.handle())?)?;
+
     conn_monitor.execute_batch("PRAGMA busy_timeout = 5000;")?;
 
     app.manage(AppState {
@@ -177,16 +205,8 @@ fn init_app_state(app: &mut tauri::App) -> Result<(), AppError> {
     Ok(())
 }
 
-fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
-    let state = app.state::<AppState>();
-    let hotkey_str = state
-        .settings
-        .lock()
-        .map_err(|_| AppError::State("settings poisoned".into()))?
-        .hotkey
-        .clone();
-
-    let normalized = crate::settings::normalize_shortcut(&hotkey_str);
+fn register_shortcut(app: &AppHandle, hotkey_str: &str) -> Result<(), AppError> {
+    let normalized = crate::settings::normalize_shortcut(hotkey_str);
 
     let shortcut = normalized
         .parse::<Shortcut>()
@@ -195,6 +215,28 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
     app.global_shortcut()
         .on_shortcut(shortcut, crate::window::shortcut_handler)
         .map_err(|e| AppError::Shortcut(e.to_string()))?;
+
+    Ok(())
+}
+
+fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
+
+    let state = app.state::<AppState>();
+
+    let (hotkey_str, open_apps_str) = {
+        let s = state
+            .settings
+            .lock()
+            .map_err(|_| AppError::State("settings poisoned".into()))?;
+        (s.hotkey.clone(), s.open_apps_hotkey.clone())
+    };
+
+    register_shortcut(app, &hotkey_str)?;
+
+    // the open-apps shortcut is best-effort: a failure here must not break the clipboard hotkey
+    if let Err(e) = register_shortcut(app, &open_apps_str) {
+        log::error!("failed to register open-apps global shortcut: {e}");
+    }
 
     Ok(())
 }

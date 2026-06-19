@@ -93,7 +93,10 @@ pub(crate) fn delete_session_impl(conn: &mut rusqlite::Connection, id: i64) -> R
             [id],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .map_err(|_| AppError::NotFound(id))?;
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => AppError::NotFound(id),
+            other => AppError::Db(other),
+        })?;
 
     if is_global != 0 {
         return Err(AppError::Validation("Cannot delete the Global session".into()));

@@ -70,6 +70,9 @@ export default function SessionsTab({
           ref={sessionsSearchRef}
           className="search-input"
           type="text"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="Search sessions..."
           value={sessionsSearch}
           onChange={(e) => setSessionsSearch(e.target.value)}

@@ -133,6 +133,19 @@
   background: #333;
 }
 
+.app-item {
+  justify-content: flex-start;
+  gap: 0.5rem;
+}
+
+.app-index {
+  min-width: 1.1rem;
+  text-align: center;
+  color: #888;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .drag-handle {
   cursor: grab;
   margin-right: 0.5rem;

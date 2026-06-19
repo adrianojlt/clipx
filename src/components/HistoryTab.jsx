@@ -55,6 +55,9 @@ export default function HistoryTab({
           ref={historySearchRef}
           className="search-input"
           type="text"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
           placeholder="Search history..."
           value={historySearch}
           onChange={(e) => setHistorySearch(e.target.value)}

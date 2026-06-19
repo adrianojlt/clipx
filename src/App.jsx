@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useCallback } from "react";
+import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
@@ -9,6 +9,8 @@ import {
   getClipboard,
   getSetting,
   activateSession,
+  listOpenApps,
+  focusApp,
   logError,
 } from "./services/clipboardService";
 
@@ -17,6 +19,7 @@ import { IS_MAC } from "./utils/shortcuts";
 
 const TAB_MOD = IS_MAC ? "Command" : "Alt";
 
+import AppsTab from "./components/AppsTab";
 import PinnedTab from "./components/PinnedTab";
 import HistoryTab from "./components/HistoryTab";
 import SessionsTab from "./components/SessionsTab";
@@ -24,15 +27,18 @@ import SessionsTab from "./components/SessionsTab";
 import "./App.css";
 
 function App() {
+  const [mode, setMode] = useState("clipboard");
   const [activeTab, setActiveTab] = useState("pinned");
   const [history, setHistory] = useState([]);
   const [pinned, setPinned] = useState([]);
   const [globalPinned, setGlobalPinned] = useState([]);
   const [sessions, setSessions] = useState([]);
+  const [apps, setApps] = useState([]);
   const [currentClipboard, setCurrentClipboard] = useState("");
   const [historySearch, setHistorySearch] = useState("");
   const [pinnedSearch, setPinnedSearch] = useState("");
   const [sessionsSearch, setSessionsSearch] = useState("");
+  const [appsSearch, setAppsSearch] = useState("");
   const [tabShortcutPinned, setTabShortcutPinned] = useState(`${TAB_MOD}+1`);
   const [tabShortcutHistory, setTabShortcutHistory] = useState(`${TAB_MOD}+2`);
   const [tabShortcutSessions, setTabShortcutSessions] = useState(`${TAB_MOD}+3`);
@@ -40,6 +46,7 @@ function App() {
   const pinnedSearchRef = useRef(null);
   const historySearchRef = useRef(null);
   const sessionsSearchRef = useRef(null);
+  const appsSearchRef = useRef(null);
 
   const filteredHistory = useMemo(
     () => history.filter((item) => item.content.toLowerCase().includes(historySearch.toLowerCase())),
@@ -60,6 +67,14 @@ function App() {
     () => sessions.filter((s) => s.name.toLowerCase().includes(sessionsSearch.toLowerCase())),
     [sessions, sessionsSearch]
   );
+
+  const filteredApps = useMemo(() => {
+    const tokens = appsSearch.toLowerCase().split(/\s+/).filter(Boolean);
+    return apps.filter((a) => {
+      const name = a.name.toLowerCase();
+      return tokens.every((t) => name.includes(t));
+    });
+  }, [apps, appsSearch]);
 
   const pinnedSet = useMemo(() => new Set(globalPinned.map((p) => p.content)), [globalPinned]);
 
@@ -121,16 +136,39 @@ function App() {
     }
   }, []);
 
+  const loadApps = useCallback(async () => {
+    try {
+      const a = await listOpenApps();
+      setApps(a);
+    } catch (e) {
+      await logError("error", `Failed to load apps: ${e}`);
+    }
+  }, []);
+
   const clearSearch = useCallback(() => {
     setHistorySearch("");
     setPinnedSearch("");
     setSessionsSearch("");
+    setAppsSearch("");
   }, []);
 
   const handleCopy = useCallback(async (text) => {
     await writeText(text);
     await getCurrentWindow().hide();
   }, []);
+
+  const handleSelectApp = useCallback(async (id) => {
+    try {
+      await focusApp(id);
+      await getCurrentWindow().hide();
+    } catch (e) {
+      await logError("error", `Failed to focus app: ${e}`);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadApps();
+  }, [loadApps]);
 
   const handleActivateSession = useCallback(async (id) => {
     try {
@@ -144,23 +182,29 @@ function App() {
   useAppEvents({
     activeTab,
     setActiveTab,
+    mode,
+    onSetMode: setMode,
     tabShortcutPinned,
     tabShortcutHistory,
     tabShortcutSessions,
     tabShortcutFind,
+    filteredApps,
     filteredPinned,
     filteredHistory,
     filteredSessions,
     pinnedSearchRef,
     historySearchRef,
     sessionsSearchRef,
+    appsSearchRef,
     onLoadData: loadData,
+    onLoadApps: loadApps,
     onLoadHistory: loadHistory,
     onLoadClipboard: loadClipboard,
     onLoadTabShortcuts: loadTabShortcuts,
     onClearSearch: clearSearch,
     onCopy: handleCopy,
     onActivateSession: handleActivateSession,
+    onFocusApp: handleSelectApp,
   });
 
   return (
@@ -169,6 +213,17 @@ function App() {
         <img src="/icon.png" alt="ClipX" className="app-icon" />
         <h1>ClipX</h1>
       </div>
+      {mode === "apps" && (
+        <AppsTab
+          filteredApps={filteredApps}
+          appsSearch={appsSearch}
+          setAppsSearch={setAppsSearch}
+          appsSearchRef={appsSearchRef}
+          onSelect={handleSelectApp}
+        />
+      )}
+      {mode === "clipboard" && (
+        <>
       <div className="tabs">
         <button
           className={activeTab === "pinned" ? "active" : ""}
@@ -223,6 +278,8 @@ function App() {
           sessionsSearchRef={sessionsSearchRef}
           onDataChanged={loadData}
         />
+      )}
+        </>
       )}
     </main>
   );

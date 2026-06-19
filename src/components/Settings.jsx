@@ -4,6 +4,7 @@ import {
   getSetting,
   setSetting,
   updateShortcut,
+  updateOpenAppsShortcut,
   applyWindowSize,
   logError,
 } from "../services/clipboardService";
@@ -131,28 +132,36 @@ function HotkeyField({ label, hint, value, onChange }) {
   );
 }
 
-function NumberField({ label, hint, value, onChange, min, max, step = 1 }) {
-  const clamp = (v) => Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v));
+function NumberField({ label, hint, value, onChange, min, max }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const n = Number(draft);
+    if (draft.trim() === "" || Number.isNaN(n)) {
+      setDraft(String(value));
+      return;
+    }
+    const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, n));
+    setDraft(String(clamped));
+    if (clamped !== value) onChange(clamped);
+  };
+
   return (
     <div className="field">
       <div className="field-label">{label}</div>
       <div className="num">
         <input
-          type="number"
-          value={value}
-          min={min}
-          max={max}
-          step={step}
-          onChange={(e) => onChange(clamp(Number(e.target.value)))}
+          type="text"
+          inputMode="numeric"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
         />
-        <div className="num-steppers">
-          <button type="button" onClick={() => onChange(clamp(value + step))} aria-label="Increase">
-            <svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 4l3-3 3 3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
-          </button>
-          <button type="button" onClick={() => onChange(clamp(value - step))} aria-label="Decrease">
-            <svg width="8" height="5" viewBox="0 0 8 5"><path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" /></svg>
-          </button>
-        </div>
       </div>
       {hint && <div className="field-hint">{hint}</div>}
     </div>
@@ -213,6 +222,12 @@ function HotkeysPanel({ s, set }) {
         hint="Click Record then press your desired key combination."
         value={s.hotkey}
         onChange={(v) => set("hotkey", v)}
+      />
+      <HotkeyField
+        label="Open List of Apps"
+        hint="System-wide hotkey to open the list of running apps."
+        value={s.openAppsHotkey}
+        onChange={(v) => set("openAppsHotkey", v)}
       />
       <div className="section-header">
         <h3>In-app Shortcuts</h3>
@@ -304,13 +319,14 @@ function Settings() {
 
   const [s, setS] = useState({
     hotkey: "",
+    openAppsHotkey: "Control+Option+Esc",
     tabShortcutPinned: `${TAB_MOD}+1`,
     tabShortcutHistory: `${TAB_MOD}+2`,
     tabShortcutSessions: `${TAB_MOD}+3`,
     tabShortcutFind: `${TAB_MOD}+F`,
     historyLimit: 20,
-    windowWidth: 400,
-    windowHeight: 600,
+    windowWidth: 600,
+    windowHeight: 700,
   });
 
   const set = (k, v) => {
@@ -337,17 +353,18 @@ function Settings() {
           return fallback;
         }
       };
-      const [hotkey, pinned, history, sessions, find, limit, width, height] = await Promise.all([
+      const [hotkey, openApps, pinned, history, sessions, find, limit, width, height] = await Promise.all([
         safeGet("hotkey", "Option+Space"),
+        safeGet("open_apps_hotkey", "Control+Option+Esc"),
         safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
         safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
         safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
         safeGet("tab_shortcut_find", `${TAB_MOD}+F`),
         safeGet("history_limit", 20, Number),
-        safeGet("window_width", 400, (v) => Number(v) || 400),
-        safeGet("window_height", 600, (v) => Number(v) || 600),
+        safeGet("window_width", 600, (v) => Number(v) || 600),
+        safeGet("window_height", 700, (v) => Number(v) || 700),
       ]);
-      setS({ hotkey, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height });
+      setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height });
     };
     load();
   }, []);
@@ -357,6 +374,7 @@ function Settings() {
     const errors = [];
     const attempt = async (fn) => { try { await fn(); } catch (e) { errors.push(String(e)); } };
     await attempt(() => updateShortcut(s.hotkey));
+    await attempt(() => updateOpenAppsShortcut(s.openAppsHotkey));
     await attempt(() => setSetting("tab_shortcut_pinned", s.tabShortcutPinned));
     await attempt(() => setSetting("tab_shortcut_history", s.tabShortcutHistory));
     await attempt(() => setSetting("tab_shortcut_sessions", s.tabShortcutSessions));
