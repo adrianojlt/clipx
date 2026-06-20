@@ -1,6 +1,12 @@
 <p align="center">
-  <img src="left.png" alt="ClipX screenshot" width="45%" />
-  <img src="right.png" alt="ClipX screenshot" width="45%" />
+  <img src="./docs/assets/pinned.png" alt="ClipX screenshot" width="45%" />
+</p>
+<p align="center">
+  <img src="./docs/assets/history.png" alt="ClipX screenshot" width="45%" />
+</p>
+
+<p align="center">
+  <img src="./docs/assets/sessions.png" alt="ClipX screenshot" width="45%" />
 </p>
 
 A lightweight clipboard manager for desktop. It keeps track of text you copy so you can recall it later without redoing the work.
