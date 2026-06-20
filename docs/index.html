@@ -21,6 +21,18 @@
   @keyframes clipx-pulse { 0%,100% { opacity:1; transform:translateY(0) } 50% { opacity:.55; transform:translateY(-2px) } }
   @keyframes clipx-glow { 0%,100% { opacity:.5 } 50% { opacity:.85 } }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  @media (max-width: 760px) {
+    /* scrollytelling: drop section anchors on mobile, keep only the Download CTA */
+    #nav-links a:not(:last-child) { display: none !important; }
+
+    /* 02 - The summon: drop the sticky scroll-beat, flow normally */
+    [data-summon-section] { height: auto !important; }
+    #summon-sticky { position: static !important; height: auto !important; overflow: visible !important; padding: clamp(70px,12vh,110px) 0 !important; }
+    [data-summon="editor"] { display: none !important; }
+    #summon-grid { gap: clamp(36px,8vw,48px) !important; }
+    #summon-stage { min-height: auto !important; }
+    [data-step] { opacity: 1 !important; }
+  }
 </style>
 </head>
 <body>
@@ -37,7 +49,7 @@
       </span>
       <span style="font-weight:600; font-size:16px; letter-spacing:-0.01em;">ClipX</span>
     </a>
-    <div style="display:flex; align-items:center; gap:clamp(14px,2.5vw,30px);">
+    <div id="nav-links" style="display:flex; align-items:center; gap:clamp(14px,2.5vw,30px);">
       <a href="#workflow" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Workflow</a>
       <a href="#features" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Features</a>
       <a href="#privacy" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Privacy</a>
@@ -108,7 +120,7 @@
 
   <!-- SUMMON MOMENT (sticky scroll beat) -->
   <section id="workflow" data-summon-section style="position:relative; height:280vh; border-top:1px solid #131418;">
-    <div style="position:sticky; top:0; height:100vh; display:flex; align-items:center; overflow:hidden;">
+    <div id="summon-sticky" style="position:sticky; top:0; height:100vh; display:flex; align-items:center; overflow:hidden;">
       <!-- faux editor backdrop -->
       <div style="position:absolute; inset:0; background:linear-gradient(180deg,#0b0c0f,#0a0a0c);"></div>
       <div data-summon="editor" style="position:absolute; inset:0; padding:clamp(40px,8vh,90px) clamp(24px,6vw,90px); font-family:'IBM Plex Mono',monospace; font-size:clamp(12px,1.3vw,15px); line-height:2.1; color:#2c2e35; user-select:none; transition:filter .5s ease;">
@@ -122,7 +134,7 @@
         <div>3e7b1aa chore: bump tauri to v2</div>
       </div>
 
-      <div style="position:relative; width:100%; max-width:1200px; margin:0 auto; padding:0 clamp(20px,4vw,48px); display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:48px; align-items:center;">
+      <div id="summon-grid" style="position:relative; width:100%; max-width:1200px; margin:0 auto; padding:0 clamp(20px,4vw,48px); display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:48px; align-items:center;">
         <div>
           <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">02 — The summon</div>
           <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:28px;">Press the hotkey.<br>It's already there.</h2>
@@ -142,7 +154,7 @@
           </div>
         </div>
 
-        <div style="position:relative; min-height:420px;">
+        <div id="summon-stage" style="position:relative; min-height:420px;">
           <div data-summon="toast" style="position:absolute; top:8%; left:50%; transform:translateX(-50%) translateY(8px); opacity:0; transition:opacity .4s ease, transform .4s ease; display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#cdd0d6; background:rgba(20,21,25,0.95); border:1px solid #2f323a; border-radius:8px; padding:7px 13px; white-space:nowrap; box-shadow:0 10px 28px -10px rgba(0,0,0,0.8); z-index:3;">
             <span style="width:6px; height:6px; border-radius:50%; background:#4f8ff0;"></span>Captured to ClipX
           </div>
@@ -393,6 +405,11 @@ document.addEventListener('DOMContentLoaded', function () {
       bar.style.width = (max > 0 ? (sc.scrollTop / max) * 100 : 0) + '%';
     }
     if (reduce || !section) return;
+    // mobile: scroll-beat disabled (section flows normally), keep popup visible
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      if (popup) { popup.style.opacity = 1; popup.style.transform = 'none'; }
+      return;
+    }
     var rect = section.getBoundingClientRect();
     var total = rect.height - window.innerHeight;
     var p = clamp(-rect.top / (total || 1));
