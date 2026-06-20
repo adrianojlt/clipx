@@ -17,6 +17,7 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Search** - Filter both pinned items and clipboard history instantly with the search box. Press `Command+F` (configurable) to jump to the search box from anywhere in the popup.
 - **Context menus** - Right-click a history or pinned item to pin it directly to a specific session.
 - **Quick copy keys** - Press `1` through `5` to copy the Nth item in the current tab (or activate a session in the Sessions tab) without touching the mouse.
+- **App switcher** - A separate global hotkey (default `Control+Option+Esc`, configurable in Settings) opens a list of currently open apps. Search by name, then press Enter or `1` through `9`, or click, to focus an app.
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
 - **Tab shortcuts** - Switch between Pinned, History, and Sessions tabs with configurable keyboard shortcuts (default Command+1 / Command+2 / Command+3).
 - **Resizable window** - Adjust the popup width and height in Settings.
