@@ -13,8 +13,8 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
         return;
     };
 
-    // ignore when the window is already visible (the other shortcut is a no-op)
-    if win.is_visible().unwrap_or(false) {
+    // ignore when the window is already visible and focused
+    if win.is_visible().unwrap_or(false) && win.is_focused().unwrap_or(false) {
         return;
     }
 
