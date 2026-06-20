@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClipX — local-first clipboard manager</title>
+<meta name="description" content="ClipX keeps every snippet you copy and brings it back the instant you need it. Local, fast, keyboard-first. macOS, Windows, Linux.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+  html, body { background: #0a0a0c; overflow-x: hidden; }
+  body { font-family: 'IBM Plex Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  ::selection { background: rgba(79,143,240,0.32); }
+  summary::-webkit-details-marker { display: none; }
+  summary::marker { content: ''; }
+  @keyframes clipx-rise { from { transform: translateY(26px) } to { transform: translateY(0) } }
+  @keyframes clipx-caret { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
+  @keyframes clipx-pulse { 0%,100% { opacity:1; transform:translateY(0) } 50% { opacity:.55; transform:translateY(-2px) } }
+  @keyframes clipx-glow { 0%,100% { opacity:.5 } 50% { opacity:.85 } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div style="background:#0a0a0c; color:#ececee; position:relative;">
+
+  <div data-progress style="position:fixed; top:0; left:0; height:2px; width:0%; background:linear-gradient(90deg,#4f8ff0,#7db0ff); z-index:200; transition:width .1s linear;"></div>
+
+  <!-- NAV -->
+  <nav style="position:fixed; top:0; left:0; right:0; z-index:100; display:flex; align-items:center; justify-content:space-between; padding:16px clamp(20px,4vw,48px); background:rgba(10,10,12,0.72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:1px solid #18191d;">
+    <a href="#top" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:#ececee;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:7px; background:linear-gradient(160deg,#23252b,#16171b); border:1px solid #2e3038; box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);">
+        <span style="width:11px; height:11px; border:1.5px solid #9aa3b2; border-radius:2px; box-shadow:3px -3px 0 -1.5px #0a0a0c, 4.5px -4.5px 0 0 #4f8ff0;"></span>
+      </span>
+      <span style="font-weight:600; font-size:16px; letter-spacing:-0.01em;">ClipX</span>
+    </a>
+    <div style="display:flex; align-items:center; gap:clamp(14px,2.5vw,30px);">
+      <a href="#workflow" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Workflow</a>
+      <a href="#features" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Features</a>
+      <a href="#privacy" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Privacy</a>
+      <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">GitHub</a>
+      <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; color:#0a0a0c; background:#4f8ff0; text-decoration:none; padding:8px 16px; border-radius:7px;">Download</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header id="top" style="position:relative; padding:clamp(120px,16vh,180px) clamp(20px,4vw,48px) clamp(60px,9vh,110px);">
+    <div style="position:absolute; top:6%; right:-6%; width:60%; height:70%; background:radial-gradient(ellipse at center, rgba(79,143,240,0.12), transparent 62%); filter:blur(12px); pointer-events:none; animation:clipx-glow 7s ease-in-out infinite;"></div>
+    <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:clamp(40px,5vw,72px); align-items:center; position:relative;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
+        <div style="display:inline-flex; align-items:center; gap:9px; font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:#6b6d75; border:1px solid #1f2127; border-radius:999px; padding:5px 13px; margin-bottom:26px;">
+          <span style="width:6px; height:6px; border-radius:50%; background:#4f8ff0;"></span>Clipboard manager · macOS · Windows · Linux
+        </div>
+        <h1 style="font-size:clamp(2.5rem,5.6vw,4.6rem); line-height:1.02; font-weight:600; letter-spacing:-0.03em; margin-bottom:24px;">Your clipboard,<br>one keystroke away.</h1>
+        <p style="font-size:clamp(1.05rem,1.5vw,1.3rem); line-height:1.55; color:#a8aab1; max-width:30ch; margin-bottom:34px;">ClipX keeps every snippet you copy and brings it back the instant you need it. Local, fast, keyboard-first.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+          <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#0a0a0c; background:#4f8ff0; text-decoration:none; padding:13px 22px; border-radius:9px; box-shadow:0 8px 24px -8px rgba(79,143,240,0.6);">Download ClipX
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; opacity:.7;">↓</span>
+          </a>
+          <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#d7d8db; background:transparent; text-decoration:none; padding:13px 22px; border-radius:9px; border:1px solid #2a2c33;">View on GitHub</a>
+        </div>
+        <div style="margin-top:30px; display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">
+          <span>Summon it anywhere with</span>
+          <span style="display:inline-flex; align-items:center; gap:5px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌘ Space</span>
+        </div>
+      </div>
+
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both; position:relative;">
+        <div style="position:absolute; inset:-8% -8% -8% -8%; background:radial-gradient(ellipse at 60% 40%, rgba(79,143,240,0.16), transparent 60%); filter:blur(8px); pointer-events:none;"></div>
+        <div style="position:relative; border:1px solid #26282d; border-radius:12px; overflow:hidden; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 2px 0 rgba(255,255,255,0.03) inset; max-width:520px; margin:0 auto;">
+          <img src="assets/pinned.png" alt="ClipX pinned items popup" style="display:block; width:100%; height:auto;">
+        </div>
+        <div style="position:absolute; right:6%; bottom:9%; display:flex; align-items:center; gap:8px; pointer-events:none;">
+          <span style="display:inline-flex; align-items:center; gap:5px; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:500; color:#d7d8db; background:rgba(20,21,25,0.92); border:1px solid #34373f; border-radius:6px; padding:5px 10px; box-shadow:0 8px 20px -6px rgba(0,0,0,0.7);">summoned at cursor</span>
+          <svg width="22" height="26" viewBox="0 0 22 26" fill="none" style="filter:drop-shadow(0 3px 5px rgba(0,0,0,0.6));"><path d="M2 2l16 9-7 1.6 4 8.2-3 1.4-4-8.2L2 19z" fill="#fff" stroke="#0a0a0c" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- PROBLEM -->
+  <section style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418;">
+    <div style="max-width:1200px; margin:0 auto;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; max-width:760px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">01 — The problem</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">The clipboard holds one thing. You copy hundreds.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.25rem); line-height:1.6; color:#a8aab1; max-width:62ch;">Every copy overwrites the last. The command you ran ten minutes ago, the path you keep retyping, the snippet you needed twice — gone the moment you copy something else. So you switch windows, scroll back, and copy it again.</p>
+      </div>
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; margin-top:clamp(40px,5vw,64px); display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1px; background:#1a1b1f; border:1px solid #1a1b1f; border-radius:12px; overflow:hidden;">
+        <div style="background:#0d0e11; padding:28px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5d5f67; margin-bottom:10px;">overwritten</div>
+          <div style="font-size:1.05rem; line-height:1.45; color:#c9cace;">The thing you just copied replaces the thing you needed.</div>
+        </div>
+        <div style="background:#0d0e11; padding:28px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5d5f67; margin-bottom:10px;">repeated</div>
+          <div style="font-size:1.05rem; line-height:1.45; color:#c9cace;">Copy, paste, lose it, find it, copy again. All day.</div>
+        </div>
+        <div style="background:#0d0e11; padding:28px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#5d5f67; margin-bottom:10px;">scattered</div>
+          <div style="font-size:1.05rem; line-height:1.45; color:#c9cace;">Useful snippets vanish into a void you can't search.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUMMON MOMENT (sticky scroll beat) -->
+  <section id="workflow" data-summon-section style="position:relative; height:280vh; border-top:1px solid #131418;">
+    <div style="position:sticky; top:0; height:100vh; display:flex; align-items:center; overflow:hidden;">
+      <!-- faux editor backdrop -->
+      <div style="position:absolute; inset:0; background:linear-gradient(180deg,#0b0c0f,#0a0a0c);"></div>
+      <div data-summon="editor" style="position:absolute; inset:0; padding:clamp(40px,8vh,90px) clamp(24px,6vw,90px); font-family:'IBM Plex Mono',monospace; font-size:clamp(12px,1.3vw,15px); line-height:2.1; color:#2c2e35; user-select:none; transition:filter .5s ease;">
+        <div>$ kubectl get pods -n legacy-sync</div>
+        <div>NAME                         READY   STATUS</div>
+        <div>legacy-sync-7d9c            1/1     Running</div>
+        <div style="color:#3a3d45;">$ docker pull <span data-summon="copyline" style="color:#5d6068; padding:1px 2px; border-radius:3px; transition:background .35s ease, color .35s ease;">myhome.ddns.net:5005/legacy:latest</span></div>
+        <div>$ # need that registry path again...</div>
+        <div>$ git log --oneline -5</div>
+        <div>a91f2c0 fix: retry on socket timeout</div>
+        <div>3e7b1aa chore: bump tauri to v2</div>
+      </div>
+
+      <div style="position:relative; width:100%; max-width:1200px; margin:0 auto; padding:0 clamp(20px,4vw,48px); display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:48px; align-items:center;">
+        <div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">02 — The summon</div>
+          <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:28px;">Press the hotkey.<br>It's already there.</h2>
+          <div style="display:flex; flex-direction:column; gap:14px; max-width:42ch;">
+            <div data-step="0" style="display:flex; gap:14px; align-items:flex-start; transition:opacity .4s ease; opacity:.32;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">01</span>
+              <span style="font-size:1.05rem; line-height:1.5; color:#c9cace;">You copy text while you work. ClipX captures it in the background.</span>
+            </div>
+            <div data-step="1" style="display:flex; gap:14px; align-items:flex-start; transition:opacity .4s ease; opacity:.32;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">02</span>
+              <span style="font-size:1.05rem; line-height:1.5; color:#c9cace;">Hit the global hotkey. The history popup opens right at your cursor.</span>
+            </div>
+            <div data-step="2" style="display:flex; gap:14px; align-items:flex-start; transition:opacity .4s ease; opacity:.32;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">03</span>
+              <span style="font-size:1.05rem; line-height:1.5; color:#c9cace;">Search or pick it, paste, done. Press Esc to dismiss.</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="position:relative; min-height:420px;">
+          <div data-summon="toast" style="position:absolute; top:8%; left:50%; transform:translateX(-50%) translateY(8px); opacity:0; transition:opacity .4s ease, transform .4s ease; display:inline-flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#cdd0d6; background:rgba(20,21,25,0.95); border:1px solid #2f323a; border-radius:8px; padding:7px 13px; white-space:nowrap; box-shadow:0 10px 28px -10px rgba(0,0,0,0.8); z-index:3;">
+            <span style="width:6px; height:6px; border-radius:50%; background:#4f8ff0;"></span>Captured to ClipX
+          </div>
+          <div data-summon="kbd" style="position:absolute; top:40%; left:50%; transform:translate(-50%,-50%); opacity:0; transition:opacity .4s ease; z-index:2; display:flex; gap:7px;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:500; color:#ececee; background:#17181c; border:1px solid #34373f; border-bottom-color:#23252b; border-radius:8px; padding:9px 14px; box-shadow:0 6px 18px -6px rgba(0,0,0,0.7);">⌘</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:500; color:#ececee; background:#17181c; border:1px solid #34373f; border-bottom-color:#23252b; border-radius:8px; padding:9px 18px; box-shadow:0 6px 18px -6px rgba(0,0,0,0.7);">Space</span>
+          </div>
+          <div data-summon="popup" style="opacity:1; transform:none; transition:opacity .5s cubic-bezier(.16,1,.3,1), transform .5s cubic-bezier(.16,1,.3,1); border:1px solid #2a2c33; border-radius:12px; overflow:hidden; box-shadow:0 50px 100px -30px rgba(0,0,0,0.95); max-width:420px; margin:0 auto; position:relative; z-index:1;">
+            <img src="assets/pinned.png" alt="ClipX popup summoned at cursor" style="display:block; width:100%; height:auto;">
+          </div>
+          <svg data-summon="cursor" width="20" height="24" viewBox="0 0 22 26" fill="none" style="position:absolute; left:62%; top:55%; opacity:0; transition:opacity .4s ease, transform .4s ease; z-index:4; filter:drop-shadow(0 3px 5px rgba(0,0,0,0.7));"><path d="M2 2l16 9-7 1.6 4 8.2-3 1.4-4-8.2L2 19z" fill="#fff" stroke="#0a0a0c" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KEYBOARD-FIRST (sticky screenshot) -->
+  <section id="features" style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418;">
+    <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:clamp(40px,5vw,72px); align-items:start;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">03 — Keyboard-first</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">Built to run without your mouse.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:34px;">Every action has a key. Open, search, copy, switch tabs, dismiss — your hands never leave home row. Every shortcut is configurable.</p>
+        <div style="display:flex; flex-direction:column; gap:1px; background:#1a1b1f; border:1px solid #1a1b1f; border-radius:10px; overflow:hidden;">
+          <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Open ClipX anywhere</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌘</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">Space</span></span></div>
+          <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Quick copy first results</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">1</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#5d5f67; align-self:center;">–</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">5</span></span></div>
+          <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Switch Pinned / History / Sessions</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌘</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">1 / 2 / 3</span></span></div>
+          <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Dismiss instantly</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">Esc</span></span></div>
+        </div>
+      </div>
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both; position:sticky; top:96px;">
+        <div style="border:1px solid #26282d; border-radius:12px; overflow:hidden; box-shadow:0 40px 90px -34px rgba(0,0,0,0.9);">
+          <img src="assets/settings-hotkeys.png" alt="ClipX hotkey settings" style="display:block; width:100%; height:auto;">
+        </div>
+        <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">Settings → Hotkeys. Record any combination.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PINNING & SESSIONS -->
+  <section style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418;">
+    <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:clamp(40px,5vw,72px); align-items:center;">
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both; order:2; position:relative;">
+        <div style="border:1px solid #26282d; border-radius:12px; overflow:hidden; box-shadow:0 40px 90px -34px rgba(0,0,0,0.9); max-width:520px;">
+          <img src="assets/sessions.png" alt="ClipX sessions" style="display:block; width:100%; height:auto;">
+        </div>
+        <div style="position:absolute; left:5%; top:34%; display:inline-flex; align-items:center; gap:7px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#f5d089; background:rgba(20,21,25,0.95); border:1px solid #4a3f24; border-radius:7px; padding:5px 10px; box-shadow:0 10px 24px -8px rgba(0,0,0,0.8);"><span style="width:6px; height:6px; border-radius:50%; background:#f5a623;"></span>active session</div>
+      </div>
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; order:1;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">04 — Pinning & sessions</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">From passing history to a kit you keep.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:30px;">Pin the snippets you reuse so they outlive the history limit. Reorder them, label them, hide sensitive ones. Group related pins into named sessions — a deploy runbook, a set of prompts, the commands for one project.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#c2c4ca; background:#101114; border:1px solid #23252b; border-radius:999px; padding:6px 13px;">Pin & reorder</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#c2c4ca; background:#101114; border:1px solid #23252b; border-radius:999px; padding:6px 13px;">Custom labels</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#c2c4ca; background:#101114; border:1px solid #23252b; border-radius:999px; padding:6px 13px;">Hide sensitive content</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#c2c4ca; background:#101114; border:1px solid #23252b; border-radius:999px; padding:6px 13px;">Named sessions</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#c2c4ca; background:#101114; border:1px solid #23252b; border-radius:999px; padding:6px 13px;">Always-on Favorites</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SEARCH & CONTEXT -->
+  <section style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418;">
+    <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:clamp(40px,5vw,72px); align-items:center;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">05 — Search & recall</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">Filter as you type. Find it in two keys.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:30px;">Search runs across pinned items and history at once. Jump straight to the search box with a shortcut, narrow the list instantly, and act without leaving the keyboard. Right-click any item for context actions — copy, label, or pin it directly into a session.</p>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; gap:13px; align-items:flex-start;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">→</span><span style="font-size:1rem; line-height:1.5; color:#c9cace;">Instant filtering across pinned and history.</span></div>
+          <div style="display:flex; gap:13px; align-items:flex-start;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">→</span><span style="font-size:1rem; line-height:1.5; color:#c9cace;">Jump to search with a single shortcut.</span></div>
+          <div style="display:flex; gap:13px; align-items:flex-start;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">→</span><span style="font-size:1rem; line-height:1.5; color:#c9cace;">Context menu actions, including pin-to-session.</span></div>
+        </div>
+      </div>
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both;">
+        <div style="border:1px solid #26282d; border-radius:12px; overflow:hidden; box-shadow:0 40px 90px -34px rgba(0,0,0,0.9); max-width:520px; margin-left:auto;">
+          <img src="assets/history.png" alt="ClipX history search" style="display:block; width:100%; height:auto;">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- APP SWITCHER -->
+  <section style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418; background:linear-gradient(180deg,#0a0a0c,#0c0d10,#0a0a0c);">
+    <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:clamp(40px,5vw,72px); align-items:center;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">06 — Bonus: app switcher</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">A second hotkey, for switching apps.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:30px;">ClipX ships a separate global hotkey that opens a list of running apps. Type to filter by name, then activate with Enter, a number key, or a click. Same keyboard-first habit, applied to your whole desktop.</p>
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">Open list of apps</span>
+          <span style="display:inline-flex; gap:6px;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:5px 11px;">⌃ Control</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:5px 11px;">⌥ Option</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:5px 11px;">Esc</span>
+          </span>
+        </div>
+      </div>
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both;">
+        <div style="border:1px solid #26282d; border-radius:12px; overflow:hidden; box-shadow:0 40px 90px -34px rgba(0,0,0,0.9); max-width:520px;">
+          <img src="assets/app-switcher.png" alt="ClipX app switcher list of running apps" style="display:block; width:100%; height:auto;">
+        </div>
+        <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">Activate with Enter, a number key, or a click.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIVACY -->
+  <section id="privacy" style="padding:clamp(90px,14vh,170px) clamp(20px,4vw,48px); border-top:1px solid #131418;">
+    <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:clamp(40px,5vw,72px); align-items:center;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">07 — Local-first</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">Your clipboard never leaves the machine.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:52ch; margin-bottom:30px;">History is stored locally in a SQLite database on your disk. There's no account, no cloud sync, and no clipboard content sent anywhere. ClipX is a quiet local tool — what you copy stays with you.</p>
+        <div style="display:flex; flex-direction:column; gap:1px; background:#1a1b1f; border:1px solid #1a1b1f; border-radius:10px; overflow:hidden; max-width:440px;">
+          <div style="background:#0d0e11; padding:16px 18px; display:flex; align-items:center; gap:12px;"><span style="color:#4f8ff0; font-family:'IBM Plex Mono',monospace; font-size:13px;">✓</span><span style="color:#c9cace; font-size:0.98rem;">Stored on-device in SQLite</span></div>
+          <div style="background:#0d0e11; padding:16px 18px; display:flex; align-items:center; gap:12px;"><span style="color:#4f8ff0; font-family:'IBM Plex Mono',monospace; font-size:13px;">✓</span><span style="color:#c9cace; font-size:0.98rem;">No cloud dependency, no account</span></div>
+          <div style="background:#0d0e11; padding:16px 18px; display:flex; align-items:center; gap:12px;"><span style="color:#4f8ff0; font-family:'IBM Plex Mono',monospace; font-size:13px;">✓</span><span style="color:#c9cace; font-size:0.98rem;">Nothing logged or sent off the machine</span></div>
+        </div>
+      </div>
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both;">
+        <div style="border:1px solid #26282d; border-radius:12px; overflow:hidden; box-shadow:0 40px 90px -34px rgba(0,0,0,0.9);">
+          <img src="assets/settings-others.png" alt="ClipX clipboard history settings" style="display:block; width:100%; height:auto;">
+        </div>
+        <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">History limit is yours — keep up to 50 recent entries.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CROSS-PLATFORM & STACK -->
+  <section style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418;">
+    <div style="max-width:1200px; margin:0 auto;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; margin-bottom:clamp(40px,5vw,60px);">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">08 — Platforms & stack</div>
+        <h2 style="font-size:clamp(1.7rem,3.2vw,2.6rem); line-height:1.12; font-weight:600; letter-spacing:-0.02em; max-width:20ch;">Native on three desktops. Honest about how it's built.</h2>
+      </div>
+      <div data-reveal data-reveal-d="100" style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
+        <div style="background:#0d0e11; border:1px solid #1c1d22; border-radius:12px; padding:26px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5d5f67; margin-bottom:16px;">Platforms</div>
+          <div style="display:flex; flex-direction:column; gap:9px; color:#d3d4d8; font-size:1.05rem;"><span>macOS</span><span>Windows</span><span>Linux</span></div>
+        </div>
+        <div style="background:#0d0e11; border:1px solid #1c1d22; border-radius:12px; padding:26px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5d5f67; margin-bottom:16px;">Runtime</div>
+          <div style="display:flex; flex-direction:column; gap:9px; color:#d3d4d8; font-size:1.05rem;"><span>Tauri v2</span><span style="color:#7c7e85; font-size:0.92rem;">Small native binary, low footprint</span></div>
+        </div>
+        <div style="background:#0d0e11; border:1px solid #1c1d22; border-radius:12px; padding:26px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5d5f67; margin-bottom:16px;">Interface</div>
+          <div style="display:flex; flex-direction:column; gap:9px; color:#d3d4d8; font-size:1.05rem;"><span>React + Vite</span><span style="color:#7c7e85; font-size:0.92rem;">The popup UI you've seen above</span></div>
+        </div>
+        <div style="background:#0d0e11; border:1px solid #1c1d22; border-radius:12px; padding:26px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.12em; text-transform:uppercase; color:#5d5f67; margin-bottom:16px;">Storage</div>
+          <div style="display:flex; flex-direction:column; gap:9px; color:#d3d4d8; font-size:1.05rem;"><span>SQLite</span><span style="color:#7c7e85; font-size:0.92rem;">Local file, on your disk only</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD -->
+  <section id="download" style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418;">
+    <div style="max-width:1200px; margin:0 auto;">
+      <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; max-width:640px; margin-bottom:clamp(36px,5vw,52px);">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">09 — Install</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:20px;">Download a build and run it.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1;">Pre-built installers for macOS, Windows, and Linux are on the Releases page. Grab the one for your platform and open it.</p>
+      </div>
+      <div data-reveal data-reveal-d="100" style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:24px;">
+        <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="text-decoration:none; background:#0d0e11; border:1px solid #1c1d22; border-radius:12px; padding:24px; display:flex; flex-direction:column; gap:6px; transition:border-color .25s ease, background .25s ease;"><span style="color:#ececee; font-size:1.1rem; font-weight:500;">macOS</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">.dmg on Releases →</span></a>
+        <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="text-decoration:none; background:#0d0e11; border:1px solid #1c1d22; border-radius:12px; padding:24px; display:flex; flex-direction:column; gap:6px; transition:border-color .25s ease, background .25s ease;"><span style="color:#ececee; font-size:1.1rem; font-weight:500;">Windows</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">.msi on Releases →</span></a>
+        <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="text-decoration:none; background:#0d0e11; border:1px solid #1c1d22; border-radius:12px; padding:24px; display:flex; flex-direction:column; gap:6px; transition:border-color .25s ease, background .25s ease;"><span style="color:#ececee; font-size:1.1rem; font-weight:500;">Linux</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">.AppImage / .deb →</span></a>
+      </div>
+      <details style="background:#0b0c0f; border:1px solid #1a1b1f; border-radius:12px; max-width:760px;">
+        <summary style="cursor:pointer; list-style:none; padding:18px 22px; display:flex; align-items:center; justify-content:space-between; gap:16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3;">
+          <span>macOS: app blocked as unverified? Run this once.</span>
+          <span style="color:#5d5f67;">＋</span>
+        </summary>
+        <div style="padding:0 22px 20px;">
+          <p style="font-size:0.95rem; line-height:1.55; color:#8b8d93; margin-bottom:14px; max-width:60ch;">macOS quarantines apps downloaded outside the App Store. Clear the flag and reopen ClipX:</p>
+          <div style="display:flex; align-items:center; gap:12px; background:#08090b; border:1px solid #1c1d22; border-radius:8px; padding:13px 16px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#cdd0d6; overflow-x:auto;">
+            <span style="color:#4f8ff0;">$</span><span style="white-space:nowrap;">xattr -cr /Applications/ClipX.app</span>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section style="padding:clamp(100px,16vh,200px) clamp(20px,4vw,48px) clamp(70px,9vh,110px); border-top:1px solid #131418; position:relative; overflow:hidden;">
+    <div style="position:absolute; bottom:-30%; left:50%; transform:translateX(-50%); width:80%; height:80%; background:radial-gradient(ellipse at center, rgba(79,143,240,0.1), transparent 65%); filter:blur(10px); pointer-events:none;"></div>
+    <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; max-width:760px; margin:0 auto; text-align:center; position:relative;">
+      <h2 style="font-size:clamp(2.2rem,5vw,4rem); line-height:1.05; font-weight:600; letter-spacing:-0.03em; margin-bottom:22px;">Stop copying the same thing twice.</h2>
+      <p style="font-size:clamp(1.05rem,1.5vw,1.25rem); line-height:1.55; color:#a8aab1; margin-bottom:36px;">Install ClipX, set your hotkey, and your clipboard history is always a keystroke away.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;">
+        <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#0a0a0c; background:#4f8ff0; text-decoration:none; padding:14px 26px; border-radius:9px; box-shadow:0 8px 24px -8px rgba(79,143,240,0.6);">Download ClipX</a>
+        <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#d7d8db; background:transparent; text-decoration:none; padding:14px 26px; border-radius:9px; border:1px solid #2a2c33;">View GitHub repository</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer style="padding:34px clamp(20px,4vw,48px); border-top:1px solid #131418; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="width:11px; height:11px; border:1.5px solid #6b6d75; border-radius:2px; box-shadow:3px -3px 0 -1.5px #0a0a0c, 4.5px -4.5px 0 0 #4f8ff0;"></span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">ClipX — local-first clipboard manager</span>
+    </div>
+    <div style="display:flex; gap:22px;">
+      <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75; text-decoration:none;">GitHub</a>
+      <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75; text-decoration:none;">Releases</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var root = document;
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // entrance stagger (CSS animation; JS only adds delay)
+  var reveals = Array.prototype.slice.call(root.querySelectorAll('[data-reveal]'));
+  if (!reduce) {
+    reveals.forEach(function (el) {
+      var d = parseInt(el.getAttribute('data-reveal-d') || '0', 10);
+      if (d) el.style.animationDelay = d + 'ms';
+    });
+  }
+
+  var bar = root.querySelector('[data-progress]');
+  var section = root.querySelector('[data-summon-section]');
+  var popup = root.querySelector('[data-summon="popup"]');
+  var cursor = root.querySelector('[data-summon="cursor"]');
+  var kbd = root.querySelector('[data-summon="kbd"]');
+  var toast = root.querySelector('[data-summon="toast"]');
+  var copyline = root.querySelector('[data-summon="copyline"]');
+  var editor = root.querySelector('[data-summon="editor"]');
+  var steps = [0, 1, 2].map(function (i) { return root.querySelector('[data-step="' + i + '"]'); });
+
+  var clamp = function (v) { return Math.max(0, Math.min(1, v)); };
+  var smooth = function (a, b, x) { var t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+
+  var ticking = false;
+  var update = function () {
+    ticking = false;
+    if (bar) {
+      var sc = document.scrollingElement || document.documentElement;
+      var max = sc.scrollHeight - window.innerHeight;
+      bar.style.width = (max > 0 ? (sc.scrollTop / max) * 100 : 0) + '%';
+    }
+    if (reduce || !section) return;
+    var rect = section.getBoundingClientRect();
+    var total = rect.height - window.innerHeight;
+    var p = clamp(-rect.top / (total || 1));
+
+    var cap = smooth(0.04, 0.16, p);
+    if (copyline) {
+      copyline.style.background = 'rgba(79,143,240,' + (0.28 * cap) + ')';
+      copyline.style.color = cap > 0.4 ? '#cdd6e4' : '#5d6068';
+    }
+    if (toast) {
+      var tv = smooth(0.06, 0.16, p) * (1 - smooth(0.22, 0.34, p));
+      toast.style.opacity = tv;
+      toast.style.transform = 'translateX(-50%) translateY(' + (8 - 8 * tv) + 'px)';
+    }
+    if (kbd) {
+      var kv = smooth(0.26, 0.4, p) * (1 - smooth(0.46, 0.56, p));
+      kbd.style.opacity = kv;
+    }
+    if (popup) {
+      var pv = smooth(0.42, 0.62, p);
+      popup.style.opacity = pv;
+      popup.style.transform = 'translateY(' + (20 - 20 * pv) + 'px) scale(' + (0.92 + 0.08 * pv) + ')';
+    }
+    if (cursor) {
+      var cv = smooth(0.5, 0.66, p);
+      cursor.style.opacity = cv;
+      cursor.style.transform = 'translate(' + (10 - 10 * cv) + 'px,' + (10 - 10 * cv) + 'px)';
+    }
+    if (editor) {
+      editor.style.filter = 'blur(' + (smooth(0.4, 0.62, p) * 2.5) + 'px)';
+    }
+    var active = 0;
+    if (p > 0.22) active = 1;
+    if (p > 0.46) active = 2;
+    steps.forEach(function (s, i) { if (s) s.style.opacity = i === active ? '1' : '0.32'; });
+  };
+
+  var onScroll = function () { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll, { passive: true });
+  update();
+  setTimeout(update, 250);
+  setTimeout(update, 900);
+});
+</script>
+</body>
+</html>
