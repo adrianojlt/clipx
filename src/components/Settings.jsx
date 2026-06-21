@@ -60,36 +60,83 @@ function KeyChips({ value }) {
 }
 
 function HotkeyField({ label, hint, value, onChange }) {
+
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState([]);
   const wrapRef = useRef(null);
   const onChangeRef = useRef(onChange);
+
   useEffect(() => { onChangeRef.current = onChange; });
 
   useEffect(() => {
+
     if (!recording) return;
+
+    const heldKeys = new Set();
+
+    let mainKey = null;
+    let mainModifiers = new Set();
+
+    const formatKey = (k) => (k === " " ? "Space" : k.length === 1 ? k.toUpperCase() : k);
+
+    const toParts = () => {
+
+      const parts = [];
+
+      if (mainModifiers.has("Meta")) parts.push("Command");
+      if (mainModifiers.has("Control")) parts.push("Ctrl");
+      if (mainModifiers.has("Alt")) parts.push("Option");
+      if (mainModifiers.has("Shift")) parts.push("Shift");
+
+      if (mainKey) parts.push(formatKey(mainKey));
+
+      return parts;
+    };
+
     const down = (e) => {
+
       e.preventDefault();
       e.stopPropagation();
-      if (e.key === "Escape") {
+
+      if (e.key === "Escape" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
         setRecording(false);
         setDraft([]);
         return;
       }
+
+      heldKeys.add(e.key);
+
       if (["Meta", "Control", "Alt", "Shift"].includes(e.key)) return;
-      const keys = [];
-      if (e.metaKey) keys.push("Command");
-      if (e.ctrlKey) keys.push("Ctrl");
-      if (e.altKey) keys.push("Option");
-      if (e.shiftKey) keys.push("Shift");
-      const k = e.key === " " ? "Space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
-      keys.push(k);
-      setDraft(keys);
-      onChangeRef.current(keys.join("+"));
-      setTimeout(() => { setRecording(false); setDraft([]); }, 120);
+
+      mainKey = e.key;
+      mainModifiers = new Set();
+
+      if (e.metaKey) mainModifiers.add("Meta");
+      if (e.ctrlKey) mainModifiers.add("Control");
+      if (e.altKey) mainModifiers.add("Alt");
+      if (e.shiftKey) mainModifiers.add("Shift");
+
+      setDraft(toParts());
     };
+
+    const up = (e) => {
+
+      heldKeys.delete(e.key);
+
+      if (heldKeys.size === 0 && mainKey) {
+        onChangeRef.current(toParts().join("+"));
+        setRecording(false);
+        setDraft([]);
+      }
+    };
+
     window.addEventListener("keydown", down, true);
-    return () => window.removeEventListener("keydown", down, true);
+    window.addEventListener("keyup", up, true);
+
+    return () => {
+      window.removeEventListener("keydown", down, true);
+      window.removeEventListener("keyup", up, true);
+    };
   }, [recording]);
 
   useEffect(() => {
@@ -370,11 +417,16 @@ function Settings() {
   }, []);
 
   const handleSave = async () => {
+
     setError("");
+
     const errors = [];
+
     const attempt = async (fn) => { try { await fn(); } catch (e) { errors.push(String(e)); } };
+
     await attempt(() => updateShortcut(s.hotkey));
     await attempt(() => updateOpenAppsShortcut(s.openAppsHotkey));
+
     await attempt(() => setSetting("tab_shortcut_pinned", s.tabShortcutPinned));
     await attempt(() => setSetting("tab_shortcut_history", s.tabShortcutHistory));
     await attempt(() => setSetting("tab_shortcut_sessions", s.tabShortcutSessions));
@@ -382,7 +434,9 @@ function Settings() {
     await attempt(() => setSetting("history_limit", String(s.historyLimit)));
     await attempt(() => setSetting("window_width", String(s.windowWidth)));
     await attempt(() => setSetting("window_height", String(s.windowHeight)));
+
     await attempt(() => applyWindowSize());
+
     if (errors.length > 0) {
       const msg = errors.join("; ");
       setError(`Failed to save settings: ${msg}`);
