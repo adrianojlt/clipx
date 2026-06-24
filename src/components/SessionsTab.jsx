@@ -100,9 +100,10 @@ export default function SessionsTab({
       </div>
       <div className="list" ref={listRef}>
         {filteredItems.length === 0 && <div className="empty">No sessions</div>}
-        {filteredItems.map((item) => (
+        {filteredItems.map((item, index) => (
           <SessionItem
             key={item.id}
+            index={index + 1}
             item={item}
             isActive={item.is_active}
             isDragging={draggingId === item.id}

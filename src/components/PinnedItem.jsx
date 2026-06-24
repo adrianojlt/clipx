@@ -5,6 +5,7 @@ import { useContextMenu } from "../hooks/useContextMenu";
 
 export default function PinnedItem({
   item,
+  index,
   isCurrentClipboard,
   isDragging,
   dragIndicator,
@@ -50,6 +51,7 @@ export default function PinnedItem({
         >
           &#x2630;
         </span>
+        <span className="item-number">{index}</span>
         <div className="pinned-text">
           {isEditing ? (
             <input

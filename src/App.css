@@ -148,7 +148,7 @@
 
 .drag-handle {
   cursor: grab;
-  margin-right: 0.5rem;
+  margin-right: 0;
   color: #888;
   font-size: 0.9rem;
   user-select: none;
@@ -157,6 +157,16 @@
 
 .drag-handle:active {
   cursor: grabbing;
+}
+
+.item-number {
+  min-width: 0.8rem;
+  margin-right: 0.4rem;
+  font-size: 0.75rem;
+  color: #666;
+  text-align: right;
+  user-select: none;
+  flex-shrink: 0;
 }
 
 .drop-indicator {

@@ -101,9 +101,10 @@ export default function PinnedTab({
       </div>
       <div className="list" ref={listRef}>
         {filteredItems.length === 0 && <div className="empty">No pinned items</div>}
-        {filteredItems.map((item) => (
+        {filteredItems.map((item, index) => (
           <PinnedItem
             key={item.id}
+            index={index + 1}
             item={item}
             isCurrentClipboard={item.content === currentClipboard}
             isDragging={draggingId === item.id}
