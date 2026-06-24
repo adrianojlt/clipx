@@ -5,6 +5,7 @@ import { useContextMenu } from "../hooks/useContextMenu";
 
 export default function HistoryItem({
   item,
+  index,
   isCurrentClipboard,
   isPinned,
   isHidden,
@@ -35,6 +36,7 @@ export default function HistoryItem({
       onMouseLeave={handleMouseLeave}
       onContextMenu={onContextMenu}
     >
+      <span className="item-number">{index}</span>
       <span className={`text${isHidden ? " hidden" : ""}`}>{item.content}</span>
       {isConfirming ? (
         <span className="delete-confirm" onClick={(e) => e.stopPropagation()}>

@@ -1,5 +1,6 @@
 export default function SessionItem({
   item,
+  index,
   isActive,
   isDragging,
   dragIndicator,
@@ -31,6 +32,7 @@ export default function SessionItem({
             &#x2630;
           </span>
         )}
+        <span className="item-number">{index}</span>
         <span className="session-name">{item.name}</span>
         <span className="session-count">{item.item_count}</span>
         {isConfirming ? (

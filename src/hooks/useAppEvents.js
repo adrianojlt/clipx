@@ -197,6 +197,7 @@ export function useAppEvents({
   }, []);
 
   useEffect(() => {
+
     const onKey = (e) => {
 
       const tag = e.target.tagName;
@@ -207,7 +208,7 @@ export function useAppEvents({
 
       const num = parseInt(e.key);
 
-      if (num >= 1 && num <= 5 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (num >= 1 && num <= 9 && !e.metaKey && !e.ctrlKey && !e.altKey) {
 
         const index = num - 1;
 

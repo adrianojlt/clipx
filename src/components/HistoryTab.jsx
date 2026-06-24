@@ -71,9 +71,10 @@ export default function HistoryTab({
       </div>
       <div className="list">
         {history.length === 0 && <div className="empty">No history</div>}
-        {filteredHistory.map((item) => (
+        {filteredHistory.map((item, index) => (
           <HistoryItem
             key={item.id}
+            index={index + 1}
             item={item}
             isCurrentClipboard={item.content === currentClipboard}
             isPinned={pinnedSet.has(item.content)}
