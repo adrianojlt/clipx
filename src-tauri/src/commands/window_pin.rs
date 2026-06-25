@@ -19,20 +19,41 @@ pub fn set_always_on_top(window: tauri::WebviewWindow, enable: bool) -> Result<(
 pub fn set_soft_pin(app: tauri::AppHandle, enable: bool) -> Result<(), AppError> {
     #[cfg(target_os = "macos")]
     {
+        use tauri::Manager;
+
         let policy = if enable {
             tauri::ActivationPolicy::Regular
         } else {
             tauri::ActivationPolicy::Accessory
         };
+
+        // Capture visibility before switching: returning to Accessory while the
+        // app is frontmost makes macOS deactivate it and drop the window.
+        let was_visible = app
+            .get_webview_window("main")
+            .and_then(|w| w.is_visible().ok())
+            .unwrap_or(false);
+
         app.set_activation_policy(policy)
             .map_err(|e| AppError::Window(e.to_string()))?;
 
-        // Now that the app is `Regular` it shows in the dock / Cmd+Tab; apply the
-        // ClipX icon on the main thread (an unbundled dev binary otherwise shows
-        // a generic icon).
         if enable {
-            app.run_on_main_thread(crate::set_dock_icon)
-                .map_err(|e| AppError::Window(e.to_string()))?;
+            // Now `Regular`, the app shows in the dock / Cmd+Tab; apply the ClipX
+            // icon on the main thread (an unbundled dev binary otherwise shows a
+            // generic icon).
+            app.run_on_main_thread(crate::set_dock_icon).map_err(|e| AppError::Window(e.to_string()))?;
+        } else if was_visible {
+            // Re-assert the window after returning to Accessory so unpinning a
+            // visible window keeps it open and focused (matching Windows) instead
+            // of vanishing. Skipped at startup, when the window is still hidden.
+            let app_handle = app.clone();
+            app.run_on_main_thread(move || {
+                if let Some(win) = app_handle.get_webview_window("main") {
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                }
+            })
+            .map_err(|e| AppError::Window(e.to_string()))?;
         }
     }
 

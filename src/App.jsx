@@ -43,6 +43,7 @@ function App() {
   const [pinMode, setPinMode] = useState("none");
   const [showPinLabel, setShowPinLabel] = useState(false);
   const pinLabelTimer = useRef(null);
+  const pinChangeAtRef = useRef(0);
   const [history, setHistory] = useState([]);
   const [pinned, setPinned] = useState([]);
   const [globalPinned, setGlobalPinned] = useState([]);
@@ -182,6 +183,7 @@ function App() {
 
   // Cycle none -> always-on-top -> soft -> none and flash the status label.
   const cyclePinMode = useCallback(() => {
+    pinChangeAtRef.current = Date.now();
     setPinMode((prev) => PIN_NEXT[prev]);
     setShowPinLabel(true);
     if (pinLabelTimer.current) clearTimeout(pinLabelTimer.current);
@@ -260,11 +262,14 @@ function App() {
   // Hide the window on focus loss only when unpinned. Pinned modes stay visible.
   // The 50ms debounce absorbs the brief focus-flicker that Windows/WebView2 emits
   // when clicking UI elements in a frameless window before the click event fires.
+  // The pin-change guard ignores the self-induced blur that macOS emits when
+  // unpinning flips the activation policy back to Accessory, so toggling to
+  // unpinned keeps the window open (matching Windows) instead of auto-hiding.
   useEffect(() => {
     const win = getCurrentWindow();
     let timer = null;
     const unlistenPromise = win.onFocusChanged(({ payload: focused }) => {
-      if (!focused && pinMode === "none") {
+      if (!focused && pinMode === "none" && Date.now() - pinChangeAtRef.current > 700) {
         timer = setTimeout(() => win.hide(), 50);
       } else if (timer !== null) {
         clearTimeout(timer);
