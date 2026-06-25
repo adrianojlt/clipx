@@ -178,23 +178,6 @@ export function useAppEvents({
     };
   }, []);
 
-  useEffect(() => {
-
-    const titleBar = document.querySelector(".title-bar");
-
-    if (!titleBar) return;
-
-    const onMouseDown = async () => {
-      try {
-        await getCurrentWindow().startDragging();
-      } catch (e) {
-        await logError("warn", `Failed to start dragging: ${e}`);
-      }
-    };
-
-    titleBar.addEventListener("mousedown", onMouseDown);
-    return () => titleBar.removeEventListener("mousedown", onMouseDown);
-  }, []);
 
   useEffect(() => {
 

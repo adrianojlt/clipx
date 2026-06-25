@@ -258,21 +258,28 @@ function App() {
   }, [pinMode]);
 
   // Hide the window on focus loss only when unpinned. Pinned modes stay visible.
+  // The 50ms debounce absorbs the brief focus-flicker that Windows/WebView2 emits
+  // when clicking UI elements in a frameless window before the click event fires.
   useEffect(() => {
     const win = getCurrentWindow();
+    let timer = null;
     const unlistenPromise = win.onFocusChanged(({ payload: focused }) => {
       if (!focused && pinMode === "none") {
-        win.hide();
+        timer = setTimeout(() => win.hide(), 50);
+      } else if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
       }
     });
     return () => {
+      if (timer !== null) clearTimeout(timer);
       unlistenPromise.then((unlisten) => unlisten());
     };
   }, [pinMode]);
 
   return (
     <main className="container">
-      <div className="title-bar">
+      <div className="title-bar" data-tauri-drag-region>
         <button
           type="button"
           className={`pin-btn pin-btn--${pinMode}`}
