@@ -4,6 +4,7 @@ pub mod logging;
 pub mod pinned;
 pub mod sessions;
 pub mod settings;
+pub mod window_pin;
 
 use crate::error::AppError;
 use crate::AppState;

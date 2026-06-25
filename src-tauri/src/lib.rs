@@ -59,6 +59,35 @@ pub struct Session {
     pub(crate) item_count: i64,
 }
 
+/// Set the macOS dock / app-switcher icon at runtime.
+///
+/// When the app enters soft pin mode it switches to `ActivationPolicy::Regular`
+/// and becomes visible in Cmd+Tab. A bundled `.app` shows the ClipX icon
+/// automatically, but an unbundled dev binary falls back to a generic icon.
+/// Must be called on the main thread once the app is `Regular` (an icon set
+/// while still `Accessory` does not persist), so `set_soft_pin` invokes this via
+/// `run_on_main_thread` right after the policy switch.
+#[cfg(target_os = "macos")]
+pub(crate) fn set_dock_icon() {
+    use objc2::{AllocAnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::NSData;
+
+    // Padded variant: the source icon is full-bleed, but macOS app icons carry a
+    // transparent margin so they don't touch the Cmd+Tab / dock tile edges.
+    const ICON_BYTES: &[u8] = include_bytes!("../icons/dock-icon.png");
+
+    let Some(mtm) = MainThreadMarker::new() else {
+        return;
+    };
+    let data = NSData::with_bytes(ICON_BYTES);
+    let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
+        return;
+    };
+    let app = NSApplication::sharedApplication(mtm);
+    unsafe { app.setApplicationIconImage(Some(&image)) };
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -93,6 +122,8 @@ pub fn run() {
             commands::sessions::pin_item_to_session,
             commands::apps::list_open_apps,
             commands::apps::focus_app,
+            commands::window_pin::set_always_on_top,
+            commands::window_pin::set_soft_pin,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

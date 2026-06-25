@@ -12,12 +12,22 @@ import {
   listOpenApps,
   focusApp,
   logError,
+  setAlwaysOnTop,
+  setSoftPin,
 } from "./services/clipboardService";
 
 import { useAppEvents } from "./hooks/useAppEvents";
 import { IS_MAC } from "./utils/shortcuts";
 
 const TAB_MOD = IS_MAC ? "Command" : "Alt";
+
+const PIN_NEXT = { none: "always-on-top", "always-on-top": "soft", soft: "none" };
+const PIN_LABELS = { none: "Unpinned", "always-on-top": "Always on top", soft: "Soft pin" };
+const PIN_TOOLTIPS = {
+  none: "Pin window",
+  "always-on-top": "Always on top - click to soft pin",
+  soft: "Soft pin - click to unpin",
+};
 
 import AppsTab from "./components/AppsTab";
 import PinnedTab from "./components/PinnedTab";
@@ -29,6 +39,10 @@ import "./App.css";
 function App() {
   const [mode, setMode] = useState("clipboard");
   const [activeTab, setActiveTab] = useState("pinned");
+  // pinMode: 'none' | 'always-on-top' | 'soft'. Ephemeral, resets on restart.
+  const [pinMode, setPinMode] = useState("none");
+  const [showPinLabel, setShowPinLabel] = useState(false);
+  const pinLabelTimer = useRef(null);
   const [history, setHistory] = useState([]);
   const [pinned, setPinned] = useState([]);
   const [globalPinned, setGlobalPinned] = useState([]);
@@ -166,6 +180,18 @@ function App() {
     }
   }, []);
 
+  // Cycle none -> always-on-top -> soft -> none and flash the status label.
+  const cyclePinMode = useCallback(() => {
+    setPinMode((prev) => PIN_NEXT[prev]);
+    setShowPinLabel(true);
+    if (pinLabelTimer.current) clearTimeout(pinLabelTimer.current);
+    pinLabelTimer.current = setTimeout(() => setShowPinLabel(false), 1500);
+  }, []);
+
+  useEffect(() => () => {
+    if (pinLabelTimer.current) clearTimeout(pinLabelTimer.current);
+  }, []);
+
   useEffect(() => {
     loadApps();
   }, [loadApps]);
@@ -207,9 +233,72 @@ function App() {
     onFocusApp: handleSelectApp,
   });
 
+  // Apply the backend window toggles whenever the pin mode changes. Each branch
+  // sets both commands explicitly so the prior mode is always cleared first.
+  useEffect(() => {
+    const applyPinMode = async () => {
+      try {
+        if (pinMode === "always-on-top") {
+          // Regular activation policy (set_soft_pin) puts ClipX in the app
+          // switcher with its icon; set_always_on_top makes it float above all.
+          await setSoftPin(true);
+          await setAlwaysOnTop(true);
+        } else if (pinMode === "soft") {
+          await setAlwaysOnTop(false);
+          await setSoftPin(true);
+        } else {
+          await setAlwaysOnTop(false);
+          await setSoftPin(false);
+        }
+      } catch (e) {
+        await logError("error", `Failed to apply pin mode: ${e}`);
+      }
+    };
+    applyPinMode();
+  }, [pinMode]);
+
+  // Hide the window on focus loss only when unpinned. Pinned modes stay visible.
+  useEffect(() => {
+    const win = getCurrentWindow();
+    const unlistenPromise = win.onFocusChanged(({ payload: focused }) => {
+      if (!focused && pinMode === "none") {
+        win.hide();
+      }
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [pinMode]);
+
   return (
     <main className="container">
       <div className="title-bar">
+        <button
+          type="button"
+          className={`pin-btn pin-btn--${pinMode}`}
+          title={PIN_TOOLTIPS[pinMode]}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={cyclePinMode}
+        >
+          <svg
+            className="pin-icon"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 17v5" />
+            <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+          </svg>
+          {pinMode === "soft" && <span className="pin-indicator" />}
+        </button>
+        <span className={`pin-label ${showPinLabel ? "pin-label--visible" : ""}`}>
+          {PIN_LABELS[pinMode]}
+        </span>
         <img src="/icon.png" alt="ClipX" className="app-icon" />
         <h1>ClipX</h1>
       </div>

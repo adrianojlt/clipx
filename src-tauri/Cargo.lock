@@ -491,9 +491,12 @@ dependencies = [
 
 [[package]]
 name = "clipx-scaffold"
-version = "0.1.24"
+version = "0.1.26"
 dependencies = [
  "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
  "rusqlite",
  "serde",
  "serde_json",
@@ -506,6 +509,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tempfile",
  "thiserror 1.0.69",
+ "windows",
 ]
 
 [[package]]
