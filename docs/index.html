@@ -120,7 +120,7 @@
   </section>
 
   <!-- SUMMON MOMENT (sticky scroll beat) -->
-  <section id="workflow" data-summon-section style="position:relative; height:280vh; border-top:1px solid #131418;">
+  <section id="workflow" data-summon-section style="position:relative; height:160vh; border-top:1px solid #131418;">
     <div id="summon-sticky" style="position:sticky; top:0; height:100vh; display:flex; align-items:center; overflow:hidden;">
       <!-- faux editor backdrop -->
       <div style="position:absolute; inset:0; background:linear-gradient(180deg,#0b0c0f,#0a0a0c);"></div>
@@ -415,36 +415,36 @@ document.addEventListener('DOMContentLoaded', function () {
     var total = rect.height - window.innerHeight;
     var p = clamp(-rect.top / (total || 1));
 
-    var cap = smooth(0.04, 0.16, p);
+    var cap = smooth(0.05, 0.22, p);
     if (copyline) {
       copyline.style.background = 'rgba(79,143,240,' + (0.28 * cap) + ')';
       copyline.style.color = cap > 0.4 ? '#cdd6e4' : '#5d6068';
     }
     if (toast) {
-      var tv = smooth(0.06, 0.16, p) * (1 - smooth(0.22, 0.34, p));
+      var tv = smooth(0.08, 0.22, p) * (1 - smooth(0.30, 0.46, p));
       toast.style.opacity = tv;
       toast.style.transform = 'translateX(-50%) translateY(' + (8 - 8 * tv) + 'px)';
     }
     if (kbd) {
-      var kv = smooth(0.26, 0.4, p) * (1 - smooth(0.46, 0.56, p));
+      var kv = smooth(0.35, 0.54, p) * (1 - smooth(0.62, 0.76, p));
       kbd.style.opacity = kv;
     }
     if (popup) {
-      var pv = smooth(0.42, 0.62, p);
+      var pv = smooth(0.57, 0.84, p);
       popup.style.opacity = pv;
       popup.style.transform = 'translateY(' + (20 - 20 * pv) + 'px) scale(' + (0.92 + 0.08 * pv) + ')';
     }
     if (cursor) {
-      var cv = smooth(0.5, 0.66, p);
+      var cv = smooth(0.68, 0.9, p);
       cursor.style.opacity = cv;
       cursor.style.transform = 'translate(' + (10 - 10 * cv) + 'px,' + (10 - 10 * cv) + 'px)';
     }
     if (editor) {
-      editor.style.filter = 'blur(' + (smooth(0.4, 0.62, p) * 2.5) + 'px)';
+      editor.style.filter = 'blur(' + (smooth(0.54, 0.84, p) * 2.5) + 'px)';
     }
     var active = 0;
-    if (p > 0.22) active = 1;
-    if (p > 0.46) active = 2;
+    if (p > 0.30) active = 1;
+    if (p > 0.62) active = 2;
     steps.forEach(function (s, i) { if (s) s.style.opacity = i === active ? '1' : '0.32'; });
   };
 
