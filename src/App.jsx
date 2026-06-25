@@ -169,8 +169,11 @@ function App() {
 
   const handleCopy = useCallback(async (text) => {
     await writeText(text);
-    await getCurrentWindow().hide();
-  }, []);
+    // Keep the window open when pinned; only auto-hide in the unpinned popup mode.
+    if (pinMode === "none") {
+      await getCurrentWindow().hide();
+    }
+  }, [pinMode]);
 
   const handleSelectApp = useCallback(async (id) => {
     try {
