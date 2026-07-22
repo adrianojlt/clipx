@@ -9,6 +9,7 @@ import {
   logError,
 } from "../services/clipboardService";
 import { IS_MAC } from "../utils/shortcuts";
+import { resolveTheme, applyTheme } from "../theme";
 import "./Settings.css";
 
 const TAB_MOD = IS_MAC ? "Command" : "Alt";
@@ -215,6 +216,25 @@ function NumberField({ label, hint, value, onChange, min, max }) {
   );
 }
 
+function SelectField({ label, hint, value, onChange, options }) {
+  return (
+    <div className="field">
+      <div className="field-label">{label}</div>
+      <div className="select">
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <svg className="select-chevron" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      {hint && <div className="field-hint">{hint}</div>}
+    </div>
+  );
+}
+
 const TABS = [
   { id: "hotkeys", label: "Hotkeys", Icon: KeyboardIcon },
   { id: "ui", label: "UI", Icon: LayoutIcon },
@@ -292,6 +312,21 @@ function UIPanel({ s, set }) {
   return (
     <>
       <div className="section-header">
+        <h3>Appearance</h3>
+        <p>Theme for the ClipX windows.</p>
+      </div>
+      <SelectField
+        label="Theme"
+        hint="Auto follows your system appearance."
+        value={s.theme}
+        onChange={(v) => set("theme", v)}
+        options={[
+          { value: "auto", label: "Auto" },
+          { value: "dark", label: "Dark" },
+          { value: "light", label: "Light" },
+        ]}
+      />
+      <div className="section-header">
         <h3>Popup Window</h3>
         <p>Size of the ClipX popup when it appears.</p>
       </div>
@@ -299,7 +334,7 @@ function UIPanel({ s, set }) {
         <NumberField label="Width" hint="Pixels (300-800)." min={300} max={800} value={s.windowWidth} onChange={(v) => set("windowWidth", v)} />
         <NumberField label="Height" hint="Pixels (400-900)." min={400} max={900} value={s.windowHeight} onChange={(v) => set("windowHeight", v)} />
       </div>
-      <div className="preview">
+      <div className="preview" data-theme={resolveTheme(s.theme)}>
         <div className="preview-label">
           <span>Preview</span>
           <span className="preview-dim">{s.windowWidth} x {s.windowHeight}</span>
@@ -374,6 +409,7 @@ function Settings() {
     historyLimit: 20,
     windowWidth: 600,
     windowHeight: 700,
+    theme: "dark",
   });
 
   const set = (k, v) => {
@@ -400,7 +436,7 @@ function Settings() {
           return fallback;
         }
       };
-      const [hotkey, openApps, pinned, history, sessions, find, limit, width, height] = await Promise.all([
+      const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme] = await Promise.all([
         safeGet("hotkey", "Option+Space"),
         safeGet("open_apps_hotkey", "Control+Option+Esc"),
         safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
@@ -410,8 +446,9 @@ function Settings() {
         safeGet("history_limit", 20, Number),
         safeGet("window_width", 600, (v) => Number(v) || 600),
         safeGet("window_height", 700, (v) => Number(v) || 700),
+        safeGet("theme", "dark"),
       ]);
-      setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height });
+      setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme });
     };
     load();
   }, []);
@@ -434,8 +471,10 @@ function Settings() {
     await attempt(() => setSetting("history_limit", String(s.historyLimit)));
     await attempt(() => setSetting("window_width", String(s.windowWidth)));
     await attempt(() => setSetting("window_height", String(s.windowHeight)));
+    await attempt(() => setSetting("theme", s.theme));
 
     await attempt(() => applyWindowSize());
+    await attempt(() => applyTheme());
 
     if (errors.length > 0) {
       const msg = errors.join("; ");

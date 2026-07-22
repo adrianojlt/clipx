@@ -16,6 +16,12 @@ pub struct Settings {
     pub tab_shortcut_sessions: String,
     pub tab_shortcut_find: String,
     pub open_apps_hotkey: String,
+    #[serde(default = "default_theme")]
+    pub theme: String,
+}
+
+fn default_theme() -> String {
+    "dark".to_string()
 }
 
 impl Default for Settings {
@@ -31,6 +37,7 @@ impl Default for Settings {
             tab_shortcut_sessions: format!("{tab_mod}+3"),
             tab_shortcut_find: format!("{tab_mod}+F"),
             open_apps_hotkey: "Control+Option+Esc".to_string(),
+            theme: default_theme(),
         }
     }
 }
@@ -82,6 +89,9 @@ impl Settings {
         }
         if let Some(v) = map.get("open_apps_hotkey") {
             s.open_apps_hotkey = v.clone();
+        }
+        if let Some(v) = map.get("theme") {
+            s.theme = v.clone();
         }
         s
     }
@@ -376,6 +386,7 @@ mod tests {
             tab_shortcut_sessions: "D".to_string(),
             tab_shortcut_find: "C".to_string(),
             open_apps_hotkey: "F".to_string(),
+            theme: "dark".to_string(),
         };
 
         s.validate();

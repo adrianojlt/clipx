@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { setSetting, logError } from "../services/clipboardService";
 import { matchesShortcut } from "../utils/shortcuts";
+import { applyTheme } from "../theme";
 import { EVENTS } from "../constants/events";
 
 export function useAppEvents({
@@ -65,11 +66,14 @@ export function useAppEvents({
       unlisteners.push(u2);
 
       const u3 = await listen("main-window-shown", (event) => {
+
         const nextMode = event.payload === "apps" ? "apps" : "clipboard";
+
         onSetMode(nextMode);
         onClearSearch();
         onLoadData();
         onLoadApps();
+
         if (nextMode === "apps") {
           setTimeout(() => appsSearchRef.current?.focus(), 0);
         }
@@ -79,7 +83,13 @@ export function useAppEvents({
 
       unlisteners.push(u3);
 
-      const u4 = await listen("settings-changed", () => {
+      const u4 = await listen("settings-changed", async (event) => {
+
+        if (event.payload === "theme") {
+          await applyTheme();
+          return;
+        }
+
         onLoadTabShortcuts();
       });
 

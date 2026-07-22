@@ -1,0 +1,153 @@
+/* Shared theme palette. Single source of truth for colors across both windows.
+   Dark is the default. The Light override is added in a later task, keyed by a
+   [data-theme="light"] attribute so it can apply to the whole document or to a
+   single subtree (e.g. the Settings preview). */
+
+:root {
+  /* Settings window palette */
+  --bg: #1a1a1a;
+  --bg-2: #212121;
+  --bg-3: #2a2a2a;
+  --bg-hover: #2f2f2f;
+  --border: #333;
+  --border-2: #3a3a3a;
+  --border-strong: #4a4a4a;
+  --text: #e5e5e5;
+  --text-2: #a8a8a8;
+  --text-3: #767676;
+  --accent: #3b82f6;
+  --accent-glow: color-mix(in oklch, var(--accent) 30%, transparent);
+  --danger: #ef4444;
+  --ok: #10b981;
+  --warning: #f59e0b;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Inter, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, Menlo, monospace;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Settings window chrome */
+  --scrollbar: #2e2e2e;
+  --scrollbar-hover: #3a3a3a;
+  --overlay-soft: rgba(255, 255, 255, 0.01);
+  --on-accent: #fff;
+  --btn-inset: rgba(255, 255, 255, 0.18);
+  --kbd-bg: #303030;
+  --kbd-border: #3d3d3d;
+  --kbd-shadow: rgba(0, 0, 0, 0.4);
+  --pulse-ring: rgba(239, 68, 68, 0.55);
+  --pulse-ring-0: rgba(239, 68, 68, 0);
+  --footer-1: #1c1c1c;
+  --footer-2: #181818;
+
+  /* Settings preview (re-themeable subtree) */
+  --preview-bg-1: #0f0f10;
+  --preview-bg-2: #16161a;
+  --preview-border: #2a2a2a;
+  --preview-grid: rgba(255, 255, 255, 0.025);
+  --preview-window-bg: #1c1c1c;
+  --preview-window-shadow: rgba(0, 0, 0, 0.5);
+  --preview-window-ring: rgba(255, 255, 255, 0.05);
+  --preview-line: rgba(255, 255, 255, 0.04);
+  --preview-row: rgba(255, 255, 255, 0.03);
+  --dot-r: #ff5f57;
+  --dot-y: #febc2e;
+  --dot-g: #28c840;
+
+  /* Main popup window palette */
+  --app-bg: #1e1e1e;
+  --app-text: #e0e0e0;
+  --app-text-strong: #fff;
+  --app-text-muted: #aaa;
+  --app-text-dim: #888;
+  --app-text-faint: #666;
+  --app-text-disabled: #555;
+  --app-text-confirm: #ccc;
+  --app-border: #333;
+  --app-hover: #333;
+  --app-surface: #252525;
+  --app-surface-2: #2a2a2a;
+  --app-surface-hover: #2c2c2c;
+  --app-input-border: #444;
+  --app-input-focus: #555;
+  --app-edit-bg: #3a3a3a;
+  --app-accent: #4a9eff;
+  --app-star: #f5c518;
+  --app-danger: #e05555;
+  --app-danger-hover: #ff6b6b;
+  --app-shadow: rgba(0, 0, 0, 0.4);
+}
+
+/* Light appearance. Attribute-scoped (NOT :root-bound) so it can flip the whole
+   document or a single subtree. Redefines every color variable with a legible
+   light value; font/radius tokens are appearance-independent and stay inherited. */
+[data-theme="light"] {
+  /* Settings window palette */
+  --bg: #f7f7f8;
+  --bg-2: #ffffff;
+  --bg-3: #eeeef1;
+  --bg-hover: #e8e8ec;
+  --border: #e2e2e6;
+  --border-2: #d6d6da;
+  --border-strong: #bcbcc2;
+  --text: #18181b;
+  --text-2: #52525b;
+  --text-3: #8a8a90;
+  --accent: #2563eb;
+  --accent-glow: color-mix(in oklch, var(--accent) 22%, transparent);
+  --danger: #dc2626;
+  --ok: #059669;
+  --warning: #d97706;
+
+  /* Settings window chrome */
+  --scrollbar: #d4d4d8;
+  --scrollbar-hover: #bcbcc2;
+  --overlay-soft: rgba(0, 0, 0, 0.015);
+  --on-accent: #fff;
+  --btn-inset: rgba(255, 255, 255, 0.28);
+  --kbd-bg: #ffffff;
+  --kbd-border: #d0d0d6;
+  --kbd-shadow: rgba(0, 0, 0, 0.15);
+  --pulse-ring: rgba(220, 38, 38, 0.5);
+  --pulse-ring-0: rgba(220, 38, 38, 0);
+  --footer-1: #f0f0f2;
+  --footer-2: #e9e9ec;
+
+  /* Settings preview (re-themeable subtree) */
+  --preview-bg-1: #e6e6ea;
+  --preview-bg-2: #f1f1f4;
+  --preview-border: #d4d4d8;
+  --preview-grid: rgba(0, 0, 0, 0.03);
+  --preview-window-bg: #ffffff;
+  --preview-window-shadow: rgba(0, 0, 0, 0.15);
+  --preview-window-ring: rgba(0, 0, 0, 0.06);
+  --preview-line: rgba(0, 0, 0, 0.05);
+  --preview-row: rgba(0, 0, 0, 0.03);
+  --dot-r: #ff5f57;
+  --dot-y: #febc2e;
+  --dot-g: #28c840;
+
+  /* Main popup window palette */
+  --app-bg: #ffffff;
+  --app-text: #18181b;
+  --app-text-strong: #000;
+  --app-text-muted: #52525b;
+  --app-text-dim: #71717a;
+  --app-text-faint: #a1a1aa;
+  --app-text-disabled: #c4c4c8;
+  --app-text-confirm: #3a3a3a;
+  --app-border: #e2e2e6;
+  --app-hover: #ececef;
+  --app-surface: #f2f2f4;
+  --app-surface-2: #eaeaed;
+  --app-surface-hover: #e5e5e9;
+  --app-input-border: #d0d0d6;
+  --app-input-focus: #b0b0b6;
+  --app-edit-bg: #ffffff;
+  --app-accent: #2563eb;
+  --app-star: #d99e00;
+  --app-danger: #dc2626;
+  --app-danger-hover: #b91c1c;
+  --app-shadow: rgba(0, 0, 0, 0.15);
+}

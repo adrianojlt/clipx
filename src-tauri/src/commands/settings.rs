@@ -32,6 +32,7 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
         "tab_shortcut_history" => s.tab_shortcut_history = value.to_string(),
         "tab_shortcut_sessions" => s.tab_shortcut_sessions = value.to_string(),
         "tab_shortcut_find" => s.tab_shortcut_find = value.to_string(),
+        "theme" => s.theme = value.to_string(),
         _ => return Err(AppError::Settings(format!("Unknown setting: {key}"))),
     }
 
@@ -82,7 +83,7 @@ pub fn set_setting(key: String, value: String, state: State<AppState>, app: AppH
     save_settings(&app, &settings)?;
     apply_settings_to_state(&settings, &state)?;
 
-    if is_tab_shortcut(&key) {
+    if is_tab_shortcut(&key) || key == "theme" {
         let _ = app.emit("settings-changed", &key);
     }
 
