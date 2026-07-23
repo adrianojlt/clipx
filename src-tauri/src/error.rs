@@ -5,6 +5,8 @@ use thiserror::Error;
 pub enum AppError {
     #[error("Database error: {0}")]
     Db(#[from] rusqlite::Error),
+    #[error("HTTP error: {0}")]
+    Http(#[from] reqwest::Error),
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON error: {0}")]

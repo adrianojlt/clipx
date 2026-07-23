@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   getSetting,
   setSetting,
@@ -8,6 +11,7 @@ import {
   applyWindowSize,
   logError,
 } from "../services/clipboardService";
+import { checkForUpdate } from "../services/updateService";
 import { IS_MAC } from "../utils/shortcuts";
 import { resolveTheme, applyTheme } from "../theme";
 import "./Settings.css";
@@ -368,7 +372,50 @@ function UIPanel({ s, set }) {
   );
 }
 
-function OthersPanel({ s, set }) {
+function OthersPanel({ s, set, checkRequested, onCheckConsumed }) {
+
+  // Local only. The check is an immediate action and must never mark the form dirty.
+  const [version, setVersion] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [update, setUpdate] = useState(null);
+
+  // A ref, not `status`, so the tray path sees an in-flight check even when it
+  // fires from a closure that captured an older render.
+  const checkingRef = useRef(false);
+
+  useEffect(() => {
+    const load = async () => setVersion(await getVersion());
+    load();
+  }, []);
+
+  const runCheck = useCallback(async () => {
+
+    if (checkingRef.current) return;
+
+    checkingRef.current = true;
+    setStatus("checking");
+
+    try {
+      const info = await checkForUpdate();
+      setUpdate(info);
+      setStatus(info ? "available" : "current");
+    } catch (e) {
+      setUpdate(null);
+      setStatus("error");
+      await logError("error", `Update check failed: ${e}`);
+    } finally {
+      checkingRef.current = false;
+    }
+  }, []);
+
+  // One-shot: the flag is cleared as it is consumed, so returning to this tab
+  // later does not replay the tray's request.
+  useEffect(() => {
+    if (!checkRequested) return;
+    onCheckConsumed();
+    runCheck();
+  }, [checkRequested, onCheckConsumed, runCheck]);
+
   return (
     <>
       <div className="section-header">
@@ -389,6 +436,35 @@ function OthersPanel({ s, set }) {
         </div>
         <div className="meter-labels"><span>1</span><span>50</span></div>
       </div>
+      <div className="section-header">
+        <h3>Updates</h3>
+        <p>Check GitHub for a newer release.</p>
+      </div>
+      <div className="field">
+        <div className="field-label">Current version{version && ` v${version}`}</div>
+        <div className="update-actions">
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={runCheck}
+            disabled={status === "checking"}
+          >
+            {status === "checking" ? "Checking…" : "Check for updates"}
+          </button>
+          {status === "available" && update && (
+            <button className="btn btn-primary" type="button" onClick={async () => await openUrl(update.url)}>
+              Download
+            </button>
+          )}
+        </div>
+        {status === "current" && <p className="update-status">ClipX is up to date.</p>}
+        {status === "available" && update && (
+          <p className="update-status">Version {update.version} is available.</p>
+        )}
+        {status === "error" && (
+          <p className="update-status is-error">Could not check for updates. Try again later.</p>
+        )}
+      </div>
     </>
   );
 }
@@ -398,6 +474,7 @@ function Settings() {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [checkRequested, setCheckRequested] = useState(false);
 
   const [s, setS] = useState({
     hotkey: "",
@@ -417,6 +494,35 @@ function Settings() {
     setDirty(true);
     setSaved(false);
   };
+
+  // Attached on mount so a tray click is never lost. The settings window is
+  // created hidden at startup, so this runs long before the menu can be used.
+  useEffect(() => {
+
+    let cancelled = false;
+    let unlisten;
+
+    const attach = async () => {
+
+      const fn = await listen("check-updates-requested", () => {
+        setActiveTab("others");
+        setCheckRequested(true);
+      });
+
+      if (cancelled) { fn(); return; }
+
+      unlisten = fn;
+    };
+
+    attach();
+
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  const onCheckConsumed = useCallback(() => setCheckRequested(false), []);
 
   useEffect(() => {
     const onKey = async (e) => {
@@ -495,7 +601,14 @@ function Settings() {
         <div className="content-scroll" key={activeTab}>
           {activeTab === "hotkeys" && <HotkeysPanel s={s} set={set} />}
           {activeTab === "ui" && <UIPanel s={s} set={set} />}
-          {activeTab === "others" && <OthersPanel s={s} set={set} />}
+          {activeTab === "others" && (
+            <OthersPanel
+              s={s}
+              set={set}
+              checkRequested={checkRequested}
+              onCheckConsumed={onCheckConsumed}
+            />
+          )}
         </div>
       </div>
       {error && <p className="error">{error}</p>}
