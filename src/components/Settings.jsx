@@ -465,6 +465,14 @@ function OthersPanel({ s, set, checkRequested, onCheckConsumed }) {
           <p className="update-status is-error">Could not check for updates. Try again later.</p>
         )}
       </div>
+      <label className="update-toggle">
+        <input
+          type="checkbox"
+          checked={s.checkUpdatesOnStartup}
+          onChange={(e) => set("checkUpdatesOnStartup", e.target.checked)}
+        />
+        <span>Check for updates on startup</span>
+      </label>
     </>
   );
 }
@@ -487,6 +495,7 @@ function Settings() {
     windowWidth: 600,
     windowHeight: 700,
     theme: "dark",
+    checkUpdatesOnStartup: true,
   });
 
   const set = (k, v) => {
@@ -542,7 +551,7 @@ function Settings() {
           return fallback;
         }
       };
-      const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme] = await Promise.all([
+      const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
         safeGet("hotkey", "Option+Space"),
         safeGet("open_apps_hotkey", "Control+Option+Esc"),
         safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
@@ -553,8 +562,9 @@ function Settings() {
         safeGet("window_width", 600, (v) => Number(v) || 600),
         safeGet("window_height", 700, (v) => Number(v) || 700),
         safeGet("theme", "dark"),
+        safeGet("check_updates_on_startup", true, (v) => v === "true"),
       ]);
-      setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme });
+      setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
     };
     load();
   }, []);
@@ -578,6 +588,7 @@ function Settings() {
     await attempt(() => setSetting("window_width", String(s.windowWidth)));
     await attempt(() => setSetting("window_height", String(s.windowHeight)));
     await attempt(() => setSetting("theme", s.theme));
+    await attempt(() => setSetting("check_updates_on_startup", String(s.checkUpdatesOnStartup)));
 
     await attempt(() => applyWindowSize());
     await attempt(() => applyTheme());

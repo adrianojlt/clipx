@@ -18,10 +18,18 @@ pub struct Settings {
     pub open_apps_hotkey: String,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_true")]
+    pub check_updates_on_startup: bool,
+    #[serde(default)]
+    pub dismissed_version: String,
 }
 
 fn default_theme() -> String {
     "dark".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -38,6 +46,8 @@ impl Default for Settings {
             tab_shortcut_find: format!("{tab_mod}+F"),
             open_apps_hotkey: "Control+Option+Esc".to_string(),
             theme: default_theme(),
+            check_updates_on_startup: true,
+            dismissed_version: String::new(),
         }
     }
 }
@@ -374,6 +384,43 @@ mod tests {
     }
 
     #[test]
+    fn read_settings_file_defaults_keys_added_after_the_file_was_written() {
+
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+
+        // A typed settings.json as written before check_updates_on_startup and
+        // dismissed_version existed. Guards the #[serde(default)] on both: without
+        // it, an existing user's file fails to parse and is silently replaced by
+        // defaults, losing every setting they had.
+        fs::write(
+            &path,
+            r#"{"hotkey":"Option+Space","history_limit":20,"window_width":600.0,"window_height":700.0,"tab_shortcut_pinned":"Command+1","tab_shortcut_history":"Command+2","tab_shortcut_sessions":"Command+3","tab_shortcut_find":"Command+F","open_apps_hotkey":"Control+Option+Esc","theme":"light"}"#,
+        )
+        .unwrap();
+
+        let loaded = read_settings_file(&path);
+
+        // New keys take their defaults.
+        assert!(loaded.check_updates_on_startup);
+        assert_eq!(loaded.dismissed_version, "");
+
+        // Pre-existing values survive, i.e. the file parsed rather than being discarded.
+        assert_eq!(loaded.theme, "light");
+        assert_eq!(loaded.hotkey, "Option+Space");
+
+        // No corrupt backup: the typed branch handled it.
+        let backups = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().contains("corrupt"))
+            .count();
+        assert_eq!(backups, 0);
+    }
+
+    #[test]
     fn validate_clamps_all_fields() {
 
         let mut s = Settings {
@@ -387,6 +434,8 @@ mod tests {
             tab_shortcut_find: "C".to_string(),
             open_apps_hotkey: "F".to_string(),
             theme: "dark".to_string(),
+            check_updates_on_startup: true,
+            dismissed_version: String::new(),
         };
 
         s.validate();

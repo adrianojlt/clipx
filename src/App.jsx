@@ -8,6 +8,7 @@ import {
   getSessions,
   getClipboard,
   getSetting,
+  setSetting,
   activateSession,
   listOpenApps,
   focusApp,
@@ -15,6 +16,8 @@ import {
   setAlwaysOnTop,
   setSoftPin,
 } from "./services/clipboardService";
+import { checkForUpdate } from "./services/updateService";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 import { useAppEvents } from "./hooks/useAppEvents";
 import { IS_MAC } from "./utils/shortcuts";
@@ -42,6 +45,7 @@ function App() {
   // pinMode: 'none' | 'always-on-top' | 'soft'. Ephemeral, resets on restart.
   const [pinMode, setPinMode] = useState("none");
   const [showPinLabel, setShowPinLabel] = useState(false);
+  const [update, setUpdate] = useState(null);
   const pinLabelTimer = useRef(null);
   const pinChangeAtRef = useRef(0);
   const [history, setHistory] = useState([]);
@@ -197,6 +201,43 @@ function App() {
     if (pinLabelTimer.current) clearTimeout(pinLabelTimer.current);
   }, []);
 
+  // Startup update check. Runs once, off the first-paint path, and stays silent
+  // in the UI whatever happens: a clipboard manager must not interrupt the user
+  // because a version lookup failed.
+  useEffect(() => {
+
+    const check = async () => {
+
+      try {
+        if ((await getSetting("check_updates_on_startup")) !== "true") return;
+
+        const info = await checkForUpdate();
+
+        if (!info) return;
+        if (info.version === (await getSetting("dismissed_version"))) return;
+
+        setUpdate(info);
+      } catch (e) {
+        await logError("warn", `Startup update check failed: ${e}`);
+      }
+    };
+
+    check();
+  }, []);
+
+  const dismissUpdate = useCallback(async () => {
+
+    const version = update?.version;
+
+    setUpdate(null);
+
+    try {
+      if (version) await setSetting("dismissed_version", version);
+    } catch (e) {
+      await logError("warn", `Failed to persist dismissed version: ${e}`);
+    }
+  }, [update]);
+
   useEffect(() => {
     loadApps();
   }, [loadApps]);
@@ -316,6 +357,27 @@ function App() {
         </span>
         <img src="/icon.png" alt="ClipX" className="app-icon" />
         <h1>ClipX</h1>
+        {update && (
+          <span className="update-badge" onMouseDown={(e) => e.stopPropagation()}>
+            <span className="update-badge-version">v{update.version}</span>
+            <button
+              type="button"
+              className="update-badge-action"
+              onClick={async () => await openUrl(update.url)}
+            >
+              Download
+            </button>
+            <button
+              type="button"
+              className="update-badge-dismiss"
+              title="Dismiss"
+              aria-label="Dismiss update notification"
+              onClick={dismissUpdate}
+            >
+              ×
+            </button>
+          </span>
+        )}
       </div>
       {mode === "apps" && (
         <AppsTab

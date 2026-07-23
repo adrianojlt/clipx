@@ -433,3 +433,15 @@ body {
   color: var(--text-3);
 }
 .update-status.is-error { color: var(--danger); }
+.update-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.update-toggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
