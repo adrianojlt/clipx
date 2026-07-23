@@ -533,41 +533,54 @@ function Settings() {
 
   const onCheckConsumed = useCallback(() => setCheckRequested(false), []);
 
-  useEffect(() => {
-    const onKey = async (e) => {
-      if (e.key === "Escape") await getCurrentWindow().hide();
+  // Reloads the buffered form from disk. Called on mount and again whenever the
+  // user abandons an edit, since the window is only hidden and never unmounts.
+  const load = useCallback(async () => {
+    const safeGet = async (key, fallback, transform = (v) => v) => {
+      try {
+        return transform(await getSetting(key));
+      } catch (e) {
+        await logError("warn", `Failed to load setting ${key}: ${e}`);
+        return fallback;
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
+      safeGet("hotkey", "Option+Space"),
+      safeGet("open_apps_hotkey", "Control+Option+Esc"),
+      safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
+      safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
+      safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
+      safeGet("tab_shortcut_find", `${TAB_MOD}+F`),
+      safeGet("history_limit", 20, Number),
+      safeGet("window_width", 600, (v) => Number(v) || 600),
+      safeGet("window_height", 700, (v) => Number(v) || 700),
+      safeGet("theme", "dark"),
+      safeGet("check_updates_on_startup", true, (v) => v === "true"),
+    ]);
+    setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
   }, []);
 
   useEffect(() => {
-    const load = async () => {
-      const safeGet = async (key, fallback, transform = (v) => v) => {
-        try {
-          return transform(await getSetting(key));
-        } catch (e) {
-          await logError("warn", `Failed to load setting ${key}: ${e}`);
-          return fallback;
-        }
-      };
-      const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
-        safeGet("hotkey", "Option+Space"),
-        safeGet("open_apps_hotkey", "Control+Option+Esc"),
-        safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
-        safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
-        safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
-        safeGet("tab_shortcut_find", `${TAB_MOD}+F`),
-        safeGet("history_limit", 20, Number),
-        safeGet("window_width", 600, (v) => Number(v) || 600),
-        safeGet("window_height", 700, (v) => Number(v) || 700),
-        safeGet("theme", "dark"),
-        safeGet("check_updates_on_startup", true, (v) => v === "true"),
-      ]);
-      setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
-    };
     load();
-  }, []);
+  }, [load]);
+
+  // Cancel and Escape abandon the buffered edits. The window is hidden first so
+  // the reset is not visible as fields flicking back to their old values.
+  const discardAndHide = useCallback(async () => {
+    await getCurrentWindow().hide();
+    setError("");
+    setSaved(false);
+    setDirty(false);
+    await load();
+  }, [load]);
+
+  useEffect(() => {
+    const onKey = async (e) => {
+      if (e.key === "Escape") await discardAndHide();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [discardAndHide]);
 
   const handleSave = async () => {
 
@@ -635,7 +648,7 @@ function Settings() {
           {!dirty && !saved && <span className="status status-idle">All changes saved</span>}
         </div>
         <div className="footer-actions">
-          <button className="btn btn-ghost" type="button" onClick={async () => await getCurrentWindow().hide()}>Cancel</button>
+          <button className="btn btn-ghost" type="button" onClick={discardAndHide}>Cancel</button>
           <button
             className={`btn btn-primary${dirty ? "" : " is-disabled"}`}
             type="button"
