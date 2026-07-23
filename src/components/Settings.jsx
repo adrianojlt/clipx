@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   getSetting,
   setSetting,
@@ -8,6 +11,7 @@ import {
   applyWindowSize,
   logError,
 } from "../services/clipboardService";
+import { checkForUpdate } from "../services/updateService";
 import { IS_MAC } from "../utils/shortcuts";
 import { resolveTheme, applyTheme } from "../theme";
 import "./Settings.css";
@@ -368,7 +372,50 @@ function UIPanel({ s, set }) {
   );
 }
 
-function OthersPanel({ s, set }) {
+function OthersPanel({ s, set, checkRequested, onCheckConsumed }) {
+
+  // Local only. The check is an immediate action and must never mark the form dirty.
+  const [version, setVersion] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [update, setUpdate] = useState(null);
+
+  // A ref, not `status`, so the tray path sees an in-flight check even when it
+  // fires from a closure that captured an older render.
+  const checkingRef = useRef(false);
+
+  useEffect(() => {
+    const load = async () => setVersion(await getVersion());
+    load();
+  }, []);
+
+  const runCheck = useCallback(async () => {
+
+    if (checkingRef.current) return;
+
+    checkingRef.current = true;
+    setStatus("checking");
+
+    try {
+      const info = await checkForUpdate();
+      setUpdate(info);
+      setStatus(info ? "available" : "current");
+    } catch (e) {
+      setUpdate(null);
+      setStatus("error");
+      await logError("error", `Update check failed: ${e}`);
+    } finally {
+      checkingRef.current = false;
+    }
+  }, []);
+
+  // One-shot: the flag is cleared as it is consumed, so returning to this tab
+  // later does not replay the tray's request.
+  useEffect(() => {
+    if (!checkRequested) return;
+    onCheckConsumed();
+    runCheck();
+  }, [checkRequested, onCheckConsumed, runCheck]);
+
   return (
     <>
       <div className="section-header">
@@ -389,6 +436,43 @@ function OthersPanel({ s, set }) {
         </div>
         <div className="meter-labels"><span>1</span><span>50</span></div>
       </div>
+      <div className="section-header">
+        <h3>Updates</h3>
+        <p>Check GitHub for a newer release.</p>
+      </div>
+      <div className="field">
+        <div className="field-label">Current version{version && ` v${version}`}</div>
+        <div className="update-actions">
+          <button
+            className="btn btn-ghost"
+            type="button"
+            onClick={runCheck}
+            disabled={status === "checking"}
+          >
+            {status === "checking" ? "Checking…" : "Check for updates"}
+          </button>
+          {status === "available" && update && (
+            <button className="btn btn-primary" type="button" onClick={async () => await openUrl(update.url)}>
+              Download
+            </button>
+          )}
+        </div>
+        {status === "current" && <p className="update-status">ClipX is up to date.</p>}
+        {status === "available" && update && (
+          <p className="update-status">Version {update.version} is available.</p>
+        )}
+        {status === "error" && (
+          <p className="update-status is-error">Could not check for updates. Try again later.</p>
+        )}
+      </div>
+      <label className="update-toggle">
+        <input
+          type="checkbox"
+          checked={s.checkUpdatesOnStartup}
+          onChange={(e) => set("checkUpdatesOnStartup", e.target.checked)}
+        />
+        <span>Check for updates on startup</span>
+      </label>
     </>
   );
 }
@@ -398,6 +482,7 @@ function Settings() {
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [checkRequested, setCheckRequested] = useState(false);
 
   const [s, setS] = useState({
     hotkey: "",
@@ -410,6 +495,7 @@ function Settings() {
     windowWidth: 600,
     windowHeight: 700,
     theme: "dark",
+    checkUpdatesOnStartup: true,
   });
 
   const set = (k, v) => {
@@ -418,40 +504,83 @@ function Settings() {
     setSaved(false);
   };
 
+  // Attached on mount so a tray click is never lost. The settings window is
+  // created hidden at startup, so this runs long before the menu can be used.
   useEffect(() => {
-    const onKey = async (e) => {
-      if (e.key === "Escape") await getCurrentWindow().hide();
+
+    let cancelled = false;
+    let unlisten;
+
+    const attach = async () => {
+
+      const fn = await listen("check-updates-requested", () => {
+        setActiveTab("others");
+        setCheckRequested(true);
+      });
+
+      if (cancelled) { fn(); return; }
+
+      unlisten = fn;
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    attach();
+
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  const onCheckConsumed = useCallback(() => setCheckRequested(false), []);
+
+  // Reloads the buffered form from disk. Called on mount and again whenever the
+  // user abandons an edit, since the window is only hidden and never unmounts.
+  const load = useCallback(async () => {
+    const safeGet = async (key, fallback, transform = (v) => v) => {
+      try {
+        return transform(await getSetting(key));
+      } catch (e) {
+        await logError("warn", `Failed to load setting ${key}: ${e}`);
+        return fallback;
+      }
+    };
+    const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
+      safeGet("hotkey", "Option+Space"),
+      safeGet("open_apps_hotkey", "Control+Option+Esc"),
+      safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
+      safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
+      safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
+      safeGet("tab_shortcut_find", `${TAB_MOD}+F`),
+      safeGet("history_limit", 20, Number),
+      safeGet("window_width", 600, (v) => Number(v) || 600),
+      safeGet("window_height", 700, (v) => Number(v) || 700),
+      safeGet("theme", "dark"),
+      safeGet("check_updates_on_startup", true, (v) => v === "true"),
+    ]);
+    setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
   }, []);
 
   useEffect(() => {
-    const load = async () => {
-      const safeGet = async (key, fallback, transform = (v) => v) => {
-        try {
-          return transform(await getSetting(key));
-        } catch (e) {
-          await logError("warn", `Failed to load setting ${key}: ${e}`);
-          return fallback;
-        }
-      };
-      const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme] = await Promise.all([
-        safeGet("hotkey", "Option+Space"),
-        safeGet("open_apps_hotkey", "Control+Option+Esc"),
-        safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
-        safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
-        safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
-        safeGet("tab_shortcut_find", `${TAB_MOD}+F`),
-        safeGet("history_limit", 20, Number),
-        safeGet("window_width", 600, (v) => Number(v) || 600),
-        safeGet("window_height", 700, (v) => Number(v) || 700),
-        safeGet("theme", "dark"),
-      ]);
-      setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme });
-    };
     load();
-  }, []);
+  }, [load]);
+
+  // Cancel and Escape abandon the buffered edits. The window is hidden first so
+  // the reset is not visible as fields flicking back to their old values.
+  const discardAndHide = useCallback(async () => {
+    await getCurrentWindow().hide();
+    setError("");
+    setSaved(false);
+    setDirty(false);
+    await load();
+  }, [load]);
+
+  useEffect(() => {
+    const onKey = async (e) => {
+      if (e.key === "Escape") await discardAndHide();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [discardAndHide]);
 
   const handleSave = async () => {
 
@@ -472,6 +601,7 @@ function Settings() {
     await attempt(() => setSetting("window_width", String(s.windowWidth)));
     await attempt(() => setSetting("window_height", String(s.windowHeight)));
     await attempt(() => setSetting("theme", s.theme));
+    await attempt(() => setSetting("check_updates_on_startup", String(s.checkUpdatesOnStartup)));
 
     await attempt(() => applyWindowSize());
     await attempt(() => applyTheme());
@@ -495,7 +625,14 @@ function Settings() {
         <div className="content-scroll" key={activeTab}>
           {activeTab === "hotkeys" && <HotkeysPanel s={s} set={set} />}
           {activeTab === "ui" && <UIPanel s={s} set={set} />}
-          {activeTab === "others" && <OthersPanel s={s} set={set} />}
+          {activeTab === "others" && (
+            <OthersPanel
+              s={s}
+              set={set}
+              checkRequested={checkRequested}
+              onCheckConsumed={onCheckConsumed}
+            />
+          )}
         </div>
       </div>
       {error && <p className="error">{error}</p>}
@@ -511,7 +648,7 @@ function Settings() {
           {!dirty && !saved && <span className="status status-idle">All changes saved</span>}
         </div>
         <div className="footer-actions">
-          <button className="btn btn-ghost" type="button" onClick={async () => await getCurrentWindow().hide()}>Cancel</button>
+          <button className="btn btn-ghost" type="button" onClick={discardAndHide}>Cancel</button>
           <button
             className={`btn btn-primary${dirty ? "" : " is-disabled"}`}
             type="button"

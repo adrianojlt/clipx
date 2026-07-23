@@ -33,6 +33,12 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
         "tab_shortcut_sessions" => s.tab_shortcut_sessions = value.to_string(),
         "tab_shortcut_find" => s.tab_shortcut_find = value.to_string(),
         "theme" => s.theme = value.to_string(),
+        "check_updates_on_startup" => {
+            s.check_updates_on_startup = value.parse::<bool>().map_err(|_| {
+                AppError::Validation(format!("Invalid check_updates_on_startup: {value}"))
+            })?;
+        }
+        "dismissed_version" => s.dismissed_version = value.to_string(),
         _ => return Err(AppError::Settings(format!("Unknown setting: {key}"))),
     }
 
@@ -128,6 +134,25 @@ mod tests {
     fn apply_field_unknown_key() {
         let mut s = Settings::default();
         assert!(matches!(apply_field(&mut s, "bogus_key", "value"), Err(AppError::Settings(_))));
+    }
+
+    #[test]
+    fn apply_field_invalid_check_updates_on_startup() {
+        let mut s = Settings::default();
+        assert!(matches!(
+            apply_field(&mut s, "check_updates_on_startup", "maybe"),
+            Err(AppError::Validation(_))
+        ));
+        assert!(s.check_updates_on_startup);
+    }
+
+    #[test]
+    fn apply_field_valid_update_settings() {
+        let mut s = Settings::default();
+        apply_field(&mut s, "check_updates_on_startup", "false").unwrap();
+        assert!(!s.check_updates_on_startup);
+        apply_field(&mut s, "dismissed_version", "0.1.29").unwrap();
+        assert_eq!(s.dismissed_version, "0.1.29");
     }
 
     #[test]

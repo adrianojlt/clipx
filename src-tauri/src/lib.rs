@@ -124,6 +124,7 @@ pub fn run() {
             commands::apps::focus_app,
             commands::window_pin::set_always_on_top,
             commands::window_pin::set_soft_pin,
+            commands::updates::check_for_update,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -279,11 +280,13 @@ fn build_tray(app: &tauri::App) -> Result<(), AppError> {
         .map_err(|e| AppError::Window(e.to_string()))?;
     let about_i = MenuItem::with_id(app, "about", "About", true, None::<&str>)
         .map_err(|e| AppError::Window(e.to_string()))?;
+    let check_i = MenuItem::with_id(app, "check_updates", "Check for Updates", true, None::<&str>)
+        .map_err(|e| AppError::Window(e.to_string()))?;
     let sep = tauri::menu::PredefinedMenuItem::separator(app)
         .map_err(|e| AppError::Window(e.to_string()))?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)
         .map_err(|e| AppError::Window(e.to_string()))?;
-    let menu = Menu::with_items(app, &[&open_i, &settings_i, &about_i, &sep, &quit_i])
+    let menu = Menu::with_items(app, &[&open_i, &settings_i, &about_i, &check_i, &sep, &quit_i])
         .map_err(|e| AppError::Window(e.to_string()))?;
 
     TrayIconBuilder::new()
@@ -294,6 +297,10 @@ fn build_tray(app: &tauri::App) -> Result<(), AppError> {
             "open" => show_window(app, "main"),
             "settings" => show_window(app, "settings"),
             "about" => show_window(app, "about"),
+            "check_updates" => {
+                show_window(app, "settings");
+                let _ = app.emit("check-updates-requested", ());
+            }
             "quit" => app.exit(0),
             _ => {}
         })

@@ -105,6 +105,56 @@
   opacity: 1;
 }
 
+/* Anchored to the right edge, mirroring .pin-btn on the left. Positioned out of
+   the flex flow on purpose: the icon and <h1> stay exactly centred whether or
+   not the badge is showing, and the pin label needs no suppression. */
+.update-badge {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.4rem;
+  border: 1px solid var(--app-accent);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.update-badge-version {
+  color: var(--app-accent);
+  font-weight: 500;
+}
+
+.update-badge-action {
+  background: var(--app-accent);
+  color: var(--app-bg);
+  border: none;
+  border-radius: 999px;
+  padding: 0 0.45rem;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.update-badge-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--app-text-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  cursor: pointer;
+}
+
+.update-badge-dismiss:hover {
+  color: var(--app-text-strong);
+}
+
 .tabs {
   display: flex;
   background: var(--app-surface);
