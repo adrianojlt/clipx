@@ -18,7 +18,11 @@ export default function SessionItem({
       {dragIndicator?.targetId === item.id && dragIndicator.position === "before" && (
         <div className="drop-indicator" />
       )}
-      <div className={`item${isActive ? " session-active" : ""}`}>
+      <div
+        className={`item${isActive ? " session-active" : ""}`}
+        onClick={() => onActivate(item.id)}
+        title={isActive ? "Active session" : "Activate session"}
+      >
         {item.is_global ? (
           <span className="drag-handle inert" title="Favorites cannot be reordered">
             &#x2630;

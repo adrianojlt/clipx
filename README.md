@@ -27,6 +27,7 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
 - **Tab shortcuts** - Switch between Pinned, History, and Sessions tabs with configurable keyboard shortcuts (default Command+1 / Command+2 / Command+3).
 - **Resizable window** - Adjust the popup width and height in Settings.
+- **Update notifications** - Checks the GitHub Releases page for a newer version and shows a title-bar badge; check manually from Settings or the tray menu. No auto-download, no clipboard data sent.
 - **Local only** - All clipboard history stays on your machine.
 
 ## Download
@@ -100,29 +101,7 @@ If something goes wrong, check the log file for details.
 
 ## Creating a release
 
-1. Bump the version in all three places (replace `0.1.11` with the new version):
-   - `package.json` - `"version"` field
-   - `src-tauri/tauri.conf.json` - `"version"` field
-   - `src-tauri/Cargo.toml` - `version` field
-
-2. Update `Cargo.lock` by running a build:
-
-```bash
-cd src-tauri && cargo build
-```
-
-3. Commit and tag:
-
-```bash
-git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
-git commit -m "bump version to vX.Y.Z"
-git tag vX.Y.Z
-git push origin vX.Y.Z
-```
-
-Pushing the tag triggers the GitHub Actions workflow, which builds installers for all platforms and publishes them as a new release.
-
-> The artifact filenames (e.g. `ClipX_0.1.11_aarch64.dmg`) come from the version in `tauri.conf.json`, not the git tag - so all three files must be bumped before tagging.
+See [RELEASING.md](./RELEASING.md) for the release checklist, including the mandatory step of publishing the draft release that the workflow creates.
 
 ## Running in development
 

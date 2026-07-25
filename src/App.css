@@ -181,7 +181,7 @@
 
 .tabs button.active {
   color: var(--app-text-strong);
-  background: var(--app-hover);
+  background: var(--app-tab-active);
   font-weight: 500;
 }
 

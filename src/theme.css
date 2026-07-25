@@ -69,6 +69,7 @@
   --app-surface: #252525;
   --app-surface-2: #2a2a2a;
   --app-surface-hover: #2c2c2c;
+  --app-tab-active: #333;
   --app-input-border: #444;
   --app-input-focus: #555;
   --app-edit-bg: #3a3a3a;
@@ -142,6 +143,7 @@
   --app-surface: #f2f2f4;
   --app-surface-2: #eaeaed;
   --app-surface-hover: #e5e5e9;
+  --app-tab-active: #dcdce1;
   --app-input-border: #d0d0d6;
   --app-input-focus: #b0b0b6;
   --app-edit-bg: #ffffff;
