@@ -374,33 +374,49 @@ function UIPanel({ s, set }) {
   );
 }
 
+// Pure, so the counts shown before a destructive replace can be tested without
+// standing up the dialog plugin.
+export function importConfirmMessage(preview) {
+
+  const trimmed =
+    preview.historyToImport < preview.fileHistory
+      ? ` (${preview.fileHistory - preview.historyToImport} older entries dropped by the history limit)`
+      : "";
+
+  return (
+    `Replace ${preview.currentHistory} history, ${preview.currentPinned} pinned and ` +
+    `${preview.currentSessions} sessions with ${preview.historyToImport} history${trimmed}, ` +
+    `${preview.filePinned} pinned and ${preview.fileSessions} sessions from the file?\n\n` +
+    `The current clipboard data is deleted and cannot be recovered.`
+  );
+}
+
+// The service layer normalizes its own failures into Error, but the dialog calls
+// in the same block can reject with a bare string.
+const errorText = (e) => (e instanceof Error ? e.message : String(e));
+
 // Local state only. Export and import are immediate actions and must never mark
 // the settings form dirty.
 function DataSection() {
 
-  const [status, setStatus] = useState("idle");
-  const [message, setMessage] = useState("");
+  // One value, so status and message cannot drift out of step.
+  const [result, setResult] = useState({ status: "idle", message: "" });
 
-  const busyRef = useRef(false);
-
+  // `action` resolves to `{ message }` once the work is done, or to null when
+  // the user backed out at the confirm step.
   const run = useCallback(async (action) => {
 
-    if (busyRef.current) return;
-
-    busyRef.current = true;
-    setStatus("working");
-    setMessage("");
+    setResult({ status: "working", message: "" });
 
     try {
-      const result = await action();
-      setStatus(result ? "done" : "idle");
-      setMessage(result ?? "");
+      const outcome = await action();
+      setResult(
+        outcome ? { status: "done", message: outcome.message } : { status: "idle", message: "" },
+      );
     } catch (e) {
-      setStatus("error");
-      setMessage(String(e));
-      await logError("error", `Clipboard data transfer failed: ${e}`);
-    } finally {
-      busyRef.current = false;
+      setResult({ status: "error", message: errorText(e) });
+      // Best-effort: a failed log must not reject out of the click handler.
+      logError("error", `Clipboard data transfer failed: ${errorText(e)}`).catch(() => {});
     }
   }, []);
 
@@ -415,8 +431,10 @@ function DataSection() {
     if (!path) return;
 
     await run(async () => {
-      const r = await exportData(path);
-      return `Exported ${r.history} history, ${r.pinned} pinned, ${r.sessions} sessions.`;
+      const summary = await exportData(path);
+      return {
+        message: `Exported ${summary.history} history, ${summary.pinned} pinned, ${summary.sessions} sessions.`,
+      };
     });
   }, [run]);
 
@@ -435,25 +453,21 @@ function DataSection() {
 
       // Validates the whole file before anything is deleted, so a bad file is
       // rejected here rather than halfway through the replace.
-      const p = await previewImport(path);
+      const preview = await previewImport(path);
 
-      const trimmed =
-        p.history_to_import < p.file_history
-          ? ` (${p.file_history - p.history_to_import} older entries dropped by the history limit)`
-          : "";
+      const confirmed = await confirmDialog(importConfirmMessage(preview), {
+        title: "Import clipboard data",
+        kind: "warning",
+        okLabel: "Replace",
+        cancelLabel: "Cancel",
+      });
 
-      const ok = await confirmDialog(
-        `Replace ${p.current_history} history, ${p.current_pinned} pinned and ` +
-          `${p.current_sessions} sessions with ${p.history_to_import} history${trimmed}, ` +
-          `${p.file_pinned} pinned and ${p.file_sessions} sessions from the file?\n\n` +
-          `The current clipboard data is deleted and cannot be recovered.`,
-        { title: "Import clipboard data", kind: "warning", okLabel: "Replace", cancelLabel: "Cancel" },
-      );
+      if (!confirmed) return null;
 
-      if (!ok) return null;
-
-      const r = await importData(path);
-      return `Imported ${r.history} history, ${r.pinned} pinned, ${r.sessions} sessions.`;
+      const summary = await importData(path);
+      return {
+        message: `Imported ${summary.history} history, ${summary.pinned} pinned, ${summary.sessions} sessions.`,
+      };
     });
   }, [run]);
 
@@ -466,10 +480,10 @@ function DataSection() {
       <div className="field">
         <div className="field-label">Export / Import</div>
         <div className="update-actions">
-          <button className="btn btn-ghost" type="button" onClick={runExport} disabled={status === "working"}>
+          <button className="btn btn-ghost" type="button" onClick={runExport} disabled={result.status === "working"}>
             Export…
           </button>
-          <button className="btn btn-ghost" type="button" onClick={runImport} disabled={status === "working"}>
+          <button className="btn btn-ghost" type="button" onClick={runImport} disabled={result.status === "working"}>
             Import…
           </button>
         </div>
@@ -478,8 +492,8 @@ function DataSection() {
           contain passwords and tokens, so keep it somewhere you trust. Importing replaces all current
           clipboard data. App settings and shortcuts are not included.
         </div>
-        {status === "done" && <p className="update-status">{message}</p>}
-        {status === "error" && <p className="update-status is-error">{message}</p>}
+        {result.status === "done" && <p className="update-status">{result.message}</p>}
+        {result.status === "error" && <p className="update-status is-error">{result.message}</p>}
       </div>
     </>
   );

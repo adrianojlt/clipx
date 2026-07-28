@@ -190,21 +190,25 @@ fn parse_export(json: &str) -> Result<ExportFile, AppError> {
     let mut pinned_ids = HashSet::new();
     let mut pinned_keys = HashSet::new();
     for p in &file.clipboard_pinned {
+
         if !pinned_ids.insert(p.id) {
             return Err(AppError::Validation(format!("Duplicate pinned id {}", p.id)));
         }
+
         if !session_ids.contains(&p.session_id) {
             return Err(AppError::Validation(format!(
                 "Pinned item {} references session {}, which is not in the file",
                 p.id, p.session_id
             )));
         }
+
         if !pinned_keys.insert((p.content.as_str(), p.session_id)) {
             return Err(AppError::Validation(format!(
                 "Duplicate pinned item in session {}",
                 p.session_id
             )));
         }
+
         validate_content(&p.content, "Pinned item")?;
         if let Some(d) = &p.description {
             if d.len() > MAX_DESC_BYTES {
