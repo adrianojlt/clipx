@@ -96,6 +96,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::settings::get_setting,
@@ -125,6 +126,9 @@ pub fn run() {
             commands::window_pin::set_always_on_top,
             commands::window_pin::set_soft_pin,
             commands::updates::check_for_update,
+            commands::transfer::export_data,
+            commands::transfer::preview_import,
+            commands::transfer::import_data,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

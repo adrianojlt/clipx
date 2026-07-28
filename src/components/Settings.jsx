@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { save, open as openFile, confirm as confirmDialog } from "@tauri-apps/plugin-dialog";
 import {
   getSetting,
   setSetting,
@@ -12,6 +13,7 @@ import {
   logError,
 } from "../services/clipboardService";
 import { checkForUpdate } from "../services/updateService";
+import { exportData, previewImport, importData } from "../services/transferService";
 import { IS_MAC } from "../utils/shortcuts";
 import { resolveTheme, applyTheme } from "../theme";
 import "./Settings.css";
@@ -372,6 +374,117 @@ function UIPanel({ s, set }) {
   );
 }
 
+// Local state only. Export and import are immediate actions and must never mark
+// the settings form dirty.
+function DataSection() {
+
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+
+  const busyRef = useRef(false);
+
+  const run = useCallback(async (action) => {
+
+    if (busyRef.current) return;
+
+    busyRef.current = true;
+    setStatus("working");
+    setMessage("");
+
+    try {
+      const result = await action();
+      setStatus(result ? "done" : "idle");
+      setMessage(result ?? "");
+    } catch (e) {
+      setStatus("error");
+      setMessage(String(e));
+      await logError("error", `Clipboard data transfer failed: ${e}`);
+    } finally {
+      busyRef.current = false;
+    }
+  }, []);
+
+  const runExport = useCallback(async () => {
+
+    const path = await save({
+      title: "Export clipboard data",
+      defaultPath: `clipx-export-${new Date().toISOString().slice(0, 10)}.json`,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+
+    if (!path) return;
+
+    await run(async () => {
+      const r = await exportData(path);
+      return `Exported ${r.history} history, ${r.pinned} pinned, ${r.sessions} sessions.`;
+    });
+  }, [run]);
+
+  const runImport = useCallback(async () => {
+
+    const path = await openFile({
+      title: "Import clipboard data",
+      multiple: false,
+      directory: false,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+
+    if (!path) return;
+
+    await run(async () => {
+
+      // Validates the whole file before anything is deleted, so a bad file is
+      // rejected here rather than halfway through the replace.
+      const p = await previewImport(path);
+
+      const trimmed =
+        p.history_to_import < p.file_history
+          ? ` (${p.file_history - p.history_to_import} older entries dropped by the history limit)`
+          : "";
+
+      const ok = await confirmDialog(
+        `Replace ${p.current_history} history, ${p.current_pinned} pinned and ` +
+          `${p.current_sessions} sessions with ${p.history_to_import} history${trimmed}, ` +
+          `${p.file_pinned} pinned and ${p.file_sessions} sessions from the file?\n\n` +
+          `The current clipboard data is deleted and cannot be recovered.`,
+        { title: "Import clipboard data", kind: "warning", okLabel: "Replace", cancelLabel: "Cancel" },
+      );
+
+      if (!ok) return null;
+
+      const r = await importData(path);
+      return `Imported ${r.history} history, ${r.pinned} pinned, ${r.sessions} sessions.`;
+    });
+  }, [run]);
+
+  return (
+    <>
+      <div className="section-header">
+        <h3>Clipboard Data</h3>
+        <p>Back up your history, pinned items and sessions, or restore them on another machine.</p>
+      </div>
+      <div className="field">
+        <div className="field-label">Export / Import</div>
+        <div className="update-actions">
+          <button className="btn btn-ghost" type="button" onClick={runExport} disabled={status === "working"}>
+            Export…
+          </button>
+          <button className="btn btn-ghost" type="button" onClick={runImport} disabled={status === "working"}>
+            Import…
+          </button>
+        </div>
+        <div className="field-hint">
+          The exported file is unencrypted and readable by anyone who opens it. Clipboard history can
+          contain passwords and tokens, so keep it somewhere you trust. Importing replaces all current
+          clipboard data. App settings and shortcuts are not included.
+        </div>
+        {status === "done" && <p className="update-status">{message}</p>}
+        {status === "error" && <p className="update-status is-error">{message}</p>}
+      </div>
+    </>
+  );
+}
+
 function OthersPanel({ s, set, checkRequested, onCheckConsumed }) {
 
   // Local only. The check is an immediate action and must never mark the form dirty.
@@ -473,6 +586,7 @@ function OthersPanel({ s, set, checkRequested, onCheckConsumed }) {
         />
         <span>Check for updates on startup</span>
       </label>
+      <DataSection />
     </>
   );
 }
