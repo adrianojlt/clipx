@@ -32,6 +32,7 @@ export function useAppEvents({
   onCopy,
   onActivateSession,
   onFocusApp,
+  onWindowShown,
 }) {
   useEffect(() => {
     onLoadData();
@@ -73,6 +74,7 @@ export function useAppEvents({
         onClearSearch();
         onLoadData();
         onLoadApps();
+        onWindowShown();
 
         if (nextMode === "apps") {
           setTimeout(() => appsSearchRef.current?.focus(), 0);
@@ -105,7 +107,7 @@ export function useAppEvents({
       clearTimeout(retryTimer);
       unlisteners.forEach((fn) => fn());
     };
-  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch, onSetMode, appsSearchRef]);
+  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch, onSetMode, onWindowShown, appsSearchRef]);
 
   useEffect(() => {
     const onKey = async (e) => {

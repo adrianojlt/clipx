@@ -23,6 +23,7 @@ import { useAppEvents } from "./hooks/useAppEvents";
 import { IS_MAC } from "./utils/shortcuts";
 
 const TAB_MOD = IS_MAC ? "Command" : "Alt";
+const UPDATE_RECHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const PIN_NEXT = { none: "always-on-top", "always-on-top": "soft", soft: "none" };
 const PIN_LABELS = { none: "Unpinned", "always-on-top": "Always on top", soft: "Soft pin" };
@@ -201,29 +202,39 @@ function App() {
     if (pinLabelTimer.current) clearTimeout(pinLabelTimer.current);
   }, []);
 
-  // Startup update check. Runs once, off the first-paint path, and stays silent
-  // in the UI whatever happens: a clipboard manager must not interrupt the user
-  // because a version lookup failed.
-  useEffect(() => {
+  // Update check. Stays silent in the UI whatever happens: a clipboard manager
+  // must not interrupt the user because a version lookup failed.
+  //
+  // ClipX hides on close and single-instance re-shows the same process rather
+  // than starting a new one, so a mount-only check would only ever run the
+  // very first time the process launches. Re-running it on every window show
+  // (throttled) is what makes "start the app" behave like a fresh check for a
+  // process that's been sitting in the tray for hours or days.
+  const lastCheckedAtRef = useRef(0);
 
-    const check = async () => {
+  const checkForUpdates = useCallback(async ({ force = false } = {}) => {
 
-      try {
-        if ((await getSetting("check_updates_on_startup")) !== "true") return;
+    if (!force && Date.now() - lastCheckedAtRef.current < UPDATE_RECHECK_INTERVAL_MS) return;
 
-        const info = await checkForUpdate();
+    lastCheckedAtRef.current = Date.now();
 
-        if (!info) return;
-        if (info.version === (await getSetting("dismissed_version"))) return;
+    try {
+      if ((await getSetting("check_updates_on_startup")) !== "true") return;
 
-        setUpdate(info);
-      } catch (e) {
-        await logError("warn", `Startup update check failed: ${e}`);
-      }
-    };
+      const info = await checkForUpdate();
 
-    check();
+      if (!info) return;
+      if (info.version === (await getSetting("dismissed_version"))) return;
+
+      setUpdate(info);
+    } catch (e) {
+      await logError("warn", `Update check failed: ${e}`);
+    }
   }, []);
+
+  useEffect(() => {
+    checkForUpdates({ force: true });
+  }, [checkForUpdates]);
 
   const dismissUpdate = useCallback(async () => {
 
@@ -276,6 +287,7 @@ function App() {
     onClearSearch: clearSearch,
     onCopy: handleCopy,
     onActivateSession: handleActivateSession,
+    onWindowShown: checkForUpdates,
     onFocusApp: handleSelectApp,
   });
 
