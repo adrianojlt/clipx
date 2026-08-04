@@ -20,8 +20,10 @@ pub async fn focus_app(id: String) -> Result<(), AppError> {
 
 #[cfg(target_os = "macos")]
 mod platform {
+
     use super::OpenApp;
     use crate::error::AppError;
+
     use std::collections::HashSet;
     use std::process::Command;
 
@@ -34,6 +36,7 @@ mod platform {
     // agree, including for Chromium/Electron apps. Needs Accessibility only.
     // Output lines: "<process name>\t<window title>" (title empty if none).
     pub fn list_open_apps() -> Result<Vec<OpenApp>, AppError> {
+
         let script = "set output to \"\"\n\
             tell application \"System Events\"\n\
             repeat with p in (every process whose background only is false)\n\
@@ -77,25 +80,31 @@ mod platform {
         }
 
         let stdout = String::from_utf8_lossy(&out.stdout);
+
         let mut seen: HashSet<String> = HashSet::new();
         let mut apps: Vec<OpenApp> = Vec::new();
 
         for line in stdout.lines() {
+
             let (app, title) = line.split_once('\t').unwrap_or((line, ""));
             let app = app.trim();
             let title = title.trim();
+
             if app.is_empty() {
                 continue;
             }
+
             let id = format!("{app}{SEP}{title}");
             if !seen.insert(id.clone()) {
                 continue;
             }
+
             let name = if title.is_empty() {
                 app.to_string()
             } else {
                 format!("{app} - {title}")
             };
+
             apps.push(OpenApp { name, id });
         }
 
@@ -106,6 +115,7 @@ mod platform {
     // id == "<process name>\u{1f}<window title>". Bring the process to the
     // front, then raise the specific window if a title is present.
     pub fn focus_app(id: &str) -> Result<(), AppError> {
+
         let (app, title) = id.split_once(SEP).unwrap_or((id, ""));
 
         if app.chars().any(|c| matches!(c, '"' | '\\' | '\0' | '\r' | '\n' | '\t'))
@@ -163,8 +173,11 @@ mod platform {
 
 #[cfg(target_os = "windows")]
 mod platform {
+
     use super::OpenApp;
+
     use crate::error::AppError;
+
     use std::os::windows::process::CommandExt;
     use std::process::Command;
 
@@ -172,6 +185,7 @@ mod platform {
 
     // List processes that own a visible main window. id = PID, name = window title.
     pub fn list_open_apps() -> Result<Vec<OpenApp>, AppError> {
+
         let script = "Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | \
             ForEach-Object { \"$($_.Id)`t$($_.MainWindowTitle)\" }";
 
@@ -210,6 +224,7 @@ mod platform {
 
     // id == PID on Windows. AppActivate accepts a PID and raises the window.
     pub fn focus_app(id: &str) -> Result<(), AppError> {
+
         let pid: u32 = id
             .parse()
             .map_err(|_| AppError::Validation(format!("invalid app id: {id}")))?;
@@ -237,6 +252,7 @@ mod platform {
 
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 mod platform {
+
     use super::OpenApp;
     use crate::error::AppError;
 

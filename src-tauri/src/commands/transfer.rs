@@ -159,12 +159,15 @@ fn parse_export(json: &str) -> Result<ExportFile, AppError> {
 
     let mut session_ids = HashSet::new();
     for s in &file.sessions {
+
         if s.id <= 0 {
             return Err(AppError::Validation(format!("Invalid session id {}", s.id)));
         }
+
         if !session_ids.insert(s.id) {
             return Err(AppError::Validation(format!("Duplicate session id {}", s.id)));
         }
+
         if s.name.trim().is_empty() {
             return Err(AppError::Validation(format!("Session {} has an empty name", s.id)));
         }
@@ -189,6 +192,7 @@ fn parse_export(json: &str) -> Result<ExportFile, AppError> {
 
     let mut pinned_ids = HashSet::new();
     let mut pinned_keys = HashSet::new();
+
     for p in &file.clipboard_pinned {
 
         if !pinned_ids.insert(p.id) {

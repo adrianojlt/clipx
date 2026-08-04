@@ -69,6 +69,7 @@ pub struct Session {
 /// `run_on_main_thread` right after the policy switch.
 #[cfg(target_os = "macos")]
 pub(crate) fn set_dock_icon() {
+
     use objc2::{AllocAnyThread, MainThreadMarker};
     use objc2_app_kit::{NSApplication, NSImage};
     use objc2_foundation::NSData;
@@ -80,10 +81,12 @@ pub(crate) fn set_dock_icon() {
     let Some(mtm) = MainThreadMarker::new() else {
         return;
     };
+
     let data = NSData::with_bytes(ICON_BYTES);
     let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) else {
         return;
     };
+
     let app = NSApplication::sharedApplication(mtm);
     unsafe { app.setApplicationIconImage(Some(&image)) };
 }
@@ -278,6 +281,7 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
 }
 
 fn build_tray(app: &tauri::App) -> Result<(), AppError> {
+
     let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)
         .map_err(|e| AppError::Window(e.to_string()))?;
     let settings_i = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)

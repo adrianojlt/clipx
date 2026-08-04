@@ -20,6 +20,7 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
 
     // get cursor position
     let state = app.state::<AppState>();
+
     let (width, height, open_apps_hotkey) = state
         .settings
         .lock()

@@ -67,39 +67,48 @@ impl Settings {
         if let Some(v) = map.get("hotkey") {
             s.hotkey = v.clone();
         }
+
         if let Some(raw) = map.get("history_limit") {
             match raw.parse() {
                 Ok(n) => s.history_limit = n,
                 Err(_) => log::warn!("settings migration: invalid history_limit {:?}, using default", raw),
             }
         }
+
         if let Some(raw) = map.get("window_width") {
             match raw.parse() {
                 Ok(n) => s.window_width = n,
                 Err(_) => log::warn!("settings migration: invalid window_width {:?}, using default", raw),
             }
         }
+
         if let Some(raw) = map.get("window_height") {
             match raw.parse() {
                 Ok(n) => s.window_height = n,
                 Err(_) => log::warn!("settings migration: invalid window_height {:?}, using default", raw),
             }
         }
+
         if let Some(v) = map.get("tab_shortcut_pinned") {
             s.tab_shortcut_pinned = v.clone();
         }
+
         if let Some(v) = map.get("tab_shortcut_history") {
             s.tab_shortcut_history = v.clone();
         }
+
         if let Some(v) = map.get("tab_shortcut_sessions") {
             s.tab_shortcut_sessions = v.clone();
         }
+
         if let Some(v) = map.get("tab_shortcut_find") {
             s.tab_shortcut_find = v.clone();
         }
+
         if let Some(v) = map.get("open_apps_hotkey") {
             s.open_apps_hotkey = v.clone();
         }
+
         if let Some(v) = map.get("theme") {
             s.theme = v.clone();
         }
