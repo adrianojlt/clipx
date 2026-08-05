@@ -50,6 +50,8 @@ export const listOpenApps = () => invoke("list_open_apps");
 
 export const focusApp = (id) => invoke("focus_app", { id });
 
+export const getCursorClientPosition = () => invoke("get_cursor_client_position");
+
 export const setAlwaysOnTop = (enable) => invoke("set_always_on_top", { enable });
 
 export const setSoftPin = (enable) => invoke("set_soft_pin", { enable });

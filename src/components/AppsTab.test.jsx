@@ -65,6 +65,15 @@ describe("AppsTab icon slot", () => {
     expect(render([])).toHaveLength(0);
   });
 
+  it("carries the app id on the row so a release can hit-test it", () => {
+    const items = render([row("Chrome", "Inbox"), row("Finder", "Downloads")]);
+
+    expect(items.map((el) => el.getAttribute("data-app-id"))).toEqual([
+      "ChromeInbox",
+      "FinderDownloads",
+    ]);
+  });
+
   it("leaves the icon out of the accessibility tree", () => {
     const [item] = render([row("Chrome", "Inbox")], { Chrome: ICON });
 

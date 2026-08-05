@@ -126,6 +126,7 @@ pub fn run() {
             commands::sessions::pin_item_to_session,
             commands::apps::list_open_apps,
             commands::apps::focus_app,
+            commands::cursor::get_cursor_client_position,
             commands::window_pin::set_always_on_top,
             commands::window_pin::set_soft_pin,
             commands::updates::check_for_update,

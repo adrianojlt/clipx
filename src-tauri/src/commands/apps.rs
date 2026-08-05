@@ -297,6 +297,172 @@ mod platform {
         })
     }
 
+    /// The running application called `name`.
+    ///
+    /// Matched the same way the icon map is keyed: on the localized name, then
+    /// on the executable's file stem, since the listing reports process names.
+    fn running_app(name: &str) -> Option<objc2::rc::Retained<objc2_app_kit::NSRunningApplication>> {
+
+        use objc2_app_kit::NSWorkspace;
+
+        NSWorkspace::sharedWorkspace()
+            .runningApplications()
+            .iter()
+            .find(|app| {
+                app.localizedName().is_some_and(|n| n.to_string() == name)
+                    || app
+                        .executableURL()
+                        .and_then(|url| url.path())
+                        .is_some_and(|path| {
+                            std::path::Path::new(&path.to_string())
+                                .file_stem()
+                                .is_some_and(|stem| stem == name)
+                        })
+            })
+    }
+
+    fn activate(app: &objc2_app_kit::NSRunningApplication) -> bool {
+        use objc2_app_kit::NSApplicationActivationOptions;
+        app.activateWithOptions(NSApplicationActivationOptions::ActivateAllWindows)
+    }
+
+    /// Click the Window-menu entry named `title` in `app`'s own menu bar.
+    ///
+    /// The same tree System Events walks, reached directly instead: spawning
+    /// `osascript` and opening an Apple Event connection to System Events costs
+    /// about 180 ms, and that was the whole of the delay in switching apps.
+    /// In-process the same click lands in a few milliseconds.
+    ///
+    /// Requires ClipX itself to hold Accessibility permission, where the scripted
+    /// path borrowed System Events'. Returns false if the permission is missing
+    /// or the menu entry is not found, leaving the caller its fallback.
+    fn press_window_menu_item(pid: i32, title: &str) -> bool {
+
+        let Some(app) = ax::Element::application(pid) else {
+            return false;
+        };
+
+        let Some(menu_bar) = app.element_attribute("AXMenuBar") else {
+            return false;
+        };
+
+        let Some(window_menu) = menu_bar
+            .children()
+            .into_iter()
+            .find(|item| item.title().as_deref() == Some("Window"))
+            .and_then(|item| item.children().into_iter().next())
+        else {
+            return false;
+        };
+
+        let items = window_menu.children();
+
+        // Exact title first, then substring: Chrome decorates its titles.
+        let target = items
+            .iter()
+            .find(|item| item.title().as_deref() == Some(title))
+            .or_else(|| {
+                items
+                    .iter()
+                    .find(|item| item.title().is_some_and(|t| t.contains(title)))
+            });
+
+        target.is_some_and(|item| item.press())
+    }
+
+    /// The slice of the Accessibility API needed to click one menu item.
+    mod ax {
+
+        use core_foundation::array::CFArray;
+        use core_foundation::base::{CFRelease, CFRetain, CFTypeRef, TCFType};
+        use core_foundation::string::{CFString, CFStringRef};
+
+        use std::ffi::c_void;
+
+        type AXUIElementRef = *const c_void;
+
+        const AX_SUCCESS: i32 = 0;
+
+        #[link(name = "ApplicationServices", kind = "framework")]
+        extern "C" {
+            fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
+            fn AXUIElementCopyAttributeValue(
+                element: AXUIElementRef,
+                attribute: CFStringRef,
+                value: *mut CFTypeRef,
+            ) -> i32;
+            fn AXUIElementPerformAction(element: AXUIElementRef, action: CFStringRef) -> i32;
+        }
+
+        /// An owned accessibility element, released with the value it wraps.
+        pub(super) struct Element(AXUIElementRef);
+
+        impl Drop for Element {
+            fn drop(&mut self) {
+                unsafe { CFRelease(self.0) };
+            }
+        }
+
+        impl Element {
+
+            pub(super) fn application(pid: i32) -> Option<Self> {
+                let element = unsafe { AXUIElementCreateApplication(pid) };
+                (!element.is_null()).then_some(Self(element))
+            }
+
+            /// Copy an attribute whose value is another element.
+            pub(super) fn element_attribute(&self, name: &str) -> Option<Self> {
+                self.copy_attribute(name).map(Self)
+            }
+
+            pub(super) fn children(&self) -> Vec<Self> {
+
+                let Some(value) = self.copy_attribute("AXChildren") else {
+                    return Vec::new();
+                };
+
+                let array = unsafe { CFArray::<*const c_void>::wrap_under_create_rule(value as _) };
+
+                // The array owns its elements, so each one handed out is retained
+                // to outlive it.
+                array
+                    .iter()
+                    .map(|item| {
+                        let element = *item;
+                        unsafe { CFRetain(element) };
+                        Self(element)
+                    })
+                    .collect()
+            }
+
+            pub(super) fn title(&self) -> Option<String> {
+                let value = self.copy_attribute("AXTitle")?;
+                let title = unsafe { CFString::wrap_under_create_rule(value as _) };
+                Some(title.to_string())
+            }
+
+            pub(super) fn press(&self) -> bool {
+                let action = CFString::new("AXPress");
+                AX_SUCCESS
+                    == unsafe { AXUIElementPerformAction(self.0, action.as_concrete_TypeRef()) }
+            }
+
+            /// Copy an attribute value, owned by the caller. `None` when the
+            /// attribute is absent or Accessibility is not permitted.
+            fn copy_attribute(&self, name: &str) -> Option<CFTypeRef> {
+
+                let key = CFString::new(name);
+                let mut value: CFTypeRef = std::ptr::null();
+
+                let status = unsafe {
+                    AXUIElementCopyAttributeValue(self.0, key.as_concrete_TypeRef(), &mut value)
+                };
+
+                (status == AX_SUCCESS && !value.is_null()).then_some(value)
+            }
+        }
+    }
+
     // id == "<process name>\u{1f}<window title>". Bring the process to the
     // front, then raise the specific window if a title is present.
     pub fn focus_app(id: &str) -> Result<(), AppError> {
@@ -308,6 +474,27 @@ mod platform {
         {
             return Err(AppError::Validation("invalid app id".into()));
         }
+
+        // Fast path: activate the process directly, and reach into its menu bar
+        // in-process when a specific window is wanted. Both cost single-digit
+        // milliseconds, against about 180 ms for the scripted equivalent below,
+        // which is why the switch used to lag behind the release of the keys.
+        //
+        // Selecting the window before activating keeps the app from coming
+        // forward on the previously-active window first, same as the script.
+        if let Some(running) = running_app(app) {
+
+            let window_ready = title.is_empty()
+                || press_window_menu_item(running.processIdentifier(), title);
+
+            if window_ready && activate(&running) {
+                return Ok(());
+            }
+        }
+
+        // Reached when ClipX holds no Accessibility permission of its own, or
+        // the window is not in the menu. Costs the ~180 ms the fast path saves.
+        log::info!("focus_app: falling back to osascript for {app:?}");
 
         // Raise the window via the app's own Window menu item. AXRaise/AXMain
         // are ignored by Chromium/Electron apps (Chrome, VS Code) for real

@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { setSetting, logError } from "../services/clipboardService";
 import { matchesShortcut } from "../utils/shortcuts";
+import { useHoldToSelectApp } from "./useHoldToSelectApp";
 import { applyTheme } from "../theme";
 import { EVENTS } from "../constants/events";
 
@@ -34,6 +35,8 @@ export function useAppEvents({
   onFocusApp,
   onWindowShown,
 }) {
+  const holdToSelect = useHoldToSelectApp(onFocusApp);
+
   useEffect(() => {
     onLoadData();
     onLoadTabShortcuts();
@@ -66,19 +69,29 @@ export function useAppEvents({
 
       unlisteners.push(u2);
 
-      const u3 = await listen("main-window-shown", (event) => {
+      const u3 = await listen("main-window-shown", async (event) => {
 
         const nextMode = event.payload === "apps" ? "apps" : "clipboard";
+
+        if (nextMode === "apps") {
+          holdToSelect.arm();
+        } else {
+          holdToSelect.disarm();
+        }
 
         onSetMode(nextMode);
         onClearSearch();
         onLoadData();
-        onLoadApps();
+        const appsLoaded = onLoadApps();
         onWindowShown();
 
         if (nextMode === "apps") {
           setTimeout(() => appsSearchRef.current?.focus(), 0);
         }
+
+        await appsLoaded;
+
+        holdToSelect.markListReady();
       });
 
       if (cancelled) { u3(); return; }
@@ -107,7 +120,7 @@ export function useAppEvents({
       clearTimeout(retryTimer);
       unlisteners.forEach((fn) => fn());
     };
-  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch, onSetMode, onWindowShown, appsSearchRef]);
+  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch, onSetMode, onWindowShown, holdToSelect, appsSearchRef]);
 
   useEffect(() => {
     const onKey = async (e) => {

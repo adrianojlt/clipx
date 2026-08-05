@@ -511,6 +511,7 @@ name = "clipx-scaffold"
 version = "0.1.28"
 dependencies = [
  "base64 0.22.1",
+ "core-foundation",
  "log",
  "objc2",
  "objc2-app-kit",

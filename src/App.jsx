@@ -184,8 +184,10 @@ function App() {
 
   const handleSelectApp = useCallback(async (id) => {
     try {
-      await focusApp(id);
+      // Hide first. Raising a specific window still costs an AppleScript round
+      // trip, and leaving the popup on screen for it is what reads as lag.
       await getCurrentWindow().hide();
+      await focusApp(id);
     } catch (e) {
       await logError("error", `Failed to focus app: ${e}`);
     }

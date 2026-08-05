@@ -45,7 +45,12 @@ export default function AppsTab({
           const icon = appIcons[app.app];
 
           return (
-            <div key={app.id} className="item app-item" onClick={() => onSelect(app.id)}>
+            <div
+              key={app.id}
+              className="item app-item"
+              data-app-id={app.id}
+              onClick={() => onSelect(app.id)}
+            >
               <span className="app-index">{i < 9 ? i + 1 : ""}</span>
               {icon ? (
                 <img className="app-item-icon" src={icon} alt="" />
