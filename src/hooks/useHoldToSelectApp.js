@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { getCursorClientPosition, logError } from "../services/clipboardService";
-import { appIdAtPoint } from "../utils/appRowAtPoint";
+import { appRowAtPoint } from "../utils/appRowAtPoint";
 
 // Modifier keys whose key-up ends the open-apps chord. The chord always carries
 // at least one, so the first of them to come up is the user letting go.
@@ -39,8 +39,8 @@ export function useHoldToSelectApp(onFocusApp) {
   // hover state: if the mouse never moved after the popup appeared, no pointer
   // event ever fired and React knows of no hovered row.
   const selectAppAtPoint = useCallback(({ x, y }) => {
-    const id = appIdAtPoint(x, y);
-    if (id) onFocusApp(id);
+    const row = appRowAtPoint(x, y);
+    if (row) onFocusApp(row);
   }, [onFocusApp]);
 
   const arm = useCallback(() => {

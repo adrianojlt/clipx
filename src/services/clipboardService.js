@@ -48,7 +48,9 @@ export const pinItemToSession = (content, sessionId, description) => invoke("pin
 // URI, kept out of the rows so a many-window app does not repeat its own icon.
 export const listOpenApps = () => invoke("list_open_apps");
 
-export const focusApp = (id) => invoke("focus_app", { id });
+// `app` is the process name: the stable key the backend records usage under,
+// since `id` carries the window title on macOS and the pid on Windows.
+export const focusApp = (id, app) => invoke("focus_app", { id, app });
 
 export const getCursorClientPosition = () => invoke("get_cursor_client_position");
 

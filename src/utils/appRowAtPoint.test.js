@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { appIdAtPoint } from "./appRowAtPoint";
+import { appRowAtPoint } from "./appRowAtPoint";
 
 // jsdom has no layout and no elementFromPoint, so it is stubbed with the node a
 // real browser would have returned for that coordinate.
@@ -14,37 +14,37 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("appIdAtPoint", () => {
-  it("returns the id of the row under the point", () => {
-    hits(`<div class="app-item" data-app-id="Chrome-1"></div>`, ".app-item");
+describe("appRowAtPoint", () => {
+  it("returns the id and app of the row under the point", () => {
+    hits(`<div class="app-item" data-app-id="Chrome-1" data-app="Chrome"></div>`, ".app-item");
 
-    expect(appIdAtPoint(10, 200)).toBe("Chrome-1");
+    expect(appRowAtPoint(10, 200)).toEqual({ id: "Chrome-1", app: "Chrome" });
   });
 
-  it("returns the row id when the point lands on a child of the row", () => {
+  it("returns the row when the point lands on a child of the row", () => {
     hits(
-      `<div class="app-item" data-app-id="Chrome-1"><span class="session-name">Inbox</span></div>`,
+      `<div class="app-item" data-app-id="Chrome-1" data-app="Chrome"><span class="session-name">Inbox</span></div>`,
       ".session-name"
     );
 
-    expect(appIdAtPoint(10, 200)).toBe("Chrome-1");
+    expect(appRowAtPoint(10, 200)).toEqual({ id: "Chrome-1", app: "Chrome" });
   });
 
   it("returns null when the point lands on the search bar", () => {
     hits(`<div class="search-bar"><input class="search-input" /></div>`, ".search-input");
 
-    expect(appIdAtPoint(10, 5)).toBeNull();
+    expect(appRowAtPoint(10, 5)).toBeNull();
   });
 
   it("returns null when the list is empty", () => {
     hits(`<div class="list"><div class="empty">No apps</div></div>`, ".empty");
 
-    expect(appIdAtPoint(10, 200)).toBeNull();
+    expect(appRowAtPoint(10, 200)).toBeNull();
   });
 
   it("returns null when the point is outside the window", () => {
-    hits(`<div class="app-item" data-app-id="Chrome-1"></div>`, null);
+    hits(`<div class="app-item" data-app-id="Chrome-1" data-app="Chrome"></div>`, null);
 
-    expect(appIdAtPoint(-40, 900)).toBeNull();
+    expect(appRowAtPoint(-40, 900)).toBeNull();
   });
 });

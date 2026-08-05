@@ -258,7 +258,7 @@ export function useAppEvents({
 
         if (index < filteredApps.length) {
           e.preventDefault();
-          onFocusApp(filteredApps[index].id);
+          onFocusApp(filteredApps[index]);
         }
       }
     };

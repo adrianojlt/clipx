@@ -61,6 +61,26 @@ pub fn init_db(conn: &mut rusqlite::Connection) -> Result<(), AppError> {
         [],
     )?;
 
+    // One row per app (the process name), bumped on every switch performed
+    // through ClipX and read back to order the open-apps list. `last_used` is
+    // Unix epoch seconds, so scoring is integer subtraction. No index: the
+    // primary key is the only lookup path and the table is read whole anyway.
+    tx.execute(
+        "CREATE TABLE IF NOT EXISTS app_usage (
+            app       TEXT PRIMARY KEY,
+            uses      INTEGER NOT NULL DEFAULT 0,
+            last_used INTEGER NOT NULL DEFAULT 0
+        )",
+        [],
+    )?;
+
+    // 180 days. An app untouched that long already scores near zero, so this
+    // changes no ordering; it only reclaims rows for apps that are gone.
+    tx.execute(
+        "DELETE FROM app_usage WHERE last_used < strftime('%s','now') - 15552000",
+        [],
+    )?;
+
     tx.execute_batch(
         "CREATE INDEX IF NOT EXISTS idx_history_created \
             ON clipboard_history(created_at DESC); \

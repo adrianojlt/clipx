@@ -182,12 +182,15 @@ function App() {
     }
   }, [pinMode]);
 
-  const handleSelectApp = useCallback(async (id) => {
+  // Takes the row rather than its fields: `id` raises the window, `app` is the
+  // process name the backend records the switch under. The hold-and-release
+  // gesture supplies the same pair read back off the row's data attributes.
+  const handleSelectApp = useCallback(async ({ id, app }) => {
     try {
       // Hide first. Raising a specific window still costs an AppleScript round
       // trip, and leaving the popup on screen for it is what reads as lag.
       await getCurrentWindow().hide();
-      await focusApp(id);
+      await focusApp(id, app);
     } catch (e) {
       await logError("error", `Failed to focus app: ${e}`);
     }

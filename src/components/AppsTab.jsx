@@ -28,7 +28,7 @@ export default function AppsTab({
           onKeyDown={(e) => {
             if (e.key === "Enter" && filteredApps.length > 0) {
               e.preventDefault();
-              onSelect(filteredApps[0].id);
+              onSelect(filteredApps[0]);
             }
             if (e.key === "Escape") {
               e.stopPropagation();
@@ -49,7 +49,8 @@ export default function AppsTab({
               key={app.id}
               className="item app-item"
               data-app-id={app.id}
-              onClick={() => onSelect(app.id)}
+              data-app={app.app}
+              onClick={() => onSelect(app)}
             >
               <span className="app-index">{i < 9 ? i + 1 : ""}</span>
               {icon ? (

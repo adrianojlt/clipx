@@ -74,6 +74,14 @@ describe("AppsTab icon slot", () => {
     ]);
   });
 
+  // The hold-and-release gesture reads both attributes off the row, so focusing
+  // an app from it can pass the process name the backend records usage under.
+  it("carries the process name on the row", () => {
+    const items = render([row("Chrome", "Inbox"), row("Finder", "Downloads")]);
+
+    expect(items.map((el) => el.getAttribute("data-app"))).toEqual(["Chrome", "Finder"]);
+  });
+
   it("leaves the icon out of the accessibility tree", () => {
     const [item] = render([row("Chrome", "Inbox")], { Chrome: ICON });
 
