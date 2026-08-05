@@ -255,6 +255,14 @@
   gap: 0.5rem;
 }
 
+/* Fixed slot so rows without a resolvable icon keep the name column aligned.
+   flex-shrink: 0 stops a long window title from compressing it to a sliver. */
+.app-item-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
 .app-index {
   min-width: 1.1rem;
   text-align: center;

@@ -54,6 +54,7 @@ function App() {
   const [globalPinned, setGlobalPinned] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [apps, setApps] = useState([]);
+  const [appIcons, setAppIcons] = useState({});
   const [currentClipboard, setCurrentClipboard] = useState("");
   const [historySearch, setHistorySearch] = useState("");
   const [pinnedSearch, setPinnedSearch] = useState("");
@@ -158,8 +159,9 @@ function App() {
 
   const loadApps = useCallback(async () => {
     try {
-      const a = await listOpenApps();
+      const { apps: a, icons } = await listOpenApps();
       setApps(a);
+      setAppIcons(icons);
     } catch (e) {
       await logError("error", `Failed to load apps: ${e}`);
     }
@@ -394,6 +396,7 @@ function App() {
       {mode === "apps" && (
         <AppsTab
           filteredApps={filteredApps}
+          appIcons={appIcons}
           appsSearch={appsSearch}
           setAppsSearch={setAppsSearch}
           appsSearchRef={appsSearchRef}

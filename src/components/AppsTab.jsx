@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 export default function AppsTab({
   filteredApps,
+  appIcons,
   appsSearch,
   setAppsSearch,
   appsSearchRef,
@@ -38,12 +39,23 @@ export default function AppsTab({
       </div>
       <div className="list">
         {filteredApps.length === 0 && <div className="empty">No apps</div>}
-        {filteredApps.map((app, i) => (
-          <div key={app.id} className="item app-item" onClick={() => onSelect(app.id)}>
-            <span className="app-index">{i < 9 ? i + 1 : ""}</span>
-            <span className="session-name">{app.name}</span>
-          </div>
-        ))}
+        {filteredApps.map((app, i) => {
+          // Every window of an app carries its icon. Apps with no resolvable
+          // icon still render the empty slot so the name column stays aligned.
+          const icon = appIcons[app.app];
+
+          return (
+            <div key={app.id} className="item app-item" onClick={() => onSelect(app.id)}>
+              <span className="app-index">{i < 9 ? i + 1 : ""}</span>
+              {icon ? (
+                <img className="app-item-icon" src={icon} alt="" />
+              ) : (
+                <span className="app-item-icon" />
+              )}
+              <span className="session-name">{app.name}</span>
+            </div>
+          );
+        })}
       </div>
     </>
   );

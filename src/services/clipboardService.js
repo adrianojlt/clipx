@@ -44,6 +44,8 @@ export const reorderSessions = (items) => invoke("reorder_sessions", { items });
 
 export const pinItemToSession = (content, sessionId, description) => invoke("pin_item_to_session", { content, sessionId, description });
 
+// Resolves to { apps, icons }: icons is a side map of app identity to PNG data
+// URI, kept out of the rows so a many-window app does not repeat its own icon.
 export const listOpenApps = () => invoke("list_open_apps");
 
 export const focusApp = (id) => invoke("focus_app", { id });
