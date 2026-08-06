@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ClipX — local-first clipboard manager</title>
-<meta name="description" content="ClipX keeps every snippet you copy and brings it back the instant you need it. Local, fast, keyboard-first. macOS, Windows, Linux.">
+<title>ClipX — local-first clipboard manager & app switcher</title>
+<meta name="description" content="ClipX keeps every snippet you copy and brings it back the instant you need it, and a second hotkey lists every running app so you can jump straight to it. Local, fast, keyboard-first. macOS, Windows, Linux.">
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,6 +53,7 @@
     <div id="nav-links" style="display:flex; align-items:center; gap:clamp(14px,2.5vw,30px);">
       <a href="#workflow" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Workflow</a>
       <a href="#features" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Features</a>
+      <a href="#apps" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Apps</a>
       <a href="#privacy" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">Privacy</a>
       <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#9a9ca3; text-decoration:none;">GitHub</a>
       <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; color:#0a0a0c; background:#4f8ff0; text-decoration:none; padding:8px 16px; border-radius:7px;">Download</a>
@@ -65,19 +66,25 @@
     <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:clamp(40px,5vw,72px); align-items:center; position:relative;">
       <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
         <div style="display:inline-flex; align-items:center; gap:9px; font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:#6b6d75; border:1px solid #1f2127; border-radius:999px; padding:5px 13px; margin-bottom:26px;">
-          <span style="width:6px; height:6px; border-radius:50%; background:#4f8ff0;"></span>Clipboard manager · macOS · Windows · Linux
+          <span style="width:6px; height:6px; border-radius:50%; background:#4f8ff0;"></span>Clipboard · App switcher · macOS · Windows · Linux
         </div>
-        <h1 style="font-size:clamp(2.5rem,5.6vw,4.6rem); line-height:1.02; font-weight:600; letter-spacing:-0.03em; margin-bottom:24px;">Your clipboard,<br>one keystroke away.</h1>
-        <p style="font-size:clamp(1.05rem,1.5vw,1.3rem); line-height:1.55; color:#a8aab1; max-width:30ch; margin-bottom:34px;">ClipX keeps every snippet you copy and brings it back the instant you need it. Local, fast, keyboard-first.</p>
+        <h1 style="font-size:clamp(2.5rem,5.6vw,4.6rem); line-height:1.02; font-weight:600; letter-spacing:-0.03em; margin-bottom:24px;">Your clipboard<br>and your apps,<br>one keystroke away.</h1>
+        <p style="font-size:clamp(1.05rem,1.5vw,1.3rem); line-height:1.55; color:#a8aab1; max-width:34ch; margin-bottom:34px;">ClipX keeps every snippet you copy and brings it back the instant you need it. A second hotkey lists every running app, so you can find and jump to one just as fast. Local, fast, keyboard-first.</p>
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
           <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#0a0a0c; background:#4f8ff0; text-decoration:none; padding:13px 22px; border-radius:9px; box-shadow:0 8px 24px -8px rgba(79,143,240,0.6);">Download ClipX
             <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; opacity:.7;">↓</span>
           </a>
           <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#d7d8db; background:transparent; text-decoration:none; padding:13px 22px; border-radius:9px; border:1px solid #2a2c33;">View on GitHub</a>
         </div>
-        <div style="margin-top:30px; display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">
-          <span>Summon it anywhere with</span>
-          <span style="display:inline-flex; align-items:center; gap:5px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌘ Space</span>
+        <div style="margin-top:30px; display:flex; flex-direction:column; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span>Clipboard history</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌘ Space</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span>Running apps</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌃ ⌥ Esc</span>
+          </div>
         </div>
       </div>
 
@@ -178,9 +185,10 @@
       <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
         <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">03 — Keyboard-first</div>
         <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">Built to run without your mouse.</h2>
-        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:34px;">Every action has a key. Open, search, copy, switch tabs, dismiss — your hands never leave home row. Every shortcut is configurable.</p>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:34px;">Every action has a key. Open, search, copy, switch tabs, switch apps, dismiss — your hands never leave home row. Every shortcut is configurable.</p>
         <div style="display:flex; flex-direction:column; gap:1px; background:#1a1b1f; border:1px solid #1a1b1f; border-radius:10px; overflow:hidden;">
           <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Open ClipX anywhere</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌘</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">Space</span></span></div>
+          <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">List running apps</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌃</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌥</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">Esc</span></span></div>
           <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Quick copy first results</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">1</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#5d5f67; align-self:center;">–</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">5</span></span></div>
           <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Switch Pinned / History / Sessions</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">⌘</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">1 / 2 / 3</span></span></div>
           <div style="background:#0d0e11; padding:15px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px;"><span style="color:#c9cace; font-size:0.98rem;">Dismiss instantly</span><span style="display:inline-flex; gap:5px;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; font-weight:500; color:#d7d8db; background:#17181c; border:1px solid #2f323a; border-bottom-color:#23252b; border-radius:6px; padding:4px 9px;">Esc</span></span></div>
@@ -241,12 +249,17 @@
   </section>
 
   <!-- APP SWITCHER -->
-  <section style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418; background:linear-gradient(180deg,#0a0a0c,#0c0d10,#0a0a0c);">
+  <section id="apps" style="padding:clamp(80px,12vh,150px) clamp(20px,4vw,48px); border-top:1px solid #131418; background:linear-gradient(180deg,#0a0a0c,#0c0d10,#0a0a0c);">
     <div style="max-width:1200px; margin:0 auto; display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:clamp(40px,5vw,72px); align-items:center;">
       <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
-        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">06 — Bonus: app switcher</div>
-        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">A second hotkey, for switching apps.</h2>
-        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:30px;">ClipX ships a separate global hotkey that opens a list of running apps. Type to filter by name, then activate with Enter, a number key, or a click. Same keyboard-first habit, applied to your whole desktop.</p>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">06 — App switcher</div>
+        <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">List, find and reach any running app.</h2>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:50ch; margin-bottom:30px;">A second global hotkey opens every app you have running, each with its own icon. Type to filter by name, then activate with Enter, a number key, or a click. The same keyboard-first habit, applied to your whole desktop.</p>
+        <div style="display:flex; flex-direction:column; gap:14px; margin-bottom:30px;">
+          <div style="display:flex; gap:13px; align-items:flex-start;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">→</span><span style="font-size:1rem; line-height:1.5; color:#c9cace;">Real app icons next to every name, so you recognise the row before you read it.</span></div>
+          <div style="display:flex; gap:13px; align-items:flex-start;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">→</span><span style="font-size:1rem; line-height:1.5; color:#c9cace;">Hold the hotkey, glide the mouse onto a row, let go: that app comes forward. Release anywhere else and the list stays put.</span></div>
+          <div style="display:flex; gap:13px; align-items:flex-start;"><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#4f8ff0; margin-top:3px;">→</span><span style="font-size:1rem; line-height:1.5; color:#c9cace;">Ordered by frecency. The apps you switch to often and recently sit at the top, in reach of the number keys, and hold that spot for hours.</span></div>
+        </div>
         <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
           <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">Open list of apps</span>
           <span style="display:inline-flex; gap:6px;">
@@ -256,11 +269,11 @@
           </span>
         </div>
       </div>
-      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both;">
+      <div data-reveal data-reveal-d="120" style="opacity:1; animation:clipx-rise .8s cubic-bezier(.16,1,.3,1) both; position:relative;">
         <div style="border:1px solid #26282d; border-radius:12px; overflow:hidden; box-shadow:0 40px 90px -34px rgba(0,0,0,0.9); max-width:520px;">
-          <img src="assets/app-switcher.png" alt="ClipX app switcher list of running apps" style="display:block; width:100%; height:auto;">
+          <img src="assets/app-switcher.png" alt="ClipX app switcher listing running apps with their icons" style="display:block; width:100%; height:auto;">
         </div>
-        <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">Activate with Enter, a number key, or a click.</div>
+        <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#6b6d75;">Most-used apps first. Enter, a number key, a click, or just release the hotkey.</div>
       </div>
     </div>
   </section>
@@ -271,9 +284,9 @@
       <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both;">
         <div style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:#6b6d75; margin-bottom:22px;">07 — Local-first</div>
         <h2 style="font-size:clamp(1.9rem,3.6vw,3rem); line-height:1.1; font-weight:600; letter-spacing:-0.02em; margin-bottom:24px;">Your clipboard never leaves the machine.</h2>
-        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:52ch; margin-bottom:30px;">History is stored locally in a SQLite database on your disk. There's no account, no cloud sync, and no clipboard content sent anywhere. ClipX is a quiet local tool — what you copy stays with you.</p>
+        <p style="font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.6; color:#a8aab1; max-width:52ch; margin-bottom:30px;">History is stored locally in a SQLite database on your disk, and so are the app switch counts behind the frecency ordering. There's no account, no cloud sync, and no clipboard content sent anywhere. ClipX is a quiet local tool — what you copy stays with you.</p>
         <div style="display:flex; flex-direction:column; gap:1px; background:#1a1b1f; border:1px solid #1a1b1f; border-radius:10px; overflow:hidden; max-width:440px;">
-          <div style="background:#0d0e11; padding:16px 18px; display:flex; align-items:center; gap:12px;"><span style="color:#4f8ff0; font-family:'IBM Plex Mono',monospace; font-size:13px;">✓</span><span style="color:#c9cace; font-size:0.98rem;">Stored on-device in SQLite</span></div>
+          <div style="background:#0d0e11; padding:16px 18px; display:flex; align-items:center; gap:12px;"><span style="color:#4f8ff0; font-family:'IBM Plex Mono',monospace; font-size:13px;">✓</span><span style="color:#c9cace; font-size:0.98rem;">Clipboard and app usage stored on-device in SQLite</span></div>
           <div style="background:#0d0e11; padding:16px 18px; display:flex; align-items:center; gap:12px;"><span style="color:#4f8ff0; font-family:'IBM Plex Mono',monospace; font-size:13px;">✓</span><span style="color:#c9cace; font-size:0.98rem;">No cloud dependency, no account</span></div>
           <div style="background:#0d0e11; padding:16px 18px; display:flex; align-items:center; gap:12px;"><span style="color:#4f8ff0; font-family:'IBM Plex Mono',monospace; font-size:13px;">✓</span><span style="color:#c9cace; font-size:0.98rem;">Nothing logged or sent off the machine</span></div>
         </div>
@@ -348,7 +361,7 @@
     <div style="position:absolute; bottom:-30%; left:50%; transform:translateX(-50%); width:80%; height:80%; background:radial-gradient(ellipse at center, rgba(79,143,240,0.1), transparent 65%); filter:blur(10px); pointer-events:none;"></div>
     <div data-reveal style="opacity:1; animation:clipx-rise .7s cubic-bezier(.16,1,.3,1) both; max-width:760px; margin:0 auto; text-align:center; position:relative;">
       <h2 style="font-size:clamp(2.2rem,5vw,4rem); line-height:1.05; font-weight:600; letter-spacing:-0.03em; margin-bottom:22px;">Stop copying the same thing twice.</h2>
-      <p style="font-size:clamp(1.05rem,1.5vw,1.25rem); line-height:1.55; color:#a8aab1; margin-bottom:36px;">Install ClipX, set your hotkey, and your clipboard history is always a keystroke away.</p>
+      <p style="font-size:clamp(1.05rem,1.5vw,1.25rem); line-height:1.55; color:#a8aab1; margin-bottom:36px;">Install ClipX, set your two hotkeys, and both your clipboard history and every running app are always a keystroke away.</p>
       <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center;">
         <a href="https://github.com/adrianojlt/clipx/releases" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#0a0a0c; background:#4f8ff0; text-decoration:none; padding:14px 26px; border-radius:9px; box-shadow:0 8px 24px -8px rgba(79,143,240,0.6);">Download ClipX</a>
         <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:9px; font-weight:500; font-size:15px; color:#d7d8db; background:transparent; text-decoration:none; padding:14px 26px; border-radius:9px; border:1px solid #2a2c33;">View GitHub repository</a>
@@ -360,7 +373,7 @@
   <footer style="padding:34px clamp(20px,4vw,48px); border-top:1px solid #131418; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px;">
     <div style="display:flex; align-items:center; gap:10px;">
       <span style="width:11px; height:11px; border:1.5px solid #6b6d75; border-radius:2px; box-shadow:3px -3px 0 -1.5px #0a0a0c, 4.5px -4.5px 0 0 #4f8ff0;"></span>
-      <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">ClipX — local-first clipboard manager</span>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75;">ClipX — local-first clipboard manager & app switcher</span>
     </div>
     <div style="display:flex; gap:22px;">
       <a href="https://github.com/adrianojlt/clipx" target="_blank" rel="noopener" style="font-family:'IBM Plex Mono',monospace; font-size:13px; color:#6b6d75; text-decoration:none;">GitHub</a>
