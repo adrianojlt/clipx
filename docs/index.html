@@ -426,7 +426,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var rect = section.getBoundingClientRect();
     var total = rect.height - window.innerHeight;
-    var p = clamp(-rect.top / (total || 1));
+    var raw = -rect.top / (total || 1);
+    var p = clamp(raw);
 
     var cap = smooth(0.0, 0.03, p);
     if (copyline) {
@@ -439,11 +440,11 @@ document.addEventListener('DOMContentLoaded', function () {
       toast.style.transform = 'translateX(-50%) translateY(' + (8 - 8 * tv) + 'px)';
     }
     if (kbd) {
-      var kv = smooth(0.0, 0.025, p) * (1 - smooth(0.055, 0.085, p));
+      var kv = smooth(0.0, 0.025, p) * (1 - smooth(0.14, 0.19, p));
       kbd.style.opacity = kv;
     }
     if (popup) {
-      var pv = smooth(0.03, 0.09, p);
+      var pv = smooth(-0.8, -0.2, raw);
       popup.style.opacity = pv;
       popup.style.transform = 'translateY(' + (20 - 20 * pv) + 'px) scale(' + (0.92 + 0.08 * pv) + ')';
     }
