@@ -34,10 +34,21 @@ Never treat `ShortcutState::Released` from `tauri-plugin-global-shortcut` as the
 
 ## Platform Integration
 
-Prefer native platform APIs over shelling out to `osascript` or `powershell` on any path the user waits on. The cost is the subprocess, not the work: an AppleScript that drives System Events spends about 180 ms launching the interpreter and opening the Apple Event connection, and only single-digit milliseconds on the action itself. Keep the script path as a fallback and log when it is taken, so a silent regression is visible.
+Prefer native platform APIs over shelling out to `osascript` or `powershell` on any path the user waits on. The cost is the subprocess, not the work. Measured on this project:
+
+| Path | Subprocess cost | Native equivalent |
+| --- | --- | --- |
+| macOS, AppleScript driving System Events | ~180 ms | Accessibility API in-process, single-digit ms |
+| Windows, `powershell.exe -NoProfile -Command` | ~700 ms bare, ~800-950 ms once `New-Object -ComObject WScript.Shell` is added | Win32 call in-process, ~0.01 ms |
+
+Windows PowerShell 5.1 is by far the worse of the two: it pays CLR and engine startup on every invocation, so a per-action `powershell` call is never acceptable on an interactive path. Keep the script path as a fallback and log when it is taken, so a silent regression is visible.
 
 Note the permission shift this implies on macOS: driving System Events borrows its Accessibility grant, while calling the Accessibility API directly requires the ClipX binary itself to be granted Accessibility, and a bundled build is a different identity than the dev binary.
+
+Windows has no permission shift, but `SetForegroundWindow` has a foreground lock: only the process owning the foreground window or the one that received the last input event may call it. Since the popup hides itself before raising the target, borrow the right by attaching to the foreground window's input queue with `AttachThreadInput`, which is what `WScript.Shell.AppActivate` does internally. See `raise_window` in `commands/apps.rs`.
 
 ## Backend Commands
 
 A new Tauri command must be (1) defined in a file under `src-tauri/src/commands/`, (2) re-exported via `pub mod <name>;` in `src-tauri/src/commands/mod.rs` if the file is new, and (3) listed in the `invoke_handler!` macro inside `run()` in `src-tauri/src/lib.rs`. Missing step 3 silently breaks the command at the frontend boundary. The frontend wrapper for every command lives in a per-feature service module under `src/services/` (e.g. `clipboardService.js`, `updateService.js`); components must call those wrappers, never `invoke()` directly.
+
+Service modules import `invoke` from `src/services/invoke.js`, never from `@tauri-apps/api/core`. Tauri creates the windows declared in `tauri.conf.json` before the `setup` hook finishes, so a command fired from a mount effect can beat `app.manage(AppState)` and be rejected at the command boundary with "state not managed". Every command taking `State<AppState>` shares that gap; the wrapper retries just that error, briefly and a bounded number of times.

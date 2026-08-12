@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 
 export const getHistory = () => invoke("get_history");
 
@@ -49,7 +49,7 @@ export const pinItemToSession = (content, sessionId, description) => invoke("pin
 export const listOpenApps = () => invoke("list_open_apps");
 
 // `app` is the process name: the stable key the backend records usage under,
-// since `id` carries the window title on macOS and the pid on Windows.
+// since `id` carries the window title on macOS and the window handle on Windows.
 export const focusApp = (id, app) => invoke("focus_app", { id, app });
 
 export const getCursorClientPosition = () => invoke("get_cursor_client_position");

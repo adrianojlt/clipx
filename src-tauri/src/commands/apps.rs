@@ -100,9 +100,9 @@ pub async fn focus_app(
 /// Frecency ordering for the open-apps list.
 ///
 /// Keyed on `app`, the process name, never on `id`: `id` carries the window
-/// title on macOS and the pid on Windows, so neither survives a restart, while
-/// the process name is also the icon key and the level at which the owner thinks
-/// about an app. Every window of an app inherits its score.
+/// title on macOS and the window handle on Windows, so neither survives a
+/// restart, while the process name is also the icon key and the level at which
+/// the owner thinks about an app. Every window of an app inherits its score.
 ///
 /// Sits above the `#[cfg]` platform split, so one implementation covers both and
 /// neither platform sort is touched.
@@ -893,11 +893,15 @@ mod windows_icons {
         pub path: String,
     }
 
-    /// Parse `<pid>\t<process name>\t<path>\t<window title>` lines, sorted by
-    /// `(app, title)`.
+    /// Parse `<window handle>\t<process name>\t<path>\t<window title>` lines,
+    /// sorted by `(app, title)`.
     ///
     /// The title comes last because it is the only field that can itself contain
-    /// a tab; a Windows path cannot, and a pid and process name will not.
+    /// a tab; a Windows path cannot, and a handle and process name will not.
+    ///
+    /// The handle becomes `id`, which `focus_app` hands straight to Win32, so a
+    /// row whose handle is missing, unparseable, or null is dropped here rather
+    /// than listed as something that cannot be switched to.
     pub fn parse_rows(stdout: &str) -> Vec<Row> {
 
         let mut rows: Vec<Row> = stdout
@@ -905,19 +909,19 @@ mod windows_icons {
             .filter_map(|line| {
                 let mut fields = line.splitn(4, '\t');
 
-                let pid = fields.next()?.trim();
+                let handle = fields.next()?.trim();
                 let process = fields.next()?.trim();
                 let path = fields.next()?.trim();
                 let title = fields.next()?.trim();
 
-                if title.is_empty() || pid.is_empty() {
+                if title.is_empty() || handle.parse::<isize>().ok()? == 0 {
                     return None;
                 }
 
                 Some(Row {
                     app: OpenApp {
                         name: title.to_string(),
-                        id: pid.to_string(),
+                        id: handle.to_string(),
                         app: process.to_string(),
                     },
                     path: path.to_string(),
@@ -1053,8 +1057,8 @@ mod windows_icons {
         use super::*;
         use std::sync::Arc;
 
-        fn line(pid: &str, process: &str, path: &str, title: &str) -> String {
-            format!("{pid}\t{process}\t{path}\t{title}")
+        fn line(handle: &str, process: &str, path: &str, title: &str) -> String {
+            format!("{handle}\t{process}\t{path}\t{title}")
         }
 
         #[test]
@@ -1081,7 +1085,7 @@ mod windows_icons {
                 "same-app rows must end up adjacent"
             );
 
-            assert_eq!(rows[0].app.id, "101", "id stays the pid");
+            assert_eq!(rows[0].app.id, "101", "id stays the window handle");
             assert_eq!(rows[0].path, r"C:\chrome.exe");
         }
 
@@ -1123,6 +1127,39 @@ mod windows_icons {
 
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0].app.name, "Real");
+        }
+
+        // `id` goes straight to Win32, so a row that could never be raised must
+        // not reach the list in the first place.
+        #[test]
+        fn drops_rows_without_a_usable_window_handle() {
+
+            let stdout = [
+                line("0", "service", r"C:\svc.exe", "Null Handle"),
+                line("", "blank", r"C:\blank.exe", "Empty Handle"),
+                line("0x1F4", "hex", r"C:\hex.exe", "Unparseable Handle"),
+                line("500", "chrome", r"C:\chrome.exe", "Real"),
+            ]
+            .join("\n");
+
+            let rows = parse_rows(&stdout);
+
+            assert_eq!(
+                rows.iter().map(|r| r.app.name.as_str()).collect::<Vec<_>>(),
+                vec!["Real"]
+            );
+        }
+
+        // 64-bit handles are printed in full by PowerShell and must survive the
+        // round trip that `focus_app` parses back with `isize::from_str`.
+        #[test]
+        fn keeps_a_wide_window_handle_intact() {
+
+            let handle = "4295032833";
+            let rows = parse_rows(&line(handle, "editor", r"C:\editor.exe", "draft.txt"));
+
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].app.id, handle);
         }
 
         #[test]
@@ -1257,8 +1294,16 @@ mod platform {
 
     use crate::error::AppError;
 
+    use std::ffi::c_void;
     use std::os::windows::process::CommandExt;
     use std::process::Command;
+
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, IsIconic, IsWindow,
+        SetForegroundWindow, ShowWindow, SW_RESTORE,
+    };
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -1283,9 +1328,13 @@ mod platform {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 
-    // List processes that own a visible main window. id = PID, name = window
-    // title, app = process name. `$_.Path` throws for elevated processes, so each
-    // row falls back to an empty path rather than failing the whole call.
+    // List processes that own a visible main window. id = the main window's
+    // handle, name = window title, app = process name. `$_.Path` throws for
+    // elevated processes, so each row falls back to an empty path rather than
+    // failing the whole call.
+    //
+    // The handle rather than the pid because it is what `focus_app` raises, and
+    // a process filtered in by a non-empty `MainWindowTitle` always has one.
     pub fn list_open_apps() -> Result<OpenAppsResult, AppError> {
 
         let script = "Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | \
@@ -1293,7 +1342,7 @@ mod platform {
             $p = ''; \
             try { $p = $_.Path } catch { }; \
             if ($null -eq $p) { $p = '' }; \
-            \"$($_.Id)`t$($_.ProcessName)`t$p`t$($_.MainWindowTitle)\" }";
+            \"$($_.MainWindowHandle)`t$($_.ProcessName)`t$p`t$($_.MainWindowTitle)\" }";
 
         let rows = parse_rows(&powershell(script)?);
 
@@ -1323,13 +1372,93 @@ mod platform {
         Ok(OpenAppsResult { apps, icons })
     }
 
-    // id == PID on Windows. AppActivate accepts a PID and raises the window.
+    /// Bring `hwnd` to the foreground, in-process.
+    ///
+    /// `SetForegroundWindow` is granted only to the process owning the current
+    /// foreground window or the one that received the last input event. The
+    /// popup hides itself before this runs, so ClipX has just given up the
+    /// first; attaching this thread to the foreground window's input queue is
+    /// how `AppActivate` borrows the right internally, and is why the plain call
+    /// is retried rather than trusted once.
+    fn raise_window(hwnd: HWND) -> bool {
+
+        unsafe {
+
+            // The list is a snapshot: the window may have closed between the
+            // popup opening and the user picking a row.
+            if !IsWindow(Some(hwnd)).as_bool() {
+                return false;
+            }
+
+            // A minimized window takes foreground status without ever becoming
+            // visible, so restore it before raising.
+            if IsIconic(hwnd).as_bool() {
+                let _ = ShowWindow(hwnd, SW_RESTORE);
+            }
+
+            if SetForegroundWindow(hwnd).as_bool() {
+                return true;
+            }
+
+            let foreground = GetWindowThreadProcessId(GetForegroundWindow(), None);
+            let current = GetCurrentThreadId();
+
+            // Nothing to borrow from: no foreground window, or it is already
+            // ours and the call above still failed.
+            if foreground == 0 || foreground == current {
+                return false;
+            }
+
+            if !AttachThreadInput(current, foreground, true).as_bool() {
+                return false;
+            }
+
+            let raised = SetForegroundWindow(hwnd).as_bool();
+            let _ = BringWindowToTop(hwnd);
+
+            // Detach unconditionally: leaving this thread's input queue wired to
+            // another app's would outlive the switch.
+            let _ = AttachThreadInput(current, foreground, false);
+
+            raised
+        }
+    }
+
+    /// The process owning `hwnd`, for the fallback below. `None` once the window
+    /// is gone.
+    fn window_pid(hwnd: HWND) -> Option<u32> {
+
+        let mut pid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+
+        (pid != 0).then_some(pid)
+    }
+
+    // id == the main window's handle on Windows.
     pub fn focus_app(id: &str) -> Result<(), AppError> {
 
-        let pid: u32 = id
+        let handle: isize = id
             .parse()
             .map_err(|_| AppError::Validation(format!("invalid app id: {id}")))?;
 
+        let hwnd = HWND(handle as *mut c_void);
+
+        // Fast path: raise the window through Win32 directly. Spawning
+        // `powershell.exe` for the scripted equivalent below costs about 800 ms
+        // of interpreter startup and COM activation before it does any work,
+        // and that was the whole of the delay in switching apps.
+        if raise_window(hwnd) {
+            return Ok(());
+        }
+
+        // Reached when the foreground lock refuses us even attached. Costs the
+        // ~800 ms the fast path saves.
+        log::info!("focus_app: falling back to powershell for window {handle}");
+
+        let pid = window_pid(hwnd)
+            .ok_or_else(|| AppError::State(format!("window {handle} no longer exists")))?;
+
+        // AppActivate accepts a PID and raises that process's window.
         let script = format!(
             "(New-Object -ComObject WScript.Shell).AppActivate({pid})"
         );

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./invoke";
 
 // Tauri serializes AppError as "<Kind> error: <detail>". The kind is internal
 // taxonomy, so only the detail is worth putting in front of a user.
