@@ -26,6 +26,7 @@ A lightweight clipboard manager for desktop. It keeps track of text you copy so 
 - **App switcher** - A separate global hotkey (default `Control+Option+Esc`, configurable in Settings) opens a list of currently open apps, each with its icon. Search by name, then press Enter or `1` through `9`, or click, to focus an app.
 - **Hold to switch** - Keep the app switcher hotkey held down, move the mouse over a row, and release: that app is focused straight away. Release with the cursor anywhere else and the list simply stays open.
 - **Most-used apps first** - The app list is ordered by frecency, so apps you switch to often and recently sit at the top and stay within reach of the `1` through `9` keys. Usage counts are stored locally alongside the rest of your data.
+- **Cycle an app's windows** *(Windows only)* - Takes over `Alt+Esc` to step through the windows of the app you are already in, instead of every window on the desktop the way Windows does. Nothing is shown and focus is never taken: each press just moves to the next window. Turn it off in Settings to hand `Alt+Esc` back to Windows, or record a different shortcut for it.
 - **Configurable history size** - Choose how many entries to keep (up to 50) in Settings.
 - **Tab shortcuts** - Switch between Pinned, History, and Sessions tabs with configurable keyboard shortcuts (default Command+1 / Command+2 / Command+3).
 - **Resizable window** - Adjust the popup width and height in Settings.

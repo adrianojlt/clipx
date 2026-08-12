@@ -32,6 +32,20 @@ Both are opened once in `init_app_state()`. Never open a new `Connection` from a
 
 Never treat `ShortcutState::Released` from `tauri-plugin-global-shortcut` as the moment the user let go of the keys. On macOS it fires about 100 ms after the press, when the popup takes focus, however long the chord is actually held. Detect a real release from a `keyup` in the webview instead, which the page receives once the window has focus.
 
+Windows shortcuts a shell already owns cannot be taken: the plugin calls `RegisterHotKey`, and Alt+Tab fails there with `ERROR_HOTKEY_ALREADY_REGISTERED` (1409). Alt+Esc is not held by anything and registers cleanly, which is what `cycle_windows_hotkey` binds by default; once ClipX holds it, Windows no longer cycles windows with it. Check a candidate with `RegisterHotKey` before designing around it rather than assuming the system reserves everything.
+
+Holding a registered chord makes Windows auto-repeat `WM_HOTKEY` about thirty times a second. An action that steps through something, rather than toggling a window, has to debounce or one held key runs the whole sequence: see `CYCLE_DEBOUNCE` in `commands/apps.rs`.
+
+## Cycling an App's Windows
+
+`cycle_windows` in `commands/apps.rs` rotates the focused app's own windows. Two things it depends on, both easy to break:
+
+`EnumWindows` returns windows in Z-order, and the rotation is that order. It therefore cannot be built on `list_open_apps`, which sorts by app and then by frecency; `switchable_windows_in_z_order` shares the enumeration but not the sorting.
+
+Raising the next window is not enough on its own. The outgoing window stays second in Z-order, so the next press raises it straight back and a third window is never reached. The outgoing window is also pushed to `HWND_BOTTOM`, which is what Alt+Esc does, and what makes the cycle actually reach every window.
+
+Windows of one app are matched by the owning executable's path, never by pid: Chromium and Electron apps spread windows over several processes, and some apps start one process per window.
+
 ## Platform Integration
 
 Prefer native platform APIs over shelling out to `osascript` or `powershell` on any path the user waits on. The cost is the subprocess, not the work. Measured on this project:

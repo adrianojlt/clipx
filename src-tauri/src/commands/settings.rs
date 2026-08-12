@@ -155,6 +155,39 @@ mod tests {
         assert_eq!(s.dismissed_version, "0.1.29");
     }
 
+    // Switching the cycler off must not disturb the binding: Alt+Esc cannot be
+    // recorded back, so a forgotten chord is unrecoverable from the recorder.
+    #[test]
+    fn disabling_the_cycler_releases_the_shortcut_but_keeps_the_binding() {
+
+        let hotkey = "Alt+Esc";
+
+        assert!(
+            super::cycle_shortcut(hotkey, true).is_some(),
+            "enabled: the chord must be claimed"
+        );
+        assert!(
+            super::cycle_shortcut(hotkey, false).is_none(),
+            "disabled: nothing may be claimed"
+        );
+    }
+
+    #[test]
+    fn an_unbound_cycler_claims_nothing_even_when_enabled() {
+        assert!(super::cycle_shortcut("", true).is_none());
+        assert!(super::cycle_shortcut("   ", true).is_none());
+    }
+
+    // Spelling must not decide identity, or turning the feature off and on again
+    // would fail to release what it registered.
+    #[test]
+    fn the_same_chord_spelled_differently_is_one_shortcut() {
+        assert_eq!(
+            super::cycle_shortcut("Alt+Esc", true),
+            super::cycle_shortcut("Option+Escape", true)
+        );
+    }
+
     #[test]
     fn apply_field_valid_values() {
         let mut s = Settings::default();
@@ -233,6 +266,76 @@ pub fn update_open_apps_shortcut(
         swap_global_shortcut(&app, &s.open_apps_hotkey, &shortcut)?;
 
         s.open_apps_hotkey = shortcut;
+        s.clone()
+    };
+
+    save_settings(&app, &settings)
+}
+
+/// The shortcut the cycler should be holding, or `None` when it should hold
+/// none: switched off, or left without a binding.
+fn cycle_shortcut(hotkey: &str, enabled: bool) -> Option<Shortcut> {
+
+    if !enabled || hotkey.trim().is_empty() {
+        return None;
+    }
+
+    normalize_shortcut(hotkey).parse::<Shortcut>().ok()
+}
+
+/// Apply the cycler's binding and its on/off state together.
+///
+/// One command for both, because they decide a single thing between them -
+/// which shortcut, if any, ClipX holds - and applying them separately would
+/// leave the hotkey registered or released according to whichever landed last.
+#[tauri::command]
+pub fn update_cycle_windows_shortcut(
+    shortcut: String,
+    enabled: bool,
+    state: State<AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), AppError> {
+
+    let settings = {
+
+        let mut s = state
+            .settings
+            .lock()
+            .map_err(|e| AppError::State(format!("settings mutex poisoned: {e}")))?;
+
+        // A binding that cannot be parsed is refused rather than silently
+        // dropped, but only when it is actually going to be used.
+        let desired = if enabled && !shortcut.trim().is_empty() {
+            Some(
+                normalize_shortcut(&shortcut)
+                    .parse::<Shortcut>()
+                    .map_err(|e| AppError::Shortcut(format!("Failed to parse '{shortcut}': {e}")))?,
+            )
+        } else {
+            None
+        };
+
+        let current = cycle_shortcut(&s.cycle_windows_hotkey, s.cycle_windows_enabled);
+
+        if current != desired {
+
+            // Claim the new one first: if the registration is refused, the old
+            // binding is still live and the settings are left untouched.
+            if let Some(next) = desired {
+                app.global_shortcut()
+                    .on_shortcut(next, shortcut_handler)
+                    .map_err(|e| AppError::Shortcut(e.to_string()))?;
+            }
+
+            if let Some(previous) = current {
+                if let Err(e) = app.global_shortcut().unregister(previous) {
+                    log::warn!("update_cycle_windows_shortcut: failed to unregister: {e}");
+                }
+            }
+        }
+
+        s.cycle_windows_hotkey = shortcut;
+        s.cycle_windows_enabled = enabled;
         s.clone()
     };
 

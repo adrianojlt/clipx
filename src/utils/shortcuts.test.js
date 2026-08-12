@@ -90,3 +90,23 @@ describe("matchesShortcut", () => {
     expect(matches(cmdEvent, "Command+1")).toBe(true);
   });
 });
+
+// Gates the window cycler, whose backend exists only on Windows. Linux is the
+// case that makes this a real distinction rather than the inverse of IS_MAC.
+describe("IS_WINDOWS", () => {
+  it("is true on Windows", async () => {
+    const { IS_WINDOWS } = await loadForPlatform("Win32");
+    expect(IS_WINDOWS).toBe(true);
+  });
+
+  it("is false on macOS", async () => {
+    const { IS_WINDOWS } = await loadForPlatform("MacIntel");
+    expect(IS_WINDOWS).toBe(false);
+  });
+
+  it("is false on Linux, where !IS_MAC would wrongly be true", async () => {
+    const { IS_WINDOWS, IS_MAC } = await loadForPlatform("Linux x86_64");
+    expect(IS_WINDOWS).toBe(false);
+    expect(IS_MAC).toBe(false);
+  });
+});

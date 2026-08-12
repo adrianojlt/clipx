@@ -97,6 +97,50 @@ pub async fn focus_app(
     Ok(())
 }
 
+// Holding the hotkey down makes Windows auto-repeat WM_HOTKEY about thirty
+// times a second, which would spin the rotation rather than advance it one
+// window per press. Deliberate tapping never gets this close together.
+const CYCLE_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(90);
+
+fn cycle_allowed() -> bool {
+
+    static LAST: std::sync::Mutex<Option<std::time::Instant>> = std::sync::Mutex::new(None);
+
+    // A poisoned lock would disable the hotkey for the rest of the process;
+    // rotating an extra time is the cheaper failure.
+    let Ok(mut last) = LAST.lock() else {
+        return true;
+    };
+
+    let now = std::time::Instant::now();
+
+    if last.is_some_and(|prev| now.duration_since(prev) < CYCLE_DEBOUNCE) {
+        return false;
+    }
+
+    *last = Some(now);
+
+    true
+}
+
+/// Rotate the windows of whichever app currently has focus.
+///
+/// Called straight from the shortcut handler rather than through a Tauri
+/// command: the rotation shows no UI and never gives ClipX focus, so the
+/// frontend is not involved at all.
+pub(crate) fn cycle_windows() {
+
+    if !cycle_allowed() {
+        return;
+    }
+
+    match platform::cycle_active_app_windows() {
+        Ok(true) => {}
+        Ok(false) => log::debug!("cycle_windows: the focused app has nothing to cycle to"),
+        Err(e) => log::warn!("cycle_windows: {e}"),
+    }
+}
+
 /// Frecency ordering for the open-apps list.
 ///
 /// Keyed on `app`, the process name, never on `id`: `id` carries the window
@@ -620,6 +664,15 @@ mod platform {
                 (status == AX_SUCCESS && !value.is_null()).then_some(value)
             }
         }
+    }
+
+    /// macOS cycles an app's own windows with Command+` already, so ClipX has no
+    /// reason to reimplement it. Only reachable if the hotkey, unset here by
+    /// default, is bound by hand.
+    pub fn cycle_active_app_windows() -> Result<bool, AppError> {
+        Err(AppError::State(
+            "cycling an app's windows is Windows-only; macOS has Command+`".into(),
+        ))
     }
 
     // id == "<pid>\u{1f}<process name>\u{1f}<window title>". Bring that exact
@@ -1306,9 +1359,151 @@ mod windows_icons {
     }
 }
 
+// Rotation order for the window cycler. Kept outside `platform` for the same
+// reason as `windows_icons`: pure logic, unit-testable from any development
+// machine, with the Win32 calls left on the other side of the boundary.
+#[cfg(any(target_os = "windows", test))]
+mod window_cycle {
+
+    /// The next window to raise when cycling within one app.
+    ///
+    /// `windows` is every switchable window on the desktop in Z-order, front to
+    /// back, each paired with the identity of the app that owns it; `current` is
+    /// the focused window. Returns the entry that follows `current` among its own
+    /// app's windows, wrapping at the end.
+    ///
+    /// `None` when there is nothing to cycle to: the focused window is not one
+    /// the enumeration offers (ClipX's own popup, desktop furniture), or its app
+    /// has only the one window.
+    pub fn next_window(windows: &[(isize, String)], current: isize) -> Option<isize> {
+
+        let identity = &windows.iter().find(|(handle, _)| *handle == current)?.1;
+
+        let same_app: Vec<isize> = windows
+            .iter()
+            .filter(|(_, owner)| owner == identity)
+            .map(|(handle, _)| *handle)
+            .collect();
+
+        if same_app.len() < 2 {
+            return None;
+        }
+
+        let at = same_app.iter().position(|handle| *handle == current)?;
+
+        Some(same_app[(at + 1) % same_app.len()])
+    }
+
+    #[cfg(test)]
+    mod tests {
+
+        use super::next_window;
+
+        fn desktop(entries: &[(isize, &str)]) -> Vec<(isize, String)> {
+            entries
+                .iter()
+                .map(|(handle, owner)| (*handle, owner.to_string()))
+                .collect()
+        }
+
+        #[test]
+        fn advances_to_the_next_window_of_the_same_app() {
+
+            let windows = desktop(&[(1, "chrome.exe"), (2, "chrome.exe"), (3, "chrome.exe")]);
+
+            assert_eq!(next_window(&windows, 1), Some(2));
+        }
+
+        // The whole point of the feature: windows of other apps sit between the
+        // focused app's own in Z-order and must be stepped over, not landed on.
+        #[test]
+        fn steps_over_windows_of_other_apps() {
+
+            let windows = desktop(&[
+                (1, "code.exe"),
+                (2, "chrome.exe"),
+                (3, "explorer.exe"),
+                (4, "code.exe"),
+            ]);
+
+            assert_eq!(next_window(&windows, 1), Some(4));
+        }
+
+        // Reachable once the cycler has demoted a window to the back of the
+        // Z-order and the user comes back round to it.
+        #[test]
+        fn wraps_around_at_the_end() {
+
+            let windows = desktop(&[(1, "code.exe"), (2, "chrome.exe"), (3, "code.exe")]);
+
+            assert_eq!(next_window(&windows, 3), Some(1));
+        }
+
+        // Three presses must visit all three windows. Raising alone would leave
+        // the previous window second in Z-order and ping-pong between two, which
+        // is why the caller also sends the outgoing window to the back: this
+        // models the Z-order it produces.
+        #[test]
+        fn three_presses_visit_every_window() {
+
+            let mut order = vec![1isize, 2, 3];
+            let mut visited = Vec::new();
+
+            for _ in 0..3 {
+
+                let windows = desktop(
+                    &order
+                        .iter()
+                        .map(|handle| (*handle, "code.exe"))
+                        .collect::<Vec<_>>(),
+                );
+
+                let current = order[0];
+                let next = next_window(&windows, current).expect("three windows must cycle");
+
+                visited.push(next);
+
+                // Raised to the front, and the outgoing window demoted to the back.
+                order.retain(|h| *h != next && *h != current);
+                order.insert(0, next);
+                order.push(current);
+            }
+
+            assert_eq!(visited, vec![2, 3, 1], "the third window was never reached");
+        }
+
+        #[test]
+        fn single_window_app_has_nothing_to_cycle() {
+
+            let windows = desktop(&[(1, "notepad.exe"), (2, "chrome.exe")]);
+
+            assert_eq!(next_window(&windows, 1), None);
+        }
+
+        #[test]
+        fn unlisted_focused_window_is_not_cycled() {
+
+            let windows = desktop(&[(1, "chrome.exe"), (2, "chrome.exe")]);
+
+            assert_eq!(next_window(&windows, 99), None);
+        }
+
+        // Two elevated apps both fall back to a pid-derived identity; those must
+        // not read as one app just because neither path could be opened.
+        #[test]
+        fn distinct_fallback_identities_do_not_merge() {
+
+            let windows = desktop(&[(1, "pid:1000"), (2, "pid:2000")]);
+
+            assert_eq!(next_window(&windows, 1), None);
+        }
+    }
+}
+
 #[cfg(target_os = "windows")]
 mod platform {
 
+    use super::window_cycle::next_window;
     use super::windows_icons::{
         build_rows, extraction_script, icon_cache, icons_by_app, parse_icon_pairs, split_cached,
         store, RawWindow,
@@ -1338,8 +1533,9 @@ mod platform {
         BringWindowToTop, EnumChildWindows, EnumWindows, GetAncestor, GetClassNameW,
         GetForegroundWindow,
         GetWindowLongW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-        IsWindow, IsWindowVisible, SetForegroundWindow, ShowWindow, GA_ROOTOWNER, GWL_EXSTYLE,
-        SW_RESTORE, WS_EX_TOOLWINDOW,
+        IsWindow, IsWindowVisible, SetForegroundWindow, SetWindowPos, ShowWindow, GA_ROOTOWNER,
+        GWL_EXSTYLE, HWND_BOTTOM, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_RESTORE,
+        WS_EX_TOOLWINDOW,
     };
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -1749,6 +1945,121 @@ mod platform {
         (pid != 0).then_some(pid)
     }
 
+    /// Drop `hwnd` to the bottom of the Z-order, without activating, moving or
+    /// resizing it. Permitted across processes: the foreground lock guards
+    /// activation, not stacking.
+    fn send_to_back(hwnd: HWND) {
+
+        unsafe {
+            let _ = SetWindowPos(
+                hwnd,
+                Some(HWND_BOTTOM),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            );
+        }
+    }
+
+    /// What makes two windows "the same app" to the cycler: the path of the
+    /// executable behind them.
+    ///
+    /// The path rather than the pid, because Chromium and Electron apps spread
+    /// their windows across several processes while some apps start a fresh
+    /// process per window, and pid-matching splits one app into several in both
+    /// cases. Where the path cannot be read - an unelevated ClipX cannot open an
+    /// elevated process - the pid stands in: still groups the windows of a
+    /// single-process app, and never merges two different ones.
+    fn app_identity(hwnd: HWND, cache: &mut HashMap<u32, String>) -> String {
+
+        let owner = window_pid(hwnd).unwrap_or(0);
+
+        // A UWP window is enumerated as its ApplicationFrameHost frame; the app
+        // inside is what decides which windows belong together.
+        let pid = hosted_pid(hwnd, owner).unwrap_or(owner);
+
+        cache
+            .entry(pid)
+            .or_insert_with(|| match process_path(pid) {
+                path if path.is_empty() => format!("pid:{pid}"),
+                // Windows paths are case-insensitive; two spellings of one
+                // executable must not read as two apps.
+                path => path.to_lowercase(),
+            })
+            .clone()
+    }
+
+    /// Every switchable window on the desktop, front to back, paired with its
+    /// app identity.
+    ///
+    /// Deliberately not built on `list_open_apps`: `EnumWindows` hands windows
+    /// back in Z-order and the rotation depends on that, while the listing path
+    /// sorts by app and then by frecency, so the order is gone by the time the
+    /// rows come back.
+    fn switchable_windows_in_z_order() -> Vec<(isize, String)> {
+
+        let mut handles: Vec<HWND> = Vec::new();
+
+        unsafe {
+            let _ = EnumWindows(
+                Some(collect_window),
+                LPARAM(&mut handles as *mut Vec<HWND> as isize),
+            );
+        }
+
+        let mut identities: HashMap<u32, String> = HashMap::new();
+
+        handles
+            .into_iter()
+            .map(|hwnd| (hwnd.0 as isize, app_identity(hwnd, &mut identities)))
+            .collect()
+    }
+
+    /// Rotate the focused app's windows, the way Alt+Esc rotates the desktop's.
+    ///
+    /// Raises the app's next window and sends the outgoing one to the back of
+    /// the Z-order. The demotion is what makes a third window reachable: raising
+    /// alone leaves the outgoing window second in Z-order, so the next press
+    /// would raise it straight back and the cycle would never leave that pair.
+    ///
+    /// `Ok(false)` means there was nothing to do, which is the ordinary result
+    /// for a single-window app.
+    pub fn cycle_active_app_windows() -> Result<bool, AppError> {
+
+        let foreground = unsafe { GetForegroundWindow() };
+
+        if foreground.is_invalid() {
+            return Ok(false);
+        }
+
+        // A focused dialog or palette is reached through its owner, which is the
+        // window the enumeration lists.
+        let current = unsafe { GetAncestor(foreground, GA_ROOTOWNER) };
+
+        let windows = switchable_windows_in_z_order();
+
+        let Some(next) = next_window(&windows, current.0 as isize) else {
+            return Ok(false);
+        };
+
+        let next = HWND(next as *mut c_void);
+
+        // Nothing has moved yet, so a refusal here leaves the desktop exactly as
+        // it was rather than half-rotated.
+        if !raise_window(next) {
+            return Err(AppError::State(format!(
+                "could not raise window {}",
+                next.0 as isize
+            )));
+        }
+
+        send_to_back(current);
+
+        Ok(true)
+    }
+
     // id == that window's own handle on Windows.
     pub fn focus_app(id: &str) -> Result<(), AppError> {
 
@@ -1857,6 +2168,79 @@ mod platform {
                 eprintln!("  {app:?} contributed {windows} windows");
             }
         }
+
+        // Acceptance evidence for the cycler against the real desktop: how it
+        // groups the windows on screen, and where each press would land.
+        //
+        // Observational on purpose - it enumerates and decides but raises
+        // nothing - so running it on a live session moves no windows.
+        #[test]
+        fn groups_the_live_desktop_into_cycles() {
+
+            let windows = super::switchable_windows_in_z_order();
+
+            if windows.is_empty() {
+                eprintln!("skipped: no switchable windows on this desktop");
+                return;
+            }
+
+            let mut by_app: HashMap<&str, Vec<isize>> = HashMap::new();
+
+            for (handle, identity) in &windows {
+                by_app.entry(identity.as_str()).or_default().push(*handle);
+            }
+
+            eprintln!(
+                "{} switchable windows across {} apps",
+                windows.len(),
+                by_app.len()
+            );
+
+            for (identity, handles) in &by_app {
+
+                let name = std::path::Path::new(identity)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| identity.to_string());
+
+                if handles.len() < 2 {
+                    eprintln!("  {name}: 1 window, nothing to cycle");
+                    assert_eq!(
+                        super::next_window(&windows, handles[0]),
+                        None,
+                        "{name}: a lone window must not cycle"
+                    );
+                    continue;
+                }
+
+                // Stepping from any window of the app must stay inside the app,
+                // never stand still, and reach every one of its windows.
+                let mut visited = Vec::new();
+                let mut at = handles[0];
+
+                for _ in 0..handles.len() {
+                    let next = super::next_window(&windows, at)
+                        .unwrap_or_else(|| panic!("{name}: {at} should cycle"));
+
+                    assert_ne!(next, at, "{name}: cycled to itself");
+                    assert!(handles.contains(&next), "{name}: cycled out of the app");
+
+                    visited.push(next);
+                    at = next;
+                }
+
+                visited.sort_unstable();
+                let mut expected = handles.clone();
+                expected.sort_unstable();
+
+                assert_eq!(
+                    visited, expected,
+                    "{name}: pressing once per window must visit them all"
+                );
+
+                eprintln!("  {name}: {} windows, full cycle reachable", handles.len());
+            }
+        }
     }
 }
 
@@ -1872,6 +2256,10 @@ mod platform {
 
     pub fn focus_app(_id: &str) -> Result<(), AppError> {
         Err(AppError::State("focusing apps not supported on this platform".into()))
+    }
+
+    pub fn cycle_active_app_windows() -> Result<bool, AppError> {
+        Err(AppError::State("cycling app windows not supported on this platform".into()))
     }
 }
 

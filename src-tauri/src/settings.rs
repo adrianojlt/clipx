@@ -16,6 +16,10 @@ pub struct Settings {
     pub tab_shortcut_sessions: String,
     pub tab_shortcut_find: String,
     pub open_apps_hotkey: String,
+    #[serde(default = "default_cycle_windows_hotkey")]
+    pub cycle_windows_hotkey: String,
+    #[serde(default = "default_cycle_windows_enabled")]
+    pub cycle_windows_enabled: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default = "default_true")]
@@ -26,6 +30,30 @@ pub struct Settings {
 
 fn default_theme() -> String {
     "dark".to_string()
+}
+
+/// Alt+Esc on Windows, the shortcut the window cycler replaces: the OS cycles
+/// every window on the desktop, this cycles the focused app's own.
+///
+/// Left unset everywhere else, so nothing is registered on a platform that has
+/// no implementation to run.
+fn default_cycle_windows_hotkey() -> String {
+    if cfg!(target_os = "windows") {
+        "Alt+Esc".to_string()
+    } else {
+        String::new()
+    }
+}
+
+/// Whether the cycler holds its hotkey.
+///
+/// Kept apart from the binding so switching the feature off preserves the chord.
+/// Alt+Esc cannot be recorded back: while ClipX holds it `RegisterHotKey` eats
+/// the keystroke before the webview sees it, and while Windows holds it the
+/// press moves focus off the settings window. An unset binding would therefore
+/// be a one-way door, which is what this flag exists to avoid.
+fn default_cycle_windows_enabled() -> bool {
+    cfg!(target_os = "windows")
 }
 
 fn default_true() -> bool {
@@ -45,6 +73,8 @@ impl Default for Settings {
             tab_shortcut_sessions: format!("{tab_mod}+3"),
             tab_shortcut_find: format!("{tab_mod}+F"),
             open_apps_hotkey: "Control+Option+Esc".to_string(),
+            cycle_windows_hotkey: default_cycle_windows_hotkey(),
+            cycle_windows_enabled: default_cycle_windows_enabled(),
             theme: default_theme(),
             check_updates_on_startup: true,
             dismissed_version: String::new(),
@@ -107,6 +137,20 @@ impl Settings {
 
         if let Some(v) = map.get("open_apps_hotkey") {
             s.open_apps_hotkey = v.clone();
+        }
+
+        if let Some(v) = map.get("cycle_windows_hotkey") {
+            s.cycle_windows_hotkey = v.clone();
+        }
+
+        if let Some(raw) = map.get("cycle_windows_enabled") {
+            match raw.parse() {
+                Ok(v) => s.cycle_windows_enabled = v,
+                Err(_) => log::warn!(
+                    "settings migration: invalid cycle_windows_enabled {:?}, using default",
+                    raw
+                ),
+            }
         }
 
         if let Some(v) = map.get("theme") {
@@ -415,6 +459,8 @@ mod tests {
         // New keys take their defaults.
         assert!(loaded.check_updates_on_startup);
         assert_eq!(loaded.dismissed_version, "");
+        assert_eq!(loaded.cycle_windows_hotkey, default_cycle_windows_hotkey());
+        assert_eq!(loaded.cycle_windows_enabled, default_cycle_windows_enabled());
 
         // Pre-existing values survive, i.e. the file parsed rather than being discarded.
         assert_eq!(loaded.theme, "light");
@@ -442,6 +488,8 @@ mod tests {
             tab_shortcut_sessions: "D".to_string(),
             tab_shortcut_find: "C".to_string(),
             open_apps_hotkey: "F".to_string(),
+            cycle_windows_hotkey: "G".to_string(),
+            cycle_windows_enabled: true,
             theme: "dark".to_string(),
             check_updates_on_startup: true,
             dismissed_version: String::new(),

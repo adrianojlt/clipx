@@ -9,16 +9,23 @@ import {
   setSetting,
   updateShortcut,
   updateOpenAppsShortcut,
+  updateCycleWindowsShortcut,
   applyWindowSize,
   logError,
 } from "../services/clipboardService";
 import { checkForUpdate } from "../services/updateService";
 import { exportData, previewImport, importData } from "../services/transferService";
-import { IS_MAC } from "../utils/shortcuts";
+import { IS_MAC, IS_WINDOWS } from "../utils/shortcuts";
 import { resolveTheme, applyTheme } from "../theme";
 import "./Settings.css";
 
 const TAB_MOD = IS_MAC ? "Command" : "Alt";
+
+// Mirrors default_cycle_windows_hotkey() in settings.rs: the window cycler only
+// has a Windows implementation, so it is left unbound elsewhere. The condition
+// has to be Windows rather than "not macOS" to match the cfg! the backend uses,
+// or a Linux build would default to a chord it cannot act on.
+const CYCLE_WINDOWS_DEFAULT = IS_WINDOWS ? "Alt+Esc" : "";
 
 const SYM = {
   Command: "⌘", Ctrl: "⌃", Control: "⌃", Option: "⌥", Alt: "⌥",
@@ -66,7 +73,11 @@ function KeyChips({ value }) {
   );
 }
 
-function HotkeyField({ label, hint, value, onChange }) {
+// `onReset` adds a button restoring the default chord. Needed for any hotkey the
+// recorder cannot capture: a system shortcut ClipX has taken over is swallowed
+// by RegisterHotKey before the webview sees it, and released it moves focus off
+// this window instead, so recording it back is impossible either way.
+function HotkeyField({ label, hint, value, onChange, disabled = false, onReset = null }) {
 
   const [recording, setRecording] = useState(false);
   const [draft, setDraft] = useState([]);
@@ -77,7 +88,7 @@ function HotkeyField({ label, hint, value, onChange }) {
 
   useEffect(() => {
 
-    if (!recording) return;
+    if (!recording || disabled) return;
 
     const heldKeys = new Set();
 
@@ -144,7 +155,7 @@ function HotkeyField({ label, hint, value, onChange }) {
       window.removeEventListener("keydown", down, true);
       window.removeEventListener("keyup", up, true);
     };
-  }, [recording]);
+  }, [recording, disabled]);
 
   useEffect(() => {
     if (!recording) return;
@@ -161,7 +172,7 @@ function HotkeyField({ label, hint, value, onChange }) {
   const display = recording && draft.length ? draft.join("+") : value;
 
   return (
-    <div className="field" ref={wrapRef}>
+    <div className={`field${disabled ? " is-disabled" : ""}`} ref={wrapRef}>
       <div className="field-label">{label}</div>
       <div className={`hotkey${recording ? " is-recording" : ""}`}>
         <div className="hotkey-display">
@@ -173,9 +184,15 @@ function HotkeyField({ label, hint, value, onChange }) {
             <KeyChips value={display} />
           )}
         </div>
+        {onReset && !recording && (
+          <button type="button" className="btn-record" disabled={disabled} onClick={onReset}>
+            Reset
+          </button>
+        )}
         <button
           type="button"
           className={`btn-record${recording ? " is-active" : ""}`}
+          disabled={disabled}
           onClick={() => { setRecording((r) => !r); setDraft([]); }}
         >
           {recording ? "Cancel" : "Record"}
@@ -302,6 +319,30 @@ function HotkeysPanel({ s, set }) {
         value={s.openAppsHotkey}
         onChange={(v) => set("openAppsHotkey", v)}
       />
+      {IS_WINDOWS && (
+        <>
+          <HotkeyField
+            label="Cycle Windows of Active App"
+            hint={`Steps through the windows of the app in front, instead of every window on the desktop the way ${CYCLE_WINDOWS_DEFAULT} normally does. Turn it off to hand the shortcut back to Windows.`}
+            value={s.cycleWindowsHotkey}
+            onChange={(v) => set("cycleWindowsHotkey", v)}
+            disabled={!s.cycleWindowsEnabled}
+            onReset={
+              s.cycleWindowsHotkey === CYCLE_WINDOWS_DEFAULT
+                ? null
+                : () => set("cycleWindowsHotkey", CYCLE_WINDOWS_DEFAULT)
+            }
+          />
+          <label className="field-toggle">
+            <input
+              type="checkbox"
+              checked={s.cycleWindowsEnabled}
+              onChange={(e) => set("cycleWindowsEnabled", e.target.checked)}
+            />
+            <span>Enable this shortcut</span>
+          </label>
+        </>
+      )}
       <div className="section-header">
         <h3>In-app Shortcuts</h3>
         <p>Used when ClipX is focused.</p>
@@ -615,6 +656,8 @@ function Settings() {
   const [s, setS] = useState({
     hotkey: "",
     openAppsHotkey: "Control+Option+Esc",
+    cycleWindowsHotkey: CYCLE_WINDOWS_DEFAULT,
+    cycleWindowsEnabled: IS_WINDOWS,
     tabShortcutPinned: `${TAB_MOD}+1`,
     tabShortcutHistory: `${TAB_MOD}+2`,
     tabShortcutSessions: `${TAB_MOD}+3`,
@@ -672,9 +715,11 @@ function Settings() {
         return fallback;
       }
     };
-    const [hotkey, openApps, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
+    const [hotkey, openApps, cycleWindows, cycleWindowsOn, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
       safeGet("hotkey", "Option+Space"),
       safeGet("open_apps_hotkey", "Control+Option+Esc"),
+      safeGet("cycle_windows_hotkey", CYCLE_WINDOWS_DEFAULT),
+      safeGet("cycle_windows_enabled", IS_WINDOWS, (v) => v === "true"),
       safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
       safeGet("tab_shortcut_history", `${TAB_MOD}+2`),
       safeGet("tab_shortcut_sessions", `${TAB_MOD}+3`),
@@ -685,7 +730,7 @@ function Settings() {
       safeGet("theme", "dark"),
       safeGet("check_updates_on_startup", true, (v) => v === "true"),
     ]);
-    setS({ hotkey, openAppsHotkey: openApps, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
+    setS({ hotkey, openAppsHotkey: openApps, cycleWindowsHotkey: cycleWindows, cycleWindowsEnabled: cycleWindowsOn, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
   }, []);
 
   useEffect(() => {
@@ -720,6 +765,7 @@ function Settings() {
 
     await attempt(() => updateShortcut(s.hotkey));
     await attempt(() => updateOpenAppsShortcut(s.openAppsHotkey));
+    await attempt(() => updateCycleWindowsShortcut(s.cycleWindowsHotkey, s.cycleWindowsEnabled));
 
     await attempt(() => setSetting("tab_shortcut_pinned", s.tabShortcutPinned));
     await attempt(() => setSetting("tab_shortcut_history", s.tabShortcutHistory));

@@ -106,6 +106,7 @@ pub fn run() {
             commands::settings::set_setting,
             commands::settings::update_shortcut,
             commands::settings::update_open_apps_shortcut,
+            commands::settings::update_cycle_windows_shortcut,
             commands::settings::apply_window_size,
             commands::clipboard::get_history,
             commands::pinned::get_pinned,
@@ -263,12 +264,17 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
 
     let state = app.state::<AppState>();
 
-    let (hotkey_str, open_apps_str) = {
+    let (hotkey_str, open_apps_str, cycle_windows_str, cycle_windows_enabled) = {
         let s = state
             .settings
             .lock()
             .map_err(|_| AppError::State("settings poisoned".into()))?;
-        (s.hotkey.clone(), s.open_apps_hotkey.clone())
+        (
+            s.hotkey.clone(),
+            s.open_apps_hotkey.clone(),
+            s.cycle_windows_hotkey.clone(),
+            s.cycle_windows_enabled,
+        )
     };
 
     register_shortcut(app, &hotkey_str)?;
@@ -276,6 +282,14 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
     // the open-apps shortcut is best-effort: a failure here must not break the clipboard hotkey
     if let Err(e) = register_shortcut(app, &open_apps_str) {
         log::error!("failed to register open-apps global shortcut: {e}");
+    }
+
+    // Best-effort too. Switched off, or left unbound as it is by default off
+    // Windows, ClipX claims nothing and the shortcut stays the system's.
+    if cycle_windows_enabled && !cycle_windows_str.is_empty() {
+        if let Err(e) = register_shortcut(app, &cycle_windows_str) {
+            log::error!("failed to register window-cycle global shortcut: {e}");
+        }
     }
 
     Ok(())

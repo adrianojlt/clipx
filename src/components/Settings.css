@@ -101,6 +101,33 @@ body {
   margin: 0 0 14px;
 }
 
+/* A switched-off hotkey: still shown, so the chord it would claim stays visible
+   and can be restored, but not editable. */
+.field.is-disabled .field-label,
+.field.is-disabled .hotkey {
+  opacity: 0.5;
+}
+
+.field.is-disabled .btn-record {
+  cursor: default;
+}
+
+/* On/off for the hotkey directly above it. */
+.field-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 16px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.field-toggle input {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .field-label {
   font-size: 13px;
   font-weight: 500;

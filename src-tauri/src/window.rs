@@ -2,10 +2,46 @@ use crate::AppState;
 use tauri::{Emitter, Manager, Monitor, PhysicalPosition, WebviewWindow};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutEvent, ShortcutState};
 
+/// Whether `shortcut` is the one `configured` describes. An unset or unparseable
+/// setting matches nothing.
+fn matches(shortcut: &Shortcut, configured: &str) -> bool {
+    crate::settings::normalize_shortcut(configured)
+        .parse::<Shortcut>()
+        .is_ok_and(|configured| shortcut == &configured)
+}
+
 pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, event: ShortcutEvent) {
 
     // ignore key-up events
     if event.state() != ShortcutState::Pressed {
+        return;
+    }
+
+    let state = app.state::<AppState>();
+
+    let (width, height, open_apps_hotkey, cycle_windows_hotkey, cycle_windows_enabled) = state
+        .settings
+        .lock()
+        .map(|s| {
+            (
+                s.window_width,
+                s.window_height,
+                s.open_apps_hotkey.clone(),
+                s.cycle_windows_hotkey.clone(),
+                s.cycle_windows_enabled,
+            )
+        })
+        .unwrap_or((400.0, 600.0, String::new(), String::new(), false));
+
+    // The window cycler shows no UI and must not take focus: it acts on whatever
+    // app is in front, which the popup would displace. Handled before the window
+    // is touched at all.
+    //
+    // Switched off the shortcut is unregistered and cannot fire, so the flag is
+    // belt and braces: it keeps a failed unregister from leaving the feature
+    // running after the user turned it off.
+    if cycle_windows_enabled && matches(shortcut, &cycle_windows_hotkey) {
+        crate::commands::apps::cycle_windows();
         return;
     }
 
@@ -18,19 +54,11 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
         return;
     }
 
-    // get cursor position
-    let state = app.state::<AppState>();
-
-    let (width, height, open_apps_hotkey) = state
-        .settings
-        .lock()
-        .map(|s| (s.window_width, s.window_height, s.open_apps_hotkey.clone()))
-        .unwrap_or((400.0, 600.0, String::new()));
-
     // decide which mode the frontend should render based on which shortcut fired
-    let mode = match crate::settings::normalize_shortcut(&open_apps_hotkey).parse::<Shortcut>() {
-        Ok(apps_shortcut) if shortcut == &apps_shortcut => "apps",
-        _ => "clipboard",
+    let mode = if matches(shortcut, &open_apps_hotkey) {
+        "apps"
+    } else {
+        "clipboard"
     };
 
     let Ok(cursor) = app.cursor_position() else {

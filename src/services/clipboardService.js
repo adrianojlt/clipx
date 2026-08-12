@@ -28,6 +28,9 @@ export const updateShortcut = (shortcut) => invoke("update_shortcut", { shortcut
 
 export const updateOpenAppsShortcut = (shortcut) => invoke("update_open_apps_shortcut", { shortcut });
 
+export const updateCycleWindowsShortcut = (shortcut, enabled) =>
+  invoke("update_cycle_windows_shortcut", { shortcut, enabled });
+
 export const applyWindowSize = () => invoke("apply_window_size");
 
 export const logError = (level, message) => invoke("log_frontend_error", { level, message });

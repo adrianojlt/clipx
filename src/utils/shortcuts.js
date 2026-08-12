@@ -1,5 +1,9 @@
 export const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform || navigator.userAgent || "");
 
+// Windows specifically, not "everything that is not a Mac": Linux builds ship
+// too, and a feature with a Windows-only backend must not offer itself there.
+export const IS_WINDOWS = typeof navigator !== "undefined" && /win/i.test(navigator.platform || navigator.userAgent || "");
+
 export function parseShortcut(shortcut) {
 
   const parts = shortcut.split("+").map((p) => p.trim());
