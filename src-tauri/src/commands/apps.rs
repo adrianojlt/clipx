@@ -370,13 +370,14 @@ mod platform {
     // windows are the last N items of its Window menu (N = AX window count),
     // which are exactly the strings focus_app clicks - so list and focus always
     // agree, including for Chromium/Electron apps. Needs Accessibility only.
-    // Output lines: "<process name>\t<window title>" (title empty if none).
+    // Output lines: "<pid>\t<process name>\t<window title>" (title empty if none).
     pub fn list_open_apps() -> Result<OpenAppsResult, AppError> {
 
         let script = "set output to \"\"\n\
             tell application \"System Events\"\n\
             repeat with p in (every process whose background only is false)\n\
             set pname to name of p\n\
+            set upid to unix id of p\n\
             set emitted to false\n\
             try\n\
             set allItems to name of every menu item of menu 1 of (menu bar item \"Window\" of menu bar 1 of p)\n\
@@ -389,14 +390,14 @@ mod platform {
             repeat with i from (sepIndex + 1) to total\n\
             set t to item i of allItems\n\
             if t is not missing value then\n\
-            set output to output & pname & tab & (t as text) & linefeed\n\
+            set output to output & upid & tab & pname & tab & (t as text) & linefeed\n\
             set emitted to true\n\
             end if\n\
             end repeat\n\
             end if\n\
             end try\n\
             if not emitted then\n\
-            set output to output & pname & tab & \"\" & linefeed\n\
+            set output to output & upid & tab & pname & tab & \"\" & linefeed\n\
             end if\n\
             end repeat\n\
             end tell\n\
@@ -422,15 +423,24 @@ mod platform {
 
         for line in stdout.lines() {
 
-            let (app, title) = line.split_once('\t').unwrap_or((line, ""));
-            let app = app.trim();
-            let title = title.trim();
+            // "<pid>\t<process name>\t<window title>". The pid is what keeps two
+            // instances of one app apart: their process names, and often their
+            // window titles too, are identical.
+            let mut fields = line.splitn(3, '\t');
 
-            if app.is_empty() {
+            let (Some(pid), Some(app)) = (fields.next(), fields.next()) else {
+                continue;
+            };
+
+            let pid = pid.trim();
+            let app = app.trim();
+            let title = fields.next().unwrap_or("").trim();
+
+            if pid.is_empty() || app.is_empty() {
                 continue;
             }
 
-            let id = format!("{app}{SEP}{title}");
+            let id = format!("{pid}{SEP}{app}{SEP}{title}");
             if !seen.insert(id.clone()) {
                 continue;
             }
@@ -456,28 +466,18 @@ mod platform {
         })
     }
 
-    /// The running application called `name`.
+    /// The running application with process id `pid`.
     ///
-    /// Matched the same way the icon map is keyed: on the localized name, then
-    /// on the executable's file stem, since the listing reports process names.
-    fn running_app(name: &str) -> Option<objc2::rc::Retained<objc2_app_kit::NSRunningApplication>> {
+    /// Keyed on the pid the listing packed into the id rather than on the
+    /// process name, which two instances of one app share.
+    fn running_app(pid: i32) -> Option<objc2::rc::Retained<objc2_app_kit::NSRunningApplication>> {
 
         use objc2_app_kit::NSWorkspace;
 
         NSWorkspace::sharedWorkspace()
             .runningApplications()
             .iter()
-            .find(|app| {
-                app.localizedName().is_some_and(|n| n.to_string() == name)
-                    || app
-                        .executableURL()
-                        .and_then(|url| url.path())
-                        .is_some_and(|path| {
-                            std::path::Path::new(&path.to_string())
-                                .file_stem()
-                                .is_some_and(|stem| stem == name)
-                        })
-            })
+            .find(|app| app.processIdentifier() == pid)
     }
 
     fn activate(app: &objc2_app_kit::NSRunningApplication) -> bool {
@@ -622,15 +622,25 @@ mod platform {
         }
     }
 
-    // id == "<process name>\u{1f}<window title>". Bring the process to the
-    // front, then raise the specific window if a title is present.
+    // id == "<pid>\u{1f}<process name>\u{1f}<window title>". Bring that exact
+    // process to the front, then raise the specific window if a title is present.
     pub fn focus_app(id: &str) -> Result<(), AppError> {
 
-        let (app, title) = id.split_once(SEP).unwrap_or((id, ""));
+        let mut fields = id.splitn(3, SEP);
 
-        if app.chars().any(|c| matches!(c, '"' | '\\' | '\0' | '\r' | '\n' | '\t'))
-            || title.chars().any(|c| matches!(c, '"' | '\\' | '\0' | '\r' | '\n' | '\t'))
-        {
+        let (Some(pid), Some(app)) = (fields.next(), fields.next()) else {
+            return Err(AppError::Validation("invalid app id".into()));
+        };
+
+        let title = fields.next().unwrap_or("");
+
+        let pid: i32 = pid
+            .parse()
+            .map_err(|_| AppError::Validation(format!("invalid pid in app id: {pid}")))?;
+
+        // The title is interpolated into the fallback script below; the pid is a
+        // number by now and the process name is no longer interpolated at all.
+        if title.chars().any(|c| matches!(c, '"' | '\\' | '\0' | '\r' | '\n' | '\t')) {
             return Err(AppError::Validation("invalid app id".into()));
         }
 
@@ -641,10 +651,9 @@ mod platform {
         //
         // Selecting the window before activating keeps the app from coming
         // forward on the previously-active window first, same as the script.
-        if let Some(running) = running_app(app) {
+        if let Some(running) = running_app(pid) {
 
-            let window_ready = title.is_empty()
-                || press_window_menu_item(running.processIdentifier(), title);
+            let window_ready = title.is_empty() || press_window_menu_item(pid, title);
 
             if window_ready && activate(&running) {
                 return Ok(());
@@ -653,7 +662,7 @@ mod platform {
 
         // Reached when ClipX holds no Accessibility permission of its own, or
         // the window is not in the menu. Costs the ~180 ms the fast path saves.
-        log::info!("focus_app: falling back to osascript for {app:?}");
+        log::info!("focus_app: falling back to osascript for {app:?} (pid {pid})");
 
         // Raise the window via the app's own Window menu item. AXRaise/AXMain
         // are ignored by Chromium/Electron apps (Chrome, VS Code) for real
@@ -679,7 +688,7 @@ mod platform {
 
         let script = format!(
             "tell application \"System Events\"\n\
-            tell process \"{app}\"\n\
+            tell (first process whose unix id is {pid})\n\
             {inner}\n\
             end tell\n\
             end tell"
