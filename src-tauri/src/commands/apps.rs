@@ -870,7 +870,7 @@ mod platform {
     }
 }
 
-// PowerShell output parsing, script building, and icon caching for Windows.
+// Row building, icon extraction scripting, and icon caching for Windows.
 //
 // Kept outside `platform`, which cannot compile on a non-Windows host because of
 // its `std::os::windows` import, so these pure functions stay unit-testable from
@@ -902,38 +902,41 @@ mod windows_icons {
         pub path: String,
     }
 
-    /// Parse `<window handle>\t<process name>\t<path>\t<window title>` lines,
-    /// sorted by `(app, title)`.
+    /// One top-level window as the enumerator found it, before validation.
     ///
-    /// The title comes last because it is the only field that can itself contain
-    /// a tab; a Windows path cannot, and a handle and process name will not.
+    /// `handle` is the window's own handle, not its process's main window: an app
+    /// contributes one of these per window it has open.
+    pub struct RawWindow {
+        pub handle: isize,
+        pub process: String,
+        pub path: String,
+        pub title: String,
+    }
+
+    /// Turn enumerated windows into listed rows, sorted by `(app, title)`.
     ///
     /// The handle becomes `id`, which `focus_app` hands straight to Win32, so a
-    /// row whose handle is missing, unparseable, or null is dropped here rather
-    /// than listed as something that cannot be switched to.
-    pub fn parse_rows(stdout: &str) -> Vec<Row> {
+    /// row with a null handle is dropped here rather than listed as something
+    /// that cannot be switched to. A titleless window has nothing to render as
+    /// its label and is dropped for the same reason.
+    pub fn build_rows(windows: Vec<RawWindow>) -> Vec<Row> {
 
-        let mut rows: Vec<Row> = stdout
-            .lines()
-            .filter_map(|line| {
-                let mut fields = line.splitn(4, '\t');
+        let mut rows: Vec<Row> = windows
+            .into_iter()
+            .filter_map(|w| {
+                let title = w.title.trim();
 
-                let handle = fields.next()?.trim();
-                let process = fields.next()?.trim();
-                let path = fields.next()?.trim();
-                let title = fields.next()?.trim();
-
-                if title.is_empty() || handle.parse::<isize>().ok()? == 0 {
+                if title.is_empty() || w.handle == 0 {
                     return None;
                 }
 
                 Some(Row {
                     app: OpenApp {
                         name: title.to_string(),
-                        id: handle.to_string(),
-                        app: process.to_string(),
+                        id: w.handle.to_string(),
+                        app: w.process.trim().to_string(),
                     },
-                    path: path.to_string(),
+                    path: w.path.trim().to_string(),
                 })
             })
             .collect();
@@ -1066,21 +1069,23 @@ mod windows_icons {
         use super::*;
         use std::sync::Arc;
 
-        fn line(handle: &str, process: &str, path: &str, title: &str) -> String {
-            format!("{handle}\t{process}\t{path}\t{title}")
+        fn win(handle: isize, process: &str, path: &str, title: &str) -> RawWindow {
+            RawWindow {
+                handle,
+                process: process.to_string(),
+                path: path.to_string(),
+                title: title.to_string(),
+            }
         }
 
         #[test]
-        fn parses_rows_and_sorts_by_app_then_title() {
+        fn builds_rows_and_sorts_by_app_then_title() {
 
-            let stdout = [
-                line("300", "explorer", r"C:\Windows\explorer.exe", "Downloads"),
-                line("100", "chrome", r"C:\chrome.exe", "Inbox"),
-                line("101", "chrome", r"C:\chrome.exe", "Docs"),
-            ]
-            .join("\n");
-
-            let rows = parse_rows(&stdout);
+            let rows = build_rows(vec![
+                win(300, "explorer", r"C:\Windows\explorer.exe", "Downloads"),
+                win(100, "chrome", r"C:\chrome.exe", "Inbox"),
+                win(101, "chrome", r"C:\chrome.exe", "Docs"),
+            ]);
 
             assert_eq!(
                 rows.iter()
@@ -1098,11 +1103,44 @@ mod windows_icons {
             assert_eq!(rows[0].path, r"C:\chrome.exe");
         }
 
+        // The bug this listing exists to avoid: one row per window, never one row
+        // per process, so every window of a multi-window app is reachable.
+        #[test]
+        fn lists_every_window_of_one_process() {
+
+            let rows = build_rows(vec![
+                win(10, "explorer", r"C:\Windows\explorer.exe", "Downloads"),
+                win(11, "explorer", r"C:\Windows\explorer.exe", "Documents"),
+                win(12, "explorer", r"C:\Windows\explorer.exe", "Pictures"),
+            ]);
+
+            assert_eq!(
+                rows.iter().map(|r| r.app.id.as_str()).collect::<Vec<_>>(),
+                vec!["11", "10", "12"],
+                "three windows, three rows, each with its own handle"
+            );
+        }
+
+        // Two instances of one app share a process name, and often a title too.
+        // The handle is what keeps their rows apart.
+        #[test]
+        fn keeps_identically_titled_windows_apart() {
+
+            let rows = build_rows(vec![
+                win(20, "notepad", r"C:\notepad.exe", "Untitled - Notepad"),
+                win(21, "notepad", r"C:\notepad.exe", "Untitled - Notepad"),
+            ]);
+
+            assert_eq!(rows.len(), 2);
+            assert_eq!(rows[0].app.id, "20");
+            assert_eq!(rows[1].app.id, "21");
+        }
+
         #[test]
         fn keeps_rows_whose_path_is_unreadable() {
 
             // Access Denied on an elevated process: empty path, row still listed.
-            let rows = parse_rows(&line("42", "elevated", "", "Admin Console"));
+            let rows = build_rows(vec![win(42, "elevated", "", "Admin Console")]);
 
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0].app.app, "elevated");
@@ -1111,28 +1149,13 @@ mod windows_icons {
         }
 
         #[test]
-        fn keeps_a_tab_inside_the_window_title() {
+        fn drops_titleless_rows() {
 
-            // The title is the last field precisely so its tabs survive.
-            let rows = parse_rows(&line("7", "editor", r"C:\editor.exe", "draft\tnotes.txt"));
-
-            assert_eq!(rows.len(), 1);
-            assert_eq!(rows[0].app.name, "draft\tnotes.txt");
-            assert_eq!(rows[0].path, r"C:\editor.exe");
-        }
-
-        #[test]
-        fn drops_short_and_titleless_rows() {
-
-            let stdout = [
-                "9\tchrome\tC:\\chrome.exe".to_string(),
-                line("10", "chrome", r"C:\chrome.exe", "   "),
-                String::new(),
-                line("11", "chrome", r"C:\chrome.exe", "Real"),
-            ]
-            .join("\n");
-
-            let rows = parse_rows(&stdout);
+            let rows = build_rows(vec![
+                win(10, "chrome", r"C:\chrome.exe", ""),
+                win(11, "chrome", r"C:\chrome.exe", "   "),
+                win(12, "chrome", r"C:\chrome.exe", "Real"),
+            ]);
 
             assert_eq!(rows.len(), 1);
             assert_eq!(rows[0].app.name, "Real");
@@ -1143,15 +1166,10 @@ mod windows_icons {
         #[test]
         fn drops_rows_without_a_usable_window_handle() {
 
-            let stdout = [
-                line("0", "service", r"C:\svc.exe", "Null Handle"),
-                line("", "blank", r"C:\blank.exe", "Empty Handle"),
-                line("0x1F4", "hex", r"C:\hex.exe", "Unparseable Handle"),
-                line("500", "chrome", r"C:\chrome.exe", "Real"),
-            ]
-            .join("\n");
-
-            let rows = parse_rows(&stdout);
+            let rows = build_rows(vec![
+                win(0, "service", r"C:\svc.exe", "Null Handle"),
+                win(500, "chrome", r"C:\chrome.exe", "Real"),
+            ]);
 
             assert_eq!(
                 rows.iter().map(|r| r.app.name.as_str()).collect::<Vec<_>>(),
@@ -1159,16 +1177,15 @@ mod windows_icons {
             );
         }
 
-        // 64-bit handles are printed in full by PowerShell and must survive the
-        // round trip that `focus_app` parses back with `isize::from_str`.
+        // 64-bit handles must survive the round trip that `focus_app` parses back
+        // with `isize::from_str`.
         #[test]
         fn keeps_a_wide_window_handle_intact() {
 
-            let handle = "4295032833";
-            let rows = parse_rows(&line(handle, "editor", r"C:\editor.exe", "draft.txt"));
+            let rows = build_rows(vec![win(4_295_032_833, "editor", r"C:\editor.exe", "draft.txt")]);
 
             assert_eq!(rows.len(), 1);
-            assert_eq!(rows[0].app.id, handle);
+            assert_eq!(rows[0].app.id, "4295032833");
         }
 
         #[test]
@@ -1269,14 +1286,11 @@ mod windows_icons {
         #[test]
         fn rekeys_icons_by_process_name() {
 
-            let rows = parse_rows(
-                &[
-                    line("1", "chrome", r"C:\chrome.exe", "Inbox"),
-                    line("2", "chrome", r"C:\chrome.exe", "Docs"),
-                    line("3", "elevated", "", "Admin"),
-                ]
-                .join("\n"),
-            );
+            let rows = build_rows(vec![
+                win(1, "chrome", r"C:\chrome.exe", "Inbox"),
+                win(2, "chrome", r"C:\chrome.exe", "Docs"),
+                win(3, "elevated", "", "Admin"),
+            ]);
 
             let by_path = HashMap::from([(
                 r"C:\chrome.exe".to_string(),
@@ -1296,25 +1310,62 @@ mod windows_icons {
 mod platform {
 
     use super::windows_icons::{
-        extraction_script, icon_cache, icons_by_app, parse_icon_pairs, parse_rows, split_cached,
-        store,
+        build_rows, extraction_script, icon_cache, icons_by_app, parse_icon_pairs, split_cached,
+        store, RawWindow,
     };
     use super::{OpenApp, OpenAppsResult};
 
     use crate::error::AppError;
 
+    use std::collections::HashMap;
     use std::ffi::c_void;
     use std::os::windows::process::CommandExt;
+    use std::path::Path;
     use std::process::Command;
 
-    use windows::Win32::Foundation::HWND;
-    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    use windows::core::{BOOL, PWSTR};
+    use windows::Win32::Foundation::{CloseHandle, FALSE, HWND, LPARAM, TRUE};
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+    use windows::Win32::System::Threading::{
+        AttachThreadInput, GetCurrentProcessId, GetCurrentThreadId, OpenProcess,
+        QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
     use windows::Win32::UI::WindowsAndMessaging::{
-        BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, IsIconic, IsWindow,
-        SetForegroundWindow, ShowWindow, SW_RESTORE,
+        BringWindowToTop, EnumChildWindows, EnumWindows, GetAncestor, GetClassNameW,
+        GetForegroundWindow,
+        GetWindowLongW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
+        IsWindow, IsWindowVisible, SetForegroundWindow, ShowWindow, GA_ROOTOWNER, GWL_EXSTYLE,
+        SW_RESTORE, WS_EX_TOOLWINDOW,
     };
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    // DWMWA_CLOAKED values. A window the app itself cloaked is a suspended UWP
+    // ghost and must not be listed; one the shell cloaked is a real window
+    // sitting on another virtual desktop, which `SetForegroundWindow` switches
+    // to, so it stays.
+    const DWM_CLOAKED_APP: u32 = 1;
+    const DWM_CLOAKED_INHERITED: u32 = 4;
+
+    // Visible, titled, unowned top-level windows that are still not somewhere to
+    // switch to: desktop furniture, and the raw UWP core window, which is either
+    // system chrome ("Windows Input Experience") or the inner half of a UWP app
+    // already listed through its ApplicationFrameWindow.
+    const SKIP_CLASSES: [&str; 5] = [
+        "Progman",
+        "WorkerW",
+        "Shell_TrayWnd",
+        "Button",
+        "Windows.UI.Core.CoreWindow",
+    ];
+
+    // The shell's host window for a UWP app. The app itself runs in a different
+    // process, as a child of this window.
+    const UWP_FRAME_CLASS: &str = "ApplicationFrameWindow";
 
     // Must stay `powershell` (Windows PowerShell 5.1), never `pwsh`: 5.1 is the
     // one shipped with Windows and the only guaranteed source of the
@@ -1337,23 +1388,278 @@ mod platform {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     }
 
-    // List processes that own a visible main window. id = the main window's
-    // handle, name = window title, app = process name. `$_.Path` throws for
-    // elevated processes, so each row falls back to an empty path rather than
-    // failing the whole call.
-    //
-    // The handle rather than the pid because it is what `focus_app` raises, and
-    // a process filtered in by a non-empty `MainWindowTitle` always has one.
+    /// Every top-level window the user could alt-tab to.
+    ///
+    /// Replaces the old `Get-Process | Where MainWindowTitle -ne ''` listing,
+    /// which was one row per *process* and therefore showed only a process's
+    /// main window: a second Explorer window, a second Word document, a second
+    /// window of any app that keeps them in one process was simply missing from
+    /// the list. `EnumWindows` sees each of them.
+    ///
+    /// The filter is the standard alt-tab one: visible, titled, not owned by
+    /// another window, not a tool window, not an app-cloaked ghost, and not one
+    /// of ClipX's own windows, since the popup itself is on screen while this
+    /// runs.
+    fn enumerate_windows() -> Vec<RawWindow> {
+
+        let mut handles: Vec<HWND> = Vec::new();
+
+        // EnumWindows itself only fails if the callback stops the enumeration,
+        // which this one never does; a partial list is still worth rendering.
+        unsafe {
+            let _ = EnumWindows(
+                Some(collect_window),
+                LPARAM(&mut handles as *mut Vec<HWND> as isize),
+            );
+        }
+
+        let names = process_names();
+        let mut paths: HashMap<u32, String> = HashMap::new();
+
+        handles
+            .into_iter()
+            .map(|hwnd| {
+                let owner = window_pid(hwnd).unwrap_or(0);
+
+                // A UWP app is listed through its frame window, which belongs to
+                // ApplicationFrameHost; name and icon it after the app inside.
+                let pid = hosted_pid(hwnd, owner).unwrap_or(owner);
+
+                // Several windows of one app share a process, so the executable
+                // is looked up once per pid rather than once per window.
+                let path = paths
+                    .entry(pid)
+                    .or_insert_with(|| process_path(pid))
+                    .clone();
+
+                RawWindow {
+                    handle: hwnd.0 as isize,
+                    process: names.get(&pid).cloned().unwrap_or_default(),
+                    path,
+                    title: window_title(hwnd),
+                }
+            })
+            .collect()
+    }
+
+    unsafe extern "system" fn collect_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
+
+        if is_switchable(hwnd) {
+            // The pointer is the `handles` vec above, alive for the whole
+            // enumeration, and EnumWindows calls this synchronously on this
+            // thread, so there is no other reference to alias.
+            let handles = unsafe { &mut *(lparam.0 as *mut Vec<HWND>) };
+            handles.push(hwnd);
+        }
+
+        TRUE
+    }
+
+    /// The process actually behind a UWP frame window, or `None` for an ordinary
+    /// window.
+    ///
+    /// Without this, every UWP app on the list would be called
+    /// "ApplicationFrameHost" and share one icon. The frame keeps being the
+    /// handle that is raised; only the identity comes from the child.
+    ///
+    /// A suspended UWP app has no core window parented to its frame, so it falls
+    /// back to the host's identity. The row still carries the app's own window
+    /// title, which is what the popup displays.
+    fn hosted_pid(hwnd: HWND, owner: u32) -> Option<u32> {
+
+        if class_name(hwnd) != UWP_FRAME_CLASS {
+            return None;
+        }
+
+        // (frame's own pid, hosted pid once found).
+        let mut found = (owner, 0u32);
+
+        unsafe {
+            let _ = EnumChildWindows(
+                Some(hwnd),
+                Some(collect_hosted),
+                LPARAM(&mut found as *mut (u32, u32) as isize),
+            );
+        }
+
+        (found.1 != 0).then_some(found.1)
+    }
+
+    unsafe extern "system" fn collect_hosted(hwnd: HWND, lparam: LPARAM) -> BOOL {
+
+        let found = unsafe { &mut *(lparam.0 as *mut (u32, u32)) };
+
+        match window_pid(hwnd) {
+            // The first child living outside the host process is the app.
+            Some(pid) if pid != found.0 => {
+                found.1 = pid;
+                FALSE
+            }
+            _ => TRUE,
+        }
+    }
+
+    fn is_switchable(hwnd: HWND) -> bool {
+
+        unsafe {
+
+            if !IsWindowVisible(hwnd).as_bool() || GetWindowTextLengthW(hwnd) == 0 {
+                return false;
+            }
+
+            // Owned windows (dialogs, palettes) are reached through their owner,
+            // which the enumeration lists separately.
+            if GetAncestor(hwnd, GA_ROOTOWNER) != hwnd {
+                return false;
+            }
+
+            if GetWindowLongW(hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0 != 0 {
+                return false;
+            }
+
+            if is_app_cloaked(hwnd) || SKIP_CLASSES.contains(&class_name(hwnd).as_str()) {
+                return false;
+            }
+
+            // ClipX's popup is up while the list is being built, and its settings
+            // and about windows may be too.
+            window_pid(hwnd) != Some(GetCurrentProcessId())
+        }
+    }
+
+    fn window_title(hwnd: HWND) -> String {
+
+        let len = unsafe { GetWindowTextLengthW(hwnd) };
+
+        if len <= 0 {
+            return String::new();
+        }
+
+        // The title can grow between the two calls; the buffer only has to be
+        // large enough for whatever the second one copies.
+        let mut buf = vec![0u16; len as usize + 1];
+        let copied = unsafe { GetWindowTextW(hwnd, &mut buf) };
+
+        String::from_utf16_lossy(&buf[..copied.max(0) as usize])
+    }
+
+    fn class_name(hwnd: HWND) -> String {
+
+        // Window class names are capped at 256 characters by the atom table.
+        let mut buf = [0u16; 257];
+        let copied = unsafe { GetClassNameW(hwnd, &mut buf) };
+
+        String::from_utf16_lossy(&buf[..copied.max(0) as usize])
+    }
+
+    /// Whether the window is cloaked by its own app: a suspended UWP view that
+    /// exists but is not on screen. Shell-cloaked windows (another virtual
+    /// desktop) are real and stay in the list.
+    fn is_app_cloaked(hwnd: HWND) -> bool {
+
+        let mut cloaked = 0u32;
+
+        let ok = unsafe {
+            DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_CLOAKED,
+                &mut cloaked as *mut u32 as *mut c_void,
+                std::mem::size_of::<u32>() as u32,
+            )
+        };
+
+        ok.is_ok() && matches!(cloaked, DWM_CLOAKED_APP | DWM_CLOAKED_INHERITED)
+    }
+
+    /// pid -> process name, without the `.exe`, matching what `Get-Process` used
+    /// to report and what the usage table and icon map are keyed by.
+    ///
+    /// A snapshot rather than `QueryFullProcessImageNameW` because it needs no
+    /// handle on the process, so an elevated app still gets a name.
+    fn process_names() -> HashMap<u32, String> {
+
+        let mut names = HashMap::new();
+
+        unsafe {
+            
+            let Ok(snapshot) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
+                log::warn!("list_open_apps: could not snapshot processes");
+                return names;
+            };
+
+            let mut entry = PROCESSENTRY32W {
+                dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+                ..Default::default()
+            };
+
+            if Process32FirstW(snapshot, &mut entry).is_ok() {
+                loop {
+                    let end = entry
+                        .szExeFile
+                        .iter()
+                        .position(|&c| c == 0)
+                        .unwrap_or(entry.szExeFile.len());
+
+                    let file = String::from_utf16_lossy(&entry.szExeFile[..end]);
+
+                    let name = Path::new(&file)
+                        .file_stem()
+                        .map(|stem| stem.to_string_lossy().into_owned())
+                        .unwrap_or(file);
+
+                    names.insert(entry.th32ProcessID, name);
+
+                    if Process32NextW(snapshot, &mut entry).is_err() {
+                        break;
+                    }
+                }
+            }
+
+            let _ = CloseHandle(snapshot);
+        }
+
+        names
+    }
+
+    /// The executable behind `pid`, or empty when it cannot be read.
+    ///
+    /// This is only the icon cache key, and opening a process of higher
+    /// integrity fails for an unelevated ClipX, so an elevated app lists without
+    /// an icon exactly as it did when `$_.Path` threw.
+    fn process_path(pid: u32) -> String {
+
+        if pid == 0 {
+            return String::new();
+        }
+
+        unsafe {
+            let Ok(process) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else {
+                return String::new();
+            };
+
+            let mut buf = vec![0u16; 1024];
+            let mut len = buf.len() as u32;
+
+            let path = QueryFullProcessImageNameW(
+                process,
+                PROCESS_NAME_WIN32,
+                PWSTR(buf.as_mut_ptr()),
+                &mut len,
+            )
+            .map(|()| String::from_utf16_lossy(&buf[..len as usize]))
+            .unwrap_or_default();
+
+            let _ = CloseHandle(process);
+
+            path
+        }
+    }
+
+    // One row per window: id = that window's handle, name = its title, app = the
+    // owning process name.
     pub fn list_open_apps() -> Result<OpenAppsResult, AppError> {
 
-        let script = "Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | \
-            ForEach-Object { \
-            $p = ''; \
-            try { $p = $_.Path } catch { }; \
-            if ($null -eq $p) { $p = '' }; \
-            \"$($_.MainWindowHandle)`t$($_.ProcessName)`t$p`t$($_.MainWindowTitle)\" }";
-
-        let rows = parse_rows(&powershell(script)?);
+        let rows = build_rows(enumerate_windows());
 
         let paths: Vec<String> = rows
             .iter()
@@ -1433,8 +1739,8 @@ mod platform {
         }
     }
 
-    /// The process owning `hwnd`, for the fallback below. `None` once the window
-    /// is gone.
+    /// The process owning `hwnd`, used both to name and to key the listing and
+    /// by the fallback below. `None` once the window is gone.
     fn window_pid(hwnd: HWND) -> Option<u32> {
 
         let mut pid = 0u32;
@@ -1443,7 +1749,7 @@ mod platform {
         (pid != 0).then_some(pid)
     }
 
-    // id == the main window's handle on Windows.
+    // id == that window's own handle on Windows.
     pub fn focus_app(id: &str) -> Result<(), AppError> {
 
         let handle: isize = id
@@ -1467,7 +1773,9 @@ mod platform {
         let pid = window_pid(hwnd)
             .ok_or_else(|| AppError::State(format!("window {handle} no longer exists")))?;
 
-        // AppActivate accepts a PID and raises that process's window.
+        // AppActivate accepts a PID, but raises that process's main window
+        // rather than the one picked: the best a fallback can do once Win32 has
+        // refused the exact handle, and still the right app.
         let script = format!(
             "(New-Object -ComObject WScript.Shell).AppActivate({pid})"
         );
@@ -1486,6 +1794,69 @@ mod platform {
         }
 
         Ok(())
+    }
+
+    #[cfg(test)]
+    mod tests {
+
+        use std::collections::{HashMap, HashSet};
+
+        // Acceptance evidence against the real desktop: prints what the popup
+        // would show. A headless runner has no windows to enumerate, so an empty
+        // listing skips rather than fails.
+        #[test]
+        fn lists_each_window_separately() {
+
+            let started = std::time::Instant::now();
+            let result = super::list_open_apps().expect("listing must not fail");
+            let cold = started.elapsed();
+
+            if result.apps.is_empty() {
+                eprintln!("skipped: no top-level windows on this desktop");
+                return;
+            }
+
+            // Second call has every icon cached, so it spawns no subprocess at
+            // all: the enumeration itself is pure Win32.
+            let started = std::time::Instant::now();
+            let _ = super::list_open_apps();
+
+            eprintln!(
+                "{} rows, {} icon keys, {cold:?} cold / {:?} warm",
+                result.apps.len(),
+                result.icons.len(),
+                started.elapsed()
+            );
+
+            let mut ids = HashSet::new();
+            let mut per_app: HashMap<&str, usize> = HashMap::new();
+
+            for row in &result.apps {
+                assert!(!row.app.is_empty(), "empty app field for {:?}", row.name);
+                assert!(!row.name.is_empty(), "empty title for {:?}", row.app);
+                assert!(
+                    row.id.parse::<isize>().is_ok_and(|h| h != 0),
+                    "id {:?} is not a usable window handle",
+                    row.id
+                );
+                assert!(ids.insert(row.id.clone()), "duplicate id {:?}", row.id);
+
+                *per_app.entry(row.app.as_str()).or_default() += 1;
+
+                eprintln!(
+                    "  app={:?} icon={} title={:?}",
+                    row.app,
+                    result.icons.contains_key(&row.app),
+                    row.name
+                );
+            }
+
+            // Not an assertion: whether any app happens to have two windows open
+            // is up to whoever is running the test.
+            for (app, windows) in per_app.iter().filter(|(_, &n)| n > 1) {
+                eprintln!("  {app:?} contributed {windows} windows");
+            }
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 [package]
 name = "clipx-scaffold"
-version = "0.1.36"
+version = "0.1.37"
 description = "Desktop clipboard manager with history and pinned items"
 authors = ["adrianojlt"]
 license = "MIT"
@@ -38,8 +38,14 @@ semver = "1"
 windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
-    # AttachThreadInput / GetCurrentThreadId, for raising another app's window.
+    # AttachThreadInput / GetCurrentThreadId, for raising another app's window,
+    # plus OpenProcess / QueryFullProcessImageNameW for a window's executable.
     "Win32_System_Threading",
+    # DwmGetWindowAttribute, to tell a real window from a cloaked ghost.
+    "Win32_Graphics_Dwm",
+    # Toolhelp process snapshot: process names for windows whose owning process
+    # cannot be opened.
+    "Win32_System_Diagnostics_ToolHelp",
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
