@@ -34,11 +34,11 @@ Never treat `ShortcutState::Released` from `tauri-plugin-global-shortcut` as the
 
 Windows shortcuts a shell already owns cannot be taken: the plugin calls `RegisterHotKey`, and Alt+Tab fails there with `ERROR_HOTKEY_ALREADY_REGISTERED` (1409). Alt+Esc is not held by anything and registers cleanly, which is what `cycle_windows_hotkey` binds by default; once ClipX holds it, Windows no longer cycles windows with it. Check a candidate with `RegisterHotKey` before designing around it rather than assuming the system reserves everything.
 
-Holding a registered chord makes Windows auto-repeat `WM_HOTKEY` about thirty times a second. An action that steps through something, rather than toggling a window, has to debounce or one held key runs the whole sequence: see `CYCLE_DEBOUNCE` in `commands/apps.rs`.
+Holding a registered chord makes Windows auto-repeat `WM_HOTKEY` about thirty times a second. An action that steps through something, rather than toggling a window, has to debounce or one held key runs the whole sequence: see `CYCLE_DEBOUNCE` in `commands/apps/mod.rs`.
 
 ## Cycling an App's Windows
 
-`cycle_windows` in `commands/apps.rs` rotates the focused app's own windows. Two things it depends on, both easy to break:
+`cycle_windows` in `commands/apps/windows.rs` rotates the focused app's own windows. Two things it depends on, both easy to break:
 
 `EnumWindows` returns windows in Z-order, and the rotation is that order. It therefore cannot be built on `list_open_apps`, which sorts by app and then by frecency; `switchable_windows_in_z_order` shares the enumeration but not the sorting.
 
@@ -57,9 +57,25 @@ Prefer native platform APIs over shelling out to `osascript` or `powershell` on 
 
 Windows PowerShell 5.1 is by far the worse of the two: it pays CLR and engine startup on every invocation, so a per-action `powershell` call is never acceptable on an interactive path. Keep the script path as a fallback and log when it is taken, so a silent regression is visible.
 
+The platform halves live in separate files under `commands/apps/`: `macos.rs` and `windows.rs` behind `#[cfg]`, `other.rs` for everything else, with the shared types, the frecency ordering and the Tauri commands in `mod.rs`. `windows_icons.rs` and `window_cycle.rs` hold the pure Windows logic that must stay unit-testable on a mac, so they compile under `test` on every host.
+
 Note the permission shift this implies on macOS: driving System Events borrows its Accessibility grant, while calling the Accessibility API directly requires the ClipX binary itself to be granted Accessibility, and a bundled build is a different identity than the dev binary.
 
-Windows has no permission shift, but `SetForegroundWindow` has a foreground lock: only the process owning the foreground window or the one that received the last input event may call it. Since the popup hides itself before raising the target, borrow the right by attaching to the foreground window's input queue with `AttachThreadInput`, which is what `WScript.Shell.AppActivate` does internally. See `raise_window` in `commands/apps.rs`.
+Windows has no permission shift, but `SetForegroundWindow` has a foreground lock: only the process owning the foreground window or the one that received the last input event may call it. Since the popup hides itself before raising the target, borrow the right by attaching to the foreground window's input queue with `AttachThreadInput`, which is what `WScript.Shell.AppActivate` does internally. See `raise_window` in `commands/apps/windows.rs`.
+
+## Listing an App's Windows on macOS
+
+`list_open_apps` in `commands/apps/macos.rs` reads `AXWindows` off each `NSRunningApplication` with a Regular activation policy, one row per titled window, and `focus_app` raises the chosen window with `AXRaise` before activating its process.
+
+It used to ask System Events for each process's Window menu instead. That failed three ways, all worth remembering:
+
+- Reading another app's menus through System Events requires the *calling* app to be allowed assistive access, not just System Events. Without it the read errors inside the script's own `try`, which swallowed it, and every app silently collapsed to a single titleless row - the exact symptom of the missing grant, with nothing in the log to say so. `list_open_apps` now logs when `AXIsProcessTrusted()` is false.
+- `repeat with p in (every process whose background only is false)` re-resolves the list on each step, so an app quitting mid-loop failed the whole script with `-1719 Invalid index`. The listing returned an error and the popup kept stale rows.
+- The subprocess cost about 1.8 s with a dozen apps open, against 3 ms for the in-process enumeration.
+
+`AXRaise` is honored by Chromium and Electron windows (verified on Chrome and VS Code), so clicking the Window-menu entry is not needed for them. Two details it does need: a minimized window has to have `AXMinimized` cleared first, and window identity is the pid plus the position in `AXWindows`, because two windows of one app routinely share a title. Positions shift as windows are raised, so `focus_app` matches on the title first and uses the index only to break ties.
+
+`AXTitle` is not the Window-menu string: Chrome appends the profile and tab group, editors append the folder. Anything matching one against the other has to try both containment directions.
 
 ## Backend Commands
 
