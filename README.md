@@ -45,6 +45,15 @@ Pre-built installers for macOS, Windows, and Linux are available on the [Release
 >
 > This removes the quarantine flag macOS adds to downloaded apps that aren't signed with an Apple Developer certificate.
 
+> **macOS Accessibility permission:** The app switcher lists every window of every open app by reading them through the macOS Accessibility API, which requires ClipX itself to be granted Accessibility. Grant it under System Settings > Privacy & Security > Accessibility, then quit and relaunch ClipX. Without the grant, the switcher still lists the apps but shows a single row for each one, with no window titles.
+>
+> The grant is tied to the binary, not to the app name, so it does not carry across builds:
+>
+> - The development binary (`pnpm tauri dev`) and the installed `/Applications/ClipX.app` are separate identities. Granting one does nothing for the other, which is why window lists can work in development and not in the installed app.
+> - Release builds are ad-hoc signed (no Apple Developer ID), so macOS identifies them by their code hash. That hash changes with every release, which invalidates the grant on each update even though the toggle in System Settings can still look enabled.
+>
+> After installing a new version, remove the existing ClipX entry from the Accessibility list, add `/Applications/ClipX.app` again, and relaunch. Signing releases with an Apple Developer ID would give the app a stable identity and remove this step, and is the intended fix once a certificate is available.
+
 ## Testing
 
 Run frontend unit tests:
@@ -101,6 +110,16 @@ If something goes wrong, check the log file for details.
 
 - Clipboard content itself (privacy protection)
 - Normal day-to-day operations
+
+**The app switcher shows only one row per app:**
+
+ClipX is not trusted for Accessibility. The log records it once per run:
+
+```
+[WARN] list_open_apps: ClipX is not trusted for Accessibility, so no window titles can be read and every app collapses to one row.
+```
+
+See the macOS Accessibility permission note under [Download](#download) for how to grant it and why the grant is lost on every update.
 
 ## Creating a release
 
