@@ -1,3 +1,7 @@
+import { useState, useEffect } from "react";
+import ContextMenu from "./ContextMenu";
+import { useContextMenu } from "../hooks/useContextMenu";
+
 export default function SessionItem({
   item,
   index,
@@ -7,21 +11,44 @@ export default function SessionItem({
   confirmDeleteId,
   onActivate,
   onMouseDown,
+  onRename,
   onRequestDelete,
   onConfirmDelete,
   onCancelDelete,
 }) {
   const isConfirming = confirmDeleteId === item.id;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(item.name);
+  const menuItems = item.is_global
+    ? []
+    : [{ label: "Rename", onClick: () => { setEditValue(item.name); setIsEditing(true); } }];
+  const { contextMenu, setContextMenu, onContextMenu } = useContextMenu(menuItems);
+
+  useEffect(() => {
+    setEditValue(item.name);
+  }, [item.name]);
+
+  const saveName = () => {
+    const name = editValue.trim();
+    setIsEditing(false);
+    if (!name || name === item.name) {
+      setEditValue(item.name);
+      return;
+    }
+    onRename(item.id, name);
+  };
 
   return (
+    <>
     <div data-id={item.id} className={`item-wrapper${isDragging ? " dragging" : ""}`}>
       {dragIndicator?.targetId === item.id && dragIndicator.position === "before" && (
         <div className="drop-indicator" />
       )}
       <div
         className={`item${isActive ? " session-active" : ""}`}
-        onClick={() => onActivate(item.id)}
-        title={isActive ? "Active session" : "Activate session"}
+        onClick={() => { if (!isEditing) onActivate(item.id); }}
+        onMouseDown={(e) => { if (e.button === 2) e.preventDefault(); }}
+        onContextMenu={onContextMenu}
       >
         {item.is_global ? (
           <span className="drag-handle inert" title="Favorites cannot be reordered">
@@ -37,7 +64,26 @@ export default function SessionItem({
           </span>
         )}
         <span className="item-number">{index}</span>
-        <span className="session-name">{item.name}</span>
+        {isEditing ? (
+          <input
+            className="session-name-edit"
+            value={editValue}
+            autoFocus
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveName();
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setEditValue(item.name);
+                setIsEditing(false);
+              }
+            }}
+            onBlur={saveName}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span className="session-name">{item.name}</span>
+        )}
         <span className="session-count">{item.item_count}</span>
         {isConfirming ? (
           <span className="delete-confirm" onClick={(e) => e.stopPropagation()}>
@@ -71,7 +117,6 @@ export default function SessionItem({
                 e.stopPropagation();
                 onActivate(item.id);
               }}
-              title={isActive ? "Active session" : "Activate session"}
             >
               &#x25B6;
             </button>
@@ -104,5 +149,14 @@ export default function SessionItem({
         <div className="drop-indicator" />
       )}
     </div>
+    {contextMenu && (
+      <ContextMenu
+        x={contextMenu.x}
+        y={contextMenu.y}
+        items={menuItems}
+        onClose={() => setContextMenu(null)}
+      />
+    )}
+    </>
   );
 }

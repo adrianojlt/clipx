@@ -41,6 +41,8 @@ export const createSession = (name) => invoke("create_session", { name });
 
 export const deleteSession = (id) => invoke("delete_session", { id });
 
+export const renameSession = (id, name) => invoke("rename_session", { id, name });
+
 export const activateSession = (id) => invoke("activate_session", { id });
 
 export const reorderSessions = (items) => invoke("reorder_sessions", { items });

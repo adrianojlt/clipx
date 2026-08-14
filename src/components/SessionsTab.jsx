@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { reorderSessions, createSession, deleteSession, activateSession, logError } from "../services/clipboardService";
+import { reorderSessions, createSession, deleteSession, activateSession, renameSession, logError } from "../services/clipboardService";
 import { useDragReorder } from "../hooks/useDragReorder";
 import SessionItem from "./SessionItem";
 
@@ -50,6 +50,15 @@ export default function SessionsTab({
       await onDataChanged();
     } catch (e) {
       await logError("error", `Failed to create session: ${e}`);
+    }
+  };
+
+  const handleRenameSession = async (id, name) => {
+    try {
+      await renameSession(id, name);
+      await onDataChanged();
+    } catch (e) {
+      await logError("error", `Failed to rename session: ${e}`);
     }
   };
 
@@ -111,6 +120,7 @@ export default function SessionsTab({
             confirmDeleteId={confirmDeleteSessionId}
             onActivate={handleActivateSession}
             onMouseDown={handleMouseDown}
+            onRename={handleRenameSession}
             onRequestDelete={setConfirmDeleteSessionId}
             onConfirmDelete={handleDeleteSession}
             onCancelDelete={() => setConfirmDeleteSessionId(null)}

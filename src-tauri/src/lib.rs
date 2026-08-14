@@ -122,6 +122,7 @@ pub fn run() {
             commands::sessions::get_sessions,
             commands::sessions::create_session,
             commands::sessions::delete_session,
+            commands::sessions::rename_session,
             commands::sessions::activate_session,
             commands::sessions::reorder_sessions,
             commands::sessions::pin_item_to_session,

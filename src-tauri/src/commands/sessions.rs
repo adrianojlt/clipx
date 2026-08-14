@@ -123,6 +123,50 @@ pub fn delete_session(id: i64, state: State<AppState>) -> Result<(), AppError> {
     delete_session_impl(&mut conn, id)
 }
 
+pub(crate) fn rename_session_impl(conn: &rusqlite::Connection, id: i64, name: &str) -> Result<(), AppError> {
+
+    if id <= 0 {
+        return Err(AppError::Validation("Invalid id".into()));
+    }
+
+    let trimmed = name.trim();
+
+    if trimmed.is_empty() {
+        return Err(AppError::Validation("Session name cannot be empty".into()));
+    }
+
+    if trimmed.len() > crate::MAX_DESC_BYTES {
+        return Err(AppError::Validation(format!(
+            "Session name exceeds {}-byte limit",
+            crate::MAX_DESC_BYTES
+        )));
+    }
+
+    let is_global: i64 = conn
+        .query_row("SELECT is_global FROM sessions WHERE id = ?1", [id], |row| row.get(0))
+        .map_err(|e| match e {
+            rusqlite::Error::QueryReturnedNoRows => AppError::NotFound(id),
+            other => AppError::Db(other),
+        })?;
+
+    if is_global != 0 {
+        return Err(AppError::Validation("Cannot rename the Favorites session".into()));
+    }
+
+    conn.execute(
+        "UPDATE sessions SET name = ?1 WHERE id = ?2",
+        rusqlite::params![trimmed, id],
+    )?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn rename_session(id: i64, name: String, state: State<AppState>) -> Result<(), AppError> {
+    let conn = lock_db(&state)?;
+    rename_session_impl(&conn, id, &name)
+}
+
 #[tauri::command]
 pub fn activate_session(id: i64, state: State<AppState>) -> Result<(), AppError> {
 
@@ -258,6 +302,45 @@ mod tests {
             )
             .unwrap();
         assert_eq!(global_active, 1);
+    }
+
+    #[test]
+    fn rename_session_success() {
+        let conn = setup();
+        let s = create_session_impl(&conn, "Work").unwrap();
+        rename_session_impl(&conn, s.id, "  Play  ").unwrap();
+        let name: String = conn
+            .query_row("SELECT name FROM sessions WHERE id = ?1", [s.id], |r| r.get(0))
+            .unwrap();
+        assert_eq!(name, "Play");
+    }
+
+    #[test]
+    fn rename_session_empty_name_rejected() {
+        let conn = setup();
+        let s = create_session_impl(&conn, "Work").unwrap();
+        assert!(matches!(
+            rename_session_impl(&conn, s.id, "   "),
+            Err(AppError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn rename_session_global_rejected() {
+        let conn = setup();
+        assert!(matches!(
+            rename_session_impl(&conn, 1, "Mine"),
+            Err(AppError::Validation(_))
+        ));
+    }
+
+    #[test]
+    fn rename_session_not_found() {
+        let conn = setup();
+        assert!(matches!(
+            rename_session_impl(&conn, 999, "Mine"),
+            Err(AppError::NotFound(999))
+        ));
     }
 
     #[test]

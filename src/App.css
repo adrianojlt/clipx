@@ -473,6 +473,19 @@
   margin-right: 0.5rem;
 }
 
+.session-name-edit {
+  flex: 1;
+  font-size: 0.85rem;
+  background: var(--app-edit-bg);
+  border: 1px solid var(--app-input-focus);
+  border-radius: 3px;
+  color: var(--app-text);
+  padding: 1px 4px;
+  margin-right: 0.5rem;
+  min-width: 0;
+  outline: none;
+}
+
 .session-count {
   font-size: 0.75rem;
   color: var(--app-text-faint);
