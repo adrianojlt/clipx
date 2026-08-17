@@ -21,7 +21,8 @@ export default function PinnedItem({
   const [editValue, setEditValue] = useState(item.description);
   const [isConfirming, setIsConfirming] = useState(false);
   const itemRef = useRef(null);
-  const sessionOptions = (sessions || []).filter((s) => !s.is_global);
+  const activeSession = (sessions || []).find((s) => s.is_active);
+  const sessionOptions = (sessions || []).filter((s) => !s.is_global || !activeSession?.is_global);
   const { handleMouseEnter, handleMouseLeave, tooltipPortal } = useItemTooltip(itemRef, item.content);
   const { contextMenu, setContextMenu, onContextMenu } = useContextMenu(sessionOptions);
 
