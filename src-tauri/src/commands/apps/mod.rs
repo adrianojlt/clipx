@@ -123,18 +123,23 @@ fn cycle_allowed() -> bool {
     true
 }
 
-/// Rotate the windows of whichever app currently has focus.
+/// Rotate the windows of whichever app currently has focus, forwards or, with
+/// `reverse`, the other way.
 ///
 /// Called straight from the shortcut handler rather than through a Tauri
 /// command: the rotation shows no UI and never gives ClipX focus, so the
 /// frontend is not involved at all.
-pub(crate) fn cycle_windows() {
+///
+/// Both directions share one debounce, deliberately: letting go of Shift part
+/// way through a held chord would otherwise fire a forward step on top of the
+/// reverse one already in flight.
+pub(crate) fn cycle_windows(reverse: bool) {
 
     if !cycle_allowed() {
         return;
     }
 
-    match platform::cycle_active_app_windows() {
+    match platform::cycle_active_app_windows(reverse) {
         Ok(true) => {}
         Ok(false) => log::debug!("cycle_windows: the focused app has nothing to cycle to"),
         Err(e) => log::warn!("cycle_windows: {e}"),

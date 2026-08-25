@@ -40,9 +40,19 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
     // Switched off the shortcut is unregistered and cannot fire, so the flag is
     // belt and braces: it keeps a failed unregister from leaving the feature
     // running after the user turned it off.
-    if cycle_windows_enabled && matches(shortcut, &cycle_windows_hotkey) {
-        crate::commands::apps::cycle_windows();
-        return;
+    if cycle_windows_enabled {
+
+        if matches(shortcut, &cycle_windows_hotkey) {
+            crate::commands::apps::cycle_windows(false);
+            return;
+        }
+
+        // Same chord plus Shift, the usual way to cycle the other way round.
+        if crate::settings::reverse_hotkey(&cycle_windows_hotkey).is_some_and(|reverse| matches(shortcut, &reverse))
+        {
+            crate::commands::apps::cycle_windows(true);
+            return;
+        }
     }
 
     let Some(win) = app.get_webview_window("main") else {

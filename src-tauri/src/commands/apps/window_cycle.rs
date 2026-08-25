@@ -31,10 +31,38 @@ pub fn next_window(windows: &[(isize, String)], current: isize) -> Option<isize>
     Some(same_app[(at + 1) % same_app.len()])
 }
 
+/// The window to raise when cycling the other way.
+///
+/// The inverse of `next_window` under the Z-order each of them produces: the
+/// backmost of the app's own windows. The caller raises it and, unlike the
+/// forward step, demotes nothing - raising the backmost window is by itself
+/// what moves the rotation one place back, and pushing the outgoing window
+/// down as well would skip an entry.
+///
+/// `None` in the same cases as `next_window`.
+pub fn previous_window(windows: &[(isize, String)], current: isize) -> Option<isize> {
+
+    let identity = &windows.iter().find(|(handle, _)| *handle == current)?.1;
+
+    let same_app: Vec<isize> = windows
+        .iter()
+        .filter(|(_, owner)| owner == identity)
+        .map(|(handle, _)| *handle)
+        .collect();
+
+    if same_app.len() < 2 {
+        return None;
+    }
+
+    let at = same_app.iter().position(|handle| *handle == current)?;
+
+    Some(same_app[(at + same_app.len() - 1) % same_app.len()])
+}
+
 #[cfg(test)]
 mod tests {
 
-    use super::next_window;
+    use super::{next_window, previous_window};
 
     fn desktop(entries: &[(isize, &str)]) -> Vec<(isize, String)> {
         entries
@@ -133,5 +161,80 @@ mod tests {
         let windows = desktop(&[(1, "pid:1000"), (2, "pid:2000")]);
 
         assert_eq!(next_window(&windows, 1), None);
+    }
+
+    // The mirror of `three_presses_visit_every_window`. Stepping back has to
+    // reach every window too, and here raising is the whole move: nothing is
+    // demoted, which is what this models.
+    #[test]
+    fn three_reverse_presses_visit_every_window() {
+
+        let mut order = vec![1isize, 2, 3];
+        let mut visited = Vec::new();
+
+        for _ in 0..3 {
+
+            let windows = desktop(
+                &order
+                    .iter()
+                    .map(|handle| (*handle, "code.exe"))
+                    .collect::<Vec<_>>(),
+            );
+
+            let previous =
+                previous_window(&windows, order[0]).expect("three windows must cycle back");
+
+            visited.push(previous);
+
+            order.retain(|h| *h != previous);
+            order.insert(0, previous);
+        }
+
+        assert_eq!(visited, vec![3, 2, 1], "stepping back skipped a window");
+    }
+
+    // Why the two are paired: a reverse press must undo a forward one, both in
+    // which window ends up focused and in the Z-order left behind.
+    #[test]
+    fn reverse_undoes_a_forward_step() {
+
+        let before = desktop(&[(1, "code.exe"), (2, "chrome.exe"), (3, "code.exe")]);
+
+        let next = next_window(&before, 1).expect("two windows to cycle");
+        assert_eq!(next, 3);
+
+        // What the forward step leaves: 3 raised, 1 demoted to the back.
+        let after = desktop(&[(3, "code.exe"), (2, "chrome.exe"), (1, "code.exe")]);
+
+        assert_eq!(previous_window(&after, next), Some(1));
+    }
+
+    #[test]
+    fn reverse_steps_over_windows_of_other_apps() {
+
+        let windows = desktop(&[
+            (1, "code.exe"),
+            (2, "chrome.exe"),
+            (3, "explorer.exe"),
+            (4, "code.exe"),
+        ]);
+
+        assert_eq!(previous_window(&windows, 1), Some(4));
+    }
+
+    #[test]
+    fn reverse_single_window_app_has_nothing_to_cycle() {
+
+        let windows = desktop(&[(1, "notepad.exe"), (2, "chrome.exe")]);
+
+        assert_eq!(previous_window(&windows, 1), None);
+    }
+
+    #[test]
+    fn reverse_unlisted_focused_window_is_not_cycled() {
+
+        let windows = desktop(&[(1, "chrome.exe"), (2, "chrome.exe")]);
+
+        assert_eq!(previous_window(&windows, 99), None);
     }
 }

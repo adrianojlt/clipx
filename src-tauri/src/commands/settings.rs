@@ -178,6 +178,31 @@ mod tests {
         assert!(super::cycle_shortcut("   ", true).is_none());
     }
 
+    // The reverse chord is claimed and released with the forward one, and only
+    // ever behind it: registering the user's own chord first means a refusal of
+    // the derived one cannot cost them the direction they configured.
+    #[test]
+    fn the_cycler_claims_the_shift_variant_alongside_its_chord() {
+
+        let claimed = super::cycle_shortcuts("Alt+Esc", true);
+
+        assert_eq!(claimed.len(), 2, "both directions must be claimed");
+        assert_eq!(claimed[0], super::cycle_shortcut("Alt+Esc", true).unwrap());
+        assert_eq!(claimed[1], "ALT+SHIFT+ESC".parse().unwrap());
+
+        assert!(
+            super::cycle_shortcuts("Alt+Esc", false).is_empty(),
+            "disabled: neither direction may be claimed"
+        );
+    }
+
+    // Nothing to derive, so the cycler holds the one chord and reverse is
+    // simply unavailable rather than colliding with the forward direction.
+    #[test]
+    fn a_chord_that_already_holds_shift_claims_only_itself() {
+        assert_eq!(super::cycle_shortcuts("Alt+Shift+Esc", true).len(), 1);
+    }
+
     // Spelling must not decide identity, or turning the feature off and on again
     // would fail to release what it registered.
     #[test]
@@ -283,6 +308,22 @@ fn cycle_shortcut(hotkey: &str, enabled: bool) -> Option<Shortcut> {
     normalize_shortcut(hotkey).parse::<Shortcut>().ok()
 }
 
+/// Every chord the cycler should be holding: the configured one, then the
+/// derived Shift variant that cycles the other way. Forward stays first, so a
+/// caller registering them in order claims the user's own chord before the
+/// one ClipX inferred.
+fn cycle_shortcuts(hotkey: &str, enabled: bool) -> Vec<Shortcut> {
+
+    let Some(forward) = cycle_shortcut(hotkey, enabled) else {
+        return Vec::new();
+    };
+
+    let reverse = crate::settings::reverse_hotkey(hotkey)
+        .and_then(|reverse| reverse.parse::<Shortcut>().ok());
+
+    std::iter::once(forward).chain(reverse).collect()
+}
+
 /// Apply the cycler's binding and its on/off state together.
 ///
 /// One command for both, because they decide a single thing between them -
@@ -305,30 +346,48 @@ pub fn update_cycle_windows_shortcut(
 
         // A binding that cannot be parsed is refused rather than silently
         // dropped, but only when it is actually going to be used.
-        let desired = if enabled && !shortcut.trim().is_empty() {
-            Some(
-                normalize_shortcut(&shortcut)
-                    .parse::<Shortcut>()
-                    .map_err(|e| AppError::Shortcut(format!("Failed to parse '{shortcut}': {e}")))?,
-            )
-        } else {
-            None
-        };
+        if enabled && !shortcut.trim().is_empty() {
+            normalize_shortcut(&shortcut)
+                .parse::<Shortcut>()
+                .map_err(|e| AppError::Shortcut(format!("Failed to parse '{shortcut}': {e}")))?;
+        }
 
-        let current = cycle_shortcut(&s.cycle_windows_hotkey, s.cycle_windows_enabled);
+        let desired = cycle_shortcuts(&shortcut, enabled);
+        let current = cycle_shortcuts(&s.cycle_windows_hotkey, s.cycle_windows_enabled);
 
         if current != desired {
 
-            // Claim the new one first: if the registration is refused, the old
-            // binding is still live and the settings are left untouched.
-            if let Some(next) = desired {
-                app.global_shortcut()
-                    .on_shortcut(next, shortcut_handler)
-                    .map_err(|e| AppError::Shortcut(e.to_string()))?;
+            // Claim the new ones first: if a registration is refused, the old
+            // binding is still live and the settings are left untouched. What
+            // both sets share is skipped, since re-registering a chord ClipX
+            // already holds is itself an error.
+            for (at, next) in desired.iter().enumerate() {
+
+                if current.contains(next) {
+                    continue;
+                }
+
+                let Err(e) = app.global_shortcut().on_shortcut(*next, shortcut_handler) else {
+                    continue;
+                };
+
+                // The forward chord is the one the user chose, so a refusal is
+                // theirs to see. The reverse chord is derived, and losing it
+                // must not fail a change they did ask for.
+                if at == 0 {
+                    return Err(AppError::Shortcut(e.to_string()));
+                }
+
+                log::warn!("update_cycle_windows_shortcut: could not claim {next:?}: {e}");
             }
 
-            if let Some(previous) = current {
-                if let Err(e) = app.global_shortcut().unregister(previous) {
+            for previous in &current {
+
+                if desired.contains(previous) {
+                    continue;
+                }
+
+                if let Err(e) = app.global_shortcut().unregister(*previous) {
                     log::warn!("update_cycle_windows_shortcut: failed to unregister: {e}");
                 }
             }

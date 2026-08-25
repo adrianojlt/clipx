@@ -288,8 +288,18 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
     // Best-effort too. Switched off, or left unbound as it is by default off
     // Windows, ClipX claims nothing and the shortcut stays the system's.
     if cycle_windows_enabled && !cycle_windows_str.is_empty() {
+
         if let Err(e) = register_shortcut(app, &cycle_windows_str) {
             log::error!("failed to register window-cycle global shortcut: {e}");
+        }
+
+        // The reverse chord is derived, not configured, so failing to claim it
+        // is not an error the user asked for: the forward direction still
+        // works and only the log says the other one did not.
+        if let Some(reverse) = crate::settings::reverse_hotkey(&cycle_windows_str) {
+            if let Err(e) = register_shortcut(app, &reverse) {
+                log::warn!("failed to register reverse window-cycle shortcut '{reverse}': {e}");
+            }
         }
     }
 

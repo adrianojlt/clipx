@@ -520,7 +520,7 @@ mod ax {
 /// macOS cycles an app's own windows with Command+` already, so ClipX has no
 /// reason to reimplement it. Only reachable if the hotkey, unset here by
 /// default, is bound by hand.
-pub fn cycle_active_app_windows() -> Result<bool, AppError> {
+pub fn cycle_active_app_windows(_reverse: bool) -> Result<bool, AppError> {
     Err(AppError::State(
         "cycling an app's windows is Windows-only; macOS has Command+`".into(),
     ))

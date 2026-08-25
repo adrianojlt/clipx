@@ -315,10 +315,55 @@ pub fn normalize_shortcut(s: &str) -> String {
 }
 
 
+/// The chord that cycles the other way: the configured one with Shift added.
+///
+/// Derived rather than configured, because that is the convention users
+/// already expect from every window cycler - Alt+Esc forwards, Alt+Shift+Esc
+/// back - and a second recorder row for a key nobody rebinds is not worth the
+/// settings surface.
+///
+/// `None` when there is nothing sane to derive: no binding at all, or one that
+/// already holds Shift, where the reverse chord would be the forward one.
+pub fn reverse_hotkey(hotkey: &str) -> Option<String> {
+
+    let normalized = normalize_shortcut(hotkey);
+
+    let mut parts: Vec<&str> = normalized
+        .split('+')
+        .filter(|tok| !tok.is_empty())
+        .collect();
+
+    // A bare key is still cycleable in reverse; nothing at all is not.
+    if parts.is_empty() || parts.iter().any(|tok| *tok == "SHIFT") {
+        return None;
+    }
+
+    // Before the key itself, so the chord reads in the usual modifier order.
+    parts.insert(parts.len() - 1, "SHIFT");
+
+    Some(parts.join("+"))
+}
+
 #[cfg(test)]
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn reverse_hotkey_adds_shift_before_the_key() {
+        assert_eq!(reverse_hotkey("Alt+Esc").as_deref(), Some("ALT+SHIFT+ESC"));
+        assert_eq!(
+            reverse_hotkey("Control+Option+Esc").as_deref(),
+            Some("CTRL+ALT+SHIFT+ESC")
+        );
+    }
+
+    #[test]
+    fn reverse_hotkey_declines_when_shift_is_taken_or_nothing_is_bound() {
+        assert_eq!(reverse_hotkey("Alt+Shift+Esc"), None);
+        assert_eq!(reverse_hotkey(""), None);
+        assert_eq!(reverse_hotkey("   "), None);
+    }
 
     #[test]
     fn normalize_shortcut_handles_option() {

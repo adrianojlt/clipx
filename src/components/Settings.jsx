@@ -27,6 +27,20 @@ const TAB_MOD = IS_MAC ? "Command" : "Alt";
 // or a Linux build would default to a chord it cannot act on.
 const CYCLE_WINDOWS_DEFAULT = IS_WINDOWS ? "Alt+Esc" : "";
 
+// Mirrors reverse_hotkey() in settings.rs. The cycler holds this chord too and
+// steps the other way with it, so the hint has to be able to name it; there is
+// nothing to derive from a chord that already uses Shift.
+function reverseHotkey(hotkey) {
+
+  const parts = (hotkey || "").split("+").map((p) => p.trim()).filter(Boolean);
+
+  if (!parts.length || parts.some((p) => p.toUpperCase() === "SHIFT")) {
+    return "";
+  }
+
+  return [...parts.slice(0, -1), "Shift", parts[parts.length - 1]].join("+");
+}
+
 const SYM = {
   Command: "⌘", Ctrl: "⌃", Control: "⌃", Option: "⌥", Alt: "⌥",
   Shift: "⇧", Space: "␣", Enter: "⏎", Escape: "⎋", Tab: "⇥",
@@ -323,7 +337,11 @@ function HotkeysPanel({ s, set }) {
         <>
           <HotkeyField
             label="Cycle Windows of Active App"
-            hint={`Steps through the windows of the app in front, instead of every window on the desktop the way ${CYCLE_WINDOWS_DEFAULT} normally does. Turn it off to hand the shortcut back to Windows.`}
+            hint={`Steps through the windows of the app in front, instead of every window on the desktop the way ${CYCLE_WINDOWS_DEFAULT} normally does.${
+              reverseHotkey(s.cycleWindowsHotkey)
+                ? ` ${reverseHotkey(s.cycleWindowsHotkey)} steps back through them.`
+                : ""
+            } Turn it off to hand the shortcut back to Windows.`}
             value={s.cycleWindowsHotkey}
             onChange={(v) => set("cycleWindowsHotkey", v)}
             disabled={!s.cycleWindowsEnabled}

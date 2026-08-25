@@ -46,6 +46,8 @@ Raising the next window is not enough on its own. The outgoing window stays seco
 
 Windows of one app are matched by the owning executable's path, never by pid: Chromium and Electron apps spread windows over several processes, and some apps start one process per window.
 
+The reverse direction is the mirror of that, not a copy of it. `previous_window` raises the app's backmost window and demotes nothing: raising the backmost window is by itself the step back, and pushing the outgoing window down as well would skip an entry. Its chord is derived, never configured - `reverse_hotkey` in `settings.rs` adds Shift to whatever the cycler is bound to, and yields nothing for a chord that already holds Shift.
+
 ## Platform Integration
 
 Prefer native platform APIs over shelling out to `osascript` or `powershell` on any path the user waits on. The cost is the subprocess, not the work. Measured on this project:

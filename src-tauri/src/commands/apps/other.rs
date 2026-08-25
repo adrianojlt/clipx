@@ -11,6 +11,6 @@ pub fn focus_app(_id: &str) -> Result<(), AppError> {
     Err(AppError::State("focusing apps not supported on this platform".into()))
 }
 
-pub fn cycle_active_app_windows() -> Result<bool, AppError> {
+pub fn cycle_active_app_windows(_reverse: bool) -> Result<bool, AppError> {
     Err(AppError::State("cycling app windows not supported on this platform".into()))
 }

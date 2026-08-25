@@ -1,6 +1,6 @@
 //! Listing, focusing and window cycling for Windows.
 
-use super::window_cycle::next_window;
+use super::window_cycle::{next_window, previous_window};
 use super::windows_icons::{
     build_rows, extraction_script, icon_cache, icons_by_app, parse_icon_pairs, split_cached,
     store, RawWindow,
@@ -516,14 +516,20 @@ fn switchable_windows_in_z_order() -> Vec<(isize, String)> {
 
 /// Rotate the focused app's windows, the way Alt+Esc rotates the desktop's.
 ///
-/// Raises the app's next window and sends the outgoing one to the back of
-/// the Z-order. The demotion is what makes a third window reachable: raising
-/// alone leaves the outgoing window second in Z-order, so the next press
-/// would raise it straight back and the cycle would never leave that pair.
+/// Forwards, this raises the app's next window and sends the outgoing one to
+/// the back of the Z-order. The demotion is what makes a third window
+/// reachable: raising alone leaves the outgoing window second in Z-order, so
+/// the next press would raise it straight back and the cycle would never
+/// leave that pair.
+///
+/// `reverse` steps the other way, and deliberately demotes nothing: it raises
+/// the app's backmost window, which moves the rotation one place back on its
+/// own. Demoting as well would push the window just left behind under the one
+/// before it and skip an entry.
 ///
 /// `Ok(false)` means there was nothing to do, which is the ordinary result
 /// for a single-window app.
-pub fn cycle_active_app_windows() -> Result<bool, AppError> {
+pub fn cycle_active_app_windows(reverse: bool) -> Result<bool, AppError> {
 
     let foreground = unsafe { GetForegroundWindow() };
 
@@ -537,7 +543,11 @@ pub fn cycle_active_app_windows() -> Result<bool, AppError> {
 
     let windows = switchable_windows_in_z_order();
 
-    let Some(next) = next_window(&windows, current.0 as isize) else {
+    let current_handle = current.0 as isize;
+
+    let step = if reverse { previous_window } else { next_window };
+
+    let Some(next) = step(&windows, current_handle) else {
         return Ok(false);
     };
 
@@ -552,7 +562,9 @@ pub fn cycle_active_app_windows() -> Result<bool, AppError> {
         )));
     }
 
-    send_to_back(current);
+    if !reverse {
+        send_to_back(current);
+    }
 
     Ok(true)
 }
