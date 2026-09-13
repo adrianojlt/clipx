@@ -28,6 +28,9 @@ export const updateShortcut = (shortcut) => invoke("update_shortcut", { shortcut
 
 export const updateOpenAppsShortcut = (shortcut) => invoke("update_open_apps_shortcut", { shortcut });
 
+export const updateActiveAppWindowsShortcut = (shortcut) =>
+  invoke("update_active_app_windows_shortcut", { shortcut });
+
 export const updateCycleWindowsShortcut = (shortcut, enabled) =>
   invoke("update_cycle_windows_shortcut", { shortcut, enabled });
 

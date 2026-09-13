@@ -9,6 +9,7 @@ import {
   setSetting,
   updateShortcut,
   updateOpenAppsShortcut,
+  updateActiveAppWindowsShortcut,
   updateCycleWindowsShortcut,
   applyWindowSize,
   logError,
@@ -26,6 +27,9 @@ const TAB_MOD = IS_MAC ? "Command" : "Alt";
 // has to be Windows rather than "not macOS" to match the cfg! the backend uses,
 // or a Linux build would default to a chord it cannot act on.
 const CYCLE_WINDOWS_DEFAULT = IS_WINDOWS ? "Alt+Esc" : "";
+
+// Mirrors default_active_app_windows_hotkey() in settings.rs.
+const ACTIVE_APP_WINDOWS_DEFAULT = "Option+Shift+Z";
 
 // Mirrors reverse_hotkey() in settings.rs. The cycler holds this chord too and
 // steps the other way with it, so the hint has to be able to name it; there is
@@ -332,6 +336,12 @@ function HotkeysPanel({ s, set }) {
         hint="System-wide hotkey to open the list of running apps."
         value={s.openAppsHotkey}
         onChange={(v) => set("openAppsHotkey", v)}
+      />
+      <HotkeyField
+        label="Open Windows of Active App"
+        hint="Same list, limited to the windows of the app in front."
+        value={s.activeAppWindowsHotkey}
+        onChange={(v) => set("activeAppWindowsHotkey", v)}
       />
       {IS_WINDOWS && (
         <>
@@ -674,6 +684,7 @@ function Settings() {
   const [s, setS] = useState({
     hotkey: "",
     openAppsHotkey: "Control+Option+Esc",
+    activeAppWindowsHotkey: ACTIVE_APP_WINDOWS_DEFAULT,
     cycleWindowsHotkey: CYCLE_WINDOWS_DEFAULT,
     cycleWindowsEnabled: IS_WINDOWS,
     tabShortcutPinned: `${TAB_MOD}+1`,
@@ -733,9 +744,10 @@ function Settings() {
         return fallback;
       }
     };
-    const [hotkey, openApps, cycleWindows, cycleWindowsOn, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
+    const [hotkey, openApps, activeAppWindows, cycleWindows, cycleWindowsOn, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
       safeGet("hotkey", "Option+Space"),
       safeGet("open_apps_hotkey", "Control+Option+Esc"),
+      safeGet("active_app_windows_hotkey", ACTIVE_APP_WINDOWS_DEFAULT),
       safeGet("cycle_windows_hotkey", CYCLE_WINDOWS_DEFAULT),
       safeGet("cycle_windows_enabled", IS_WINDOWS, (v) => v === "true"),
       safeGet("tab_shortcut_pinned", `${TAB_MOD}+1`),
@@ -748,7 +760,7 @@ function Settings() {
       safeGet("theme", "dark"),
       safeGet("check_updates_on_startup", true, (v) => v === "true"),
     ]);
-    setS({ hotkey, openAppsHotkey: openApps, cycleWindowsHotkey: cycleWindows, cycleWindowsEnabled: cycleWindowsOn, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
+    setS({ hotkey, openAppsHotkey: openApps, activeAppWindowsHotkey: activeAppWindows, cycleWindowsHotkey: cycleWindows, cycleWindowsEnabled: cycleWindowsOn, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
   }, []);
 
   useEffect(() => {
@@ -783,6 +795,7 @@ function Settings() {
 
     await attempt(() => updateShortcut(s.hotkey));
     await attempt(() => updateOpenAppsShortcut(s.openAppsHotkey));
+    await attempt(() => updateActiveAppWindowsShortcut(s.activeAppWindowsHotkey));
     await attempt(() => updateCycleWindowsShortcut(s.cycleWindowsHotkey, s.cycleWindowsEnabled));
 
     await attempt(() => setSetting("tab_shortcut_pinned", s.tabShortcutPinned));

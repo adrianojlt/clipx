@@ -517,6 +517,17 @@ mod ax {
     }
 }
 
+/// The name of the app in front, spelled exactly as `list_open_apps` spells the
+/// `app` field, so the listing can be filtered down to that app's own windows.
+pub fn active_app_name() -> Option<String> {
+
+    use objc2_app_kit::NSWorkspace;
+
+    let app = NSWorkspace::sharedWorkspace().frontmostApplication()?;
+
+    app_name(&app)
+}
+
 /// macOS cycles an app's own windows with Command+` already, so ClipX has no
 /// reason to reimplement it. Only reachable if the hotkey, unset here by
 /// default, is bound by hand.

@@ -297,6 +297,29 @@ pub fn update_open_apps_shortcut(
     save_settings(&app, &settings)
 }
 
+#[tauri::command]
+pub fn update_active_app_windows_shortcut(
+    shortcut: String,
+    state: State<AppState>,
+    app: tauri::AppHandle,
+) -> Result<(), AppError> {
+
+    let settings = {
+
+        let mut s = state
+            .settings
+            .lock()
+            .map_err(|e| AppError::State(format!("settings mutex poisoned: {e}")))?;
+
+        swap_global_shortcut(&app, &s.active_app_windows_hotkey, &shortcut)?;
+
+        s.active_app_windows_hotkey = shortcut;
+        s.clone()
+    };
+
+    save_settings(&app, &settings)
+}
+
 /// The shortcut the cycler should be holding, or `None` when it should hold
 /// none: switched off, or left without a binding.
 fn cycle_shortcut(hotkey: &str, enabled: bool) -> Option<Shortcut> {

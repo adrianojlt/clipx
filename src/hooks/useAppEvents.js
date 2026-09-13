@@ -12,6 +12,7 @@ export function useAppEvents({
   setActiveTab,
   mode,
   onSetMode,
+  onSetAppScope,
   tabShortcutPinned,
   tabShortcutHistory,
   tabShortcutSessions,
@@ -71,7 +72,10 @@ export function useAppEvents({
 
       const u3 = await listen("main-window-shown", async (event) => {
 
-        const nextMode = event.payload === "apps" ? "apps" : "clipboard";
+        const nextMode = event.payload?.mode === "apps" ? "apps" : "clipboard";
+
+        // Set before the mode, so the list never renders unscoped for a frame.
+        onSetAppScope(event.payload?.app ?? null);
 
         if (nextMode === "apps") {
           holdToSelect.arm();
@@ -120,7 +124,7 @@ export function useAppEvents({
       clearTimeout(retryTimer);
       unlisteners.forEach((fn) => fn());
     };
-  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch, onSetMode, onWindowShown, holdToSelect, appsSearchRef]);
+  }, [onLoadData, onLoadApps, onLoadHistory, onLoadClipboard, onLoadTabShortcuts, onClearSearch, onSetMode, onSetAppScope, onWindowShown, holdToSelect, appsSearchRef]);
 
   useEffect(() => {
     const onKey = async (e) => {

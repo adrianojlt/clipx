@@ -569,6 +569,33 @@ pub fn cycle_active_app_windows(reverse: bool) -> Result<bool, AppError> {
     Ok(true)
 }
 
+/// The process name of the app in front, spelled exactly as `list_open_apps`
+/// spells the `app` field, so the listing can be filtered down to that app's
+/// own windows.
+///
+/// The process name rather than the executable path the cycler groups by: the
+/// popup already groups its rows by this, and both spellings answer the same
+/// question for a multi-process app, where every window's pid resolves to one
+/// name.
+pub fn active_app_name() -> Option<String> {
+
+    let foreground = unsafe { GetForegroundWindow() };
+
+    if foreground.is_invalid() {
+        return None;
+    }
+
+    // A focused dialog or palette belongs to the window that owns it.
+    let window = unsafe { GetAncestor(foreground, GA_ROOTOWNER) };
+
+    let owner = window_pid(window)?;
+    let pid = hosted_pid(window, owner).unwrap_or(owner);
+
+    process_names()
+        .remove(&pid)
+        .filter(|name| !name.trim().is_empty())
+}
+
 // id == that window's own handle on Windows.
 pub fn focus_app(id: &str) -> Result<(), AppError> {
 
@@ -676,6 +703,34 @@ mod tests {
         for (app, windows) in per_app.iter().filter(|(_, &n)| n > 1) {
             eprintln!("  {app:?} contributed {windows} windows");
         }
+    }
+
+    // The scoped listing is only useful if the name captured at hotkey time is
+    // spelled the way the listed rows spell theirs, so check it against them.
+    // A headless runner has no foreground window and skips.
+    #[test]
+    fn the_active_app_is_named_the_way_its_rows_are() {
+
+        let Some(name) = super::active_app_name() else {
+            eprintln!("skipped: no foreground window on this desktop");
+            return;
+        };
+
+        let rows = super::list_open_apps().expect("listing must not fail");
+
+        let windows: Vec<&str> = rows
+            .apps
+            .iter()
+            .filter(|row| row.app == name)
+            .map(|row| row.name.as_str())
+            .collect();
+
+        eprintln!("active app {name:?} would list {windows:?}");
+
+        assert!(
+            !windows.is_empty(),
+            "{name:?} matched no listed row, so the scoped list would be empty"
+        );
     }
 
     // Acceptance evidence for the cycler against the real desktop: how it

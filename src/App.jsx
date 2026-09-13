@@ -42,6 +42,9 @@ import "./App.css";
 
 function App() {
   const [mode, setMode] = useState("clipboard");
+  // The app whose windows the list is limited to, or null for every window.
+  // Set by the shortcut that opens the list scoped to the app in front.
+  const [appScope, setAppScope] = useState(null);
   const [activeTab, setActiveTab] = useState("pinned");
   // pinMode: 'none' | 'always-on-top' | 'soft'. Ephemeral, resets on restart.
   const [pinMode, setPinMode] = useState("none");
@@ -92,10 +95,11 @@ function App() {
   const filteredApps = useMemo(() => {
     const tokens = appsSearch.toLowerCase().split(/\s+/).filter(Boolean);
     return apps.filter((a) => {
+      if (appScope && a.app !== appScope) return false;
       const name = a.name.toLowerCase();
       return tokens.every((t) => name.includes(t));
     });
-  }, [apps, appsSearch]);
+  }, [apps, appsSearch, appScope]);
 
   const pinnedSet = useMemo(() => new Set(globalPinned.map((p) => p.content)), [globalPinned]);
 
@@ -274,6 +278,7 @@ function App() {
     setActiveTab,
     mode,
     onSetMode: setMode,
+    onSetAppScope: setAppScope,
     tabShortcutPinned,
     tabShortcutHistory,
     tabShortcutSessions,

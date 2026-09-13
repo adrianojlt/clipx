@@ -123,6 +123,16 @@ fn cycle_allowed() -> bool {
     true
 }
 
+/// The app in front, named the way listed rows name theirs, so the popup can be
+/// scoped to that app's own windows.
+///
+/// Read from the shortcut handler before the popup is shown: once ClipX takes
+/// focus the app the user was working in is no longer the one in front, so this
+/// cannot be answered from inside `list_open_apps`.
+pub(crate) fn active_app_name() -> Option<String> {
+    platform::active_app_name()
+}
+
 /// Rotate the windows of whichever app currently has focus, forwards or, with
 /// `reverse`, the other way.
 ///

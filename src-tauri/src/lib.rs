@@ -106,6 +106,7 @@ pub fn run() {
             commands::settings::set_setting,
             commands::settings::update_shortcut,
             commands::settings::update_open_apps_shortcut,
+            commands::settings::update_active_app_windows_shortcut,
             commands::settings::update_cycle_windows_shortcut,
             commands::settings::apply_window_size,
             commands::clipboard::get_history,
@@ -265,7 +266,7 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
 
     let state = app.state::<AppState>();
 
-    let (hotkey_str, open_apps_str, cycle_windows_str, cycle_windows_enabled) = {
+    let (hotkey_str, open_apps_str, active_app_windows_str, cycle_windows_str, cycle_windows_enabled) = {
         let s = state
             .settings
             .lock()
@@ -273,6 +274,7 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
         (
             s.hotkey.clone(),
             s.open_apps_hotkey.clone(),
+            s.active_app_windows_hotkey.clone(),
             s.cycle_windows_hotkey.clone(),
             s.cycle_windows_enabled,
         )
@@ -283,6 +285,14 @@ fn register_initial_shortcut(app: &AppHandle) -> Result<(), AppError> {
     // the open-apps shortcut is best-effort: a failure here must not break the clipboard hotkey
     if let Err(e) = register_shortcut(app, &open_apps_str) {
         log::error!("failed to register open-apps global shortcut: {e}");
+    }
+
+    // Best-effort for the same reason, and skipped when unbound: the chord is
+    // then the system's, as it is for any shortcut the user cleared.
+    if !active_app_windows_str.trim().is_empty() {
+        if let Err(e) = register_shortcut(app, &active_app_windows_str) {
+            log::error!("failed to register active-app-windows global shortcut: {e}");
+        }
     }
 
     // Best-effort too. Switched off, or left unbound as it is by default off
@@ -348,7 +358,10 @@ fn show_window(app: &AppHandle, label: &str) {
         let _ = win.show();
         let _ = win.set_focus();
         if label == "main" {
-            let _ = app.emit("main-window-shown", ());
+            let _ = app.emit(
+                "main-window-shown",
+                crate::window::WindowShown { mode: "clipboard", app: None },
+            );
         }
     }
 }

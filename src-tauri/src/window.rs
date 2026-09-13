@@ -2,6 +2,17 @@ use crate::AppState;
 use tauri::{Emitter, Manager, Monitor, PhysicalPosition, WebviewWindow};
 use tauri_plugin_global_shortcut::{Shortcut, ShortcutEvent, ShortcutState};
 
+/// What the popup is being opened as: the mode to render, and, when the app
+/// list was asked for scoped to one app, the name its rows carry.
+///
+/// `app` is captured before the window is shown, since showing it takes focus
+/// away from the app being scoped to.
+#[derive(Clone, serde::Serialize)]
+pub(crate) struct WindowShown {
+    pub(crate) mode: &'static str,
+    pub(crate) app: Option<String>,
+}
+
 /// Whether `shortcut` is the one `configured` describes. An unset or unparseable
 /// setting matches nothing.
 fn matches(shortcut: &Shortcut, configured: &str) -> bool {
@@ -19,7 +30,14 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
 
     let state = app.state::<AppState>();
 
-    let (width, height, open_apps_hotkey, cycle_windows_hotkey, cycle_windows_enabled) = state
+    let (
+        width,
+        height,
+        open_apps_hotkey,
+        active_app_windows_hotkey,
+        cycle_windows_hotkey,
+        cycle_windows_enabled,
+    ) = state
         .settings
         .lock()
         .map(|s| {
@@ -27,11 +45,12 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
                 s.window_width,
                 s.window_height,
                 s.open_apps_hotkey.clone(),
+                s.active_app_windows_hotkey.clone(),
                 s.cycle_windows_hotkey.clone(),
                 s.cycle_windows_enabled,
             )
         })
-        .unwrap_or((400.0, 600.0, String::new(), String::new(), false));
+        .unwrap_or((400.0, 600.0, String::new(), String::new(), String::new(), false));
 
     // The window cycler shows no UI and must not take focus: it acts on whatever
     // app is in front, which the popup would displace. Handled before the window
@@ -64,11 +83,20 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
         return;
     }
 
-    // decide which mode the frontend should render based on which shortcut fired
-    let mode = if matches(shortcut, &open_apps_hotkey) {
-        "apps"
+    // Decide which mode the frontend should render based on which shortcut
+    // fired. The scoped listing reads the app in front here, before the popup
+    // is shown and ClipX itself becomes that app.
+    let shown = if matches(shortcut, &active_app_windows_hotkey) {
+        WindowShown {
+            mode: "apps",
+            // Nothing readable in front - no window, or a platform with no
+            // implementation - lists every window rather than nothing.
+            app: crate::commands::apps::active_app_name(),
+        }
+    } else if matches(shortcut, &open_apps_hotkey) {
+        WindowShown { mode: "apps", app: None }
     } else {
-        "clipboard"
+        WindowShown { mode: "clipboard", app: None }
     };
 
     let Ok(cursor) = app.cursor_position() else {
@@ -90,7 +118,7 @@ pub(crate) fn shortcut_handler(app: &tauri::AppHandle, shortcut: &Shortcut, even
     let _ = win.set_position(tauri::Position::Physical(PhysicalPosition { x, y }));
     let _ = win.show();
     let _ = win.set_focus();
-    let _ = app.emit("main-window-shown", mode);
+    let _ = app.emit("main-window-shown", shown);
 }
 
 pub(crate) fn monitor_under_point(win: &WebviewWindow, x: i32, y: i32) -> Option<Monitor> {

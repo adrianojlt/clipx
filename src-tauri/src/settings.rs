@@ -16,6 +16,8 @@ pub struct Settings {
     pub tab_shortcut_sessions: String,
     pub tab_shortcut_find: String,
     pub open_apps_hotkey: String,
+    #[serde(default = "default_active_app_windows_hotkey")]
+    pub active_app_windows_hotkey: String,
     #[serde(default = "default_cycle_windows_hotkey")]
     pub cycle_windows_hotkey: String,
     #[serde(default = "default_cycle_windows_enabled")]
@@ -30,6 +32,12 @@ pub struct Settings {
 
 fn default_theme() -> String {
     "dark".to_string()
+}
+
+/// The open-apps popup scoped to the app in front: the same list, showing only
+/// that app's own windows.
+fn default_active_app_windows_hotkey() -> String {
+    "Option+Shift+Z".to_string()
 }
 
 /// Alt+Esc on Windows, the shortcut the window cycler replaces: the OS cycles
@@ -73,6 +81,7 @@ impl Default for Settings {
             tab_shortcut_sessions: format!("{tab_mod}+3"),
             tab_shortcut_find: format!("{tab_mod}+F"),
             open_apps_hotkey: "Control+Option+Esc".to_string(),
+            active_app_windows_hotkey: default_active_app_windows_hotkey(),
             cycle_windows_hotkey: default_cycle_windows_hotkey(),
             cycle_windows_enabled: default_cycle_windows_enabled(),
             theme: default_theme(),
@@ -137,6 +146,10 @@ impl Settings {
 
         if let Some(v) = map.get("open_apps_hotkey") {
             s.open_apps_hotkey = v.clone();
+        }
+
+        if let Some(v) = map.get("active_app_windows_hotkey") {
+            s.active_app_windows_hotkey = v.clone();
         }
 
         if let Some(v) = map.get("cycle_windows_hotkey") {
@@ -504,6 +517,10 @@ mod tests {
         // New keys take their defaults.
         assert!(loaded.check_updates_on_startup);
         assert_eq!(loaded.dismissed_version, "");
+        assert_eq!(
+            loaded.active_app_windows_hotkey,
+            default_active_app_windows_hotkey()
+        );
         assert_eq!(loaded.cycle_windows_hotkey, default_cycle_windows_hotkey());
         assert_eq!(loaded.cycle_windows_enabled, default_cycle_windows_enabled());
 
@@ -533,6 +550,7 @@ mod tests {
             tab_shortcut_sessions: "D".to_string(),
             tab_shortcut_find: "C".to_string(),
             open_apps_hotkey: "F".to_string(),
+            active_app_windows_hotkey: "H".to_string(),
             cycle_windows_hotkey: "G".to_string(),
             cycle_windows_enabled: true,
             theme: "dark".to_string(),
