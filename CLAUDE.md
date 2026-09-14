@@ -34,28 +34,27 @@ Never treat `ShortcutState::Released` from `tauri-plugin-global-shortcut` as the
 
 Windows shortcuts a shell already owns cannot be taken: the plugin calls `RegisterHotKey`, and Alt+Tab fails there with `ERROR_HOTKEY_ALREADY_REGISTERED` (1409). Alt+Esc is not held by anything and registers cleanly, which is what `cycle_windows_hotkey` binds by default; once ClipX holds it, Windows no longer cycles windows with it. Check a candidate with `RegisterHotKey` before designing around it rather than assuming the system reserves everything.
 
-Holding a registered chord makes Windows auto-repeat `WM_HOTKEY` about thirty times a second. An action that steps through something, rather than toggling a window, has to debounce or one held key runs the whole sequence: see `CYCLE_DEBOUNCE` in `commands/apps/mod.rs`.
+Anything about the app the user was working in has to be read in the shortcut handler, before the popup is shown. Once ClipX is on screen it is itself the app in front, so a command invoked from the popup can no longer answer that question. The listing scoped to the active app captures the app's name there and passes it along.
+
+The `main-window-shown` event carries `{ mode, app }`, not a bare mode string: `app` is that captured name, or null for an unscoped popup. Every emitter of the event owes the frontend that shape.
+
+Holding a registered chord makes Windows auto-repeat `WM_HOTKEY` about thirty times a second. An action that steps through something, rather than toggling a window, has to debounce or one held key runs the whole sequence; the cycler's debounce lives in `commands/apps/mod.rs`.
 
 ## Cycling an App's Windows
 
-`cycle_windows` in `commands/apps/windows.rs` rotates the focused app's own windows. Two things it depends on, both easy to break:
+The cycler in `commands/apps/windows.rs` rotates the focused app's own windows. Two things it depends on, both easy to break:
 
-`EnumWindows` returns windows in Z-order, and the rotation is that order. It therefore cannot be built on `list_open_apps`, which sorts by app and then by frecency; `switchable_windows_in_z_order` shares the enumeration but not the sorting.
+`EnumWindows` returns windows in Z-order, and the rotation is that order. It therefore cannot be built on `list_open_apps`, which sorts by app and then by frecency; the cycler shares the enumeration but not the sorting.
 
 Raising the next window is not enough on its own. The outgoing window stays second in Z-order, so the next press raises it straight back and a third window is never reached. The outgoing window is also pushed to `HWND_BOTTOM`, which is what Alt+Esc does, and what makes the cycle actually reach every window.
 
 Windows of one app are matched by the owning executable's path, never by pid: Chromium and Electron apps spread windows over several processes, and some apps start one process per window.
 
-The reverse direction is the mirror of that, not a copy of it. `previous_window` raises the app's backmost window and demotes nothing: raising the backmost window is by itself the step back, and pushing the outgoing window down as well would skip an entry. Its chord is derived, never configured - `reverse_hotkey` in `settings.rs` adds Shift to whatever the cycler is bound to, and yields nothing for a chord that already holds Shift.
+The reverse direction is the mirror of that, not a copy of it. It raises the app's backmost window and demotes nothing: raising the backmost window is by itself the step back, and pushing the outgoing window down as well would skip an entry. Its chord is derived, never configured - `settings.rs` adds Shift to whatever the cycler is bound to, and yields nothing for a chord that already holds Shift.
 
 ## Platform Integration
 
-Prefer native platform APIs over shelling out to `osascript` or `powershell` on any path the user waits on. The cost is the subprocess, not the work. Measured on this project:
-
-| Path | Subprocess cost | Native equivalent |
-| --- | --- | --- |
-| macOS, AppleScript driving System Events | ~180 ms | Accessibility API in-process, single-digit ms |
-| Windows, `powershell.exe -NoProfile -Command` | ~700 ms bare, ~800-950 ms once `New-Object -ComObject WScript.Shell` is added | Win32 call in-process, ~0.01 ms |
+Prefer native platform APIs over shelling out to `osascript` or `powershell` on any path the user waits on. The cost is the subprocess, not the work: measured here, an AppleScript round trip costs hundreds of milliseconds against single-digit milliseconds in-process, and a `powershell` invocation costs most of a second against a Win32 call that costs nothing measurable.
 
 Windows PowerShell 5.1 is by far the worse of the two: it pays CLR and engine startup on every invocation, so a per-action `powershell` call is never acceptable on an interactive path. Keep the script path as a fallback and log when it is taken, so a silent regression is visible.
 
@@ -63,17 +62,13 @@ The platform halves live in separate files under `commands/apps/`: `macos.rs` an
 
 Note the permission shift this implies on macOS: driving System Events borrows its Accessibility grant, while calling the Accessibility API directly requires the ClipX binary itself to be granted Accessibility, and a bundled build is a different identity than the dev binary.
 
-Windows has no permission shift, but `SetForegroundWindow` has a foreground lock: only the process owning the foreground window or the one that received the last input event may call it. Since the popup hides itself before raising the target, borrow the right by attaching to the foreground window's input queue with `AttachThreadInput`, which is what `WScript.Shell.AppActivate` does internally. See `raise_window` in `commands/apps/windows.rs`.
+Windows has no permission shift, but `SetForegroundWindow` has a foreground lock: only the process owning the foreground window or the one that received the last input event may call it. Since the popup hides itself before raising the target, borrow the right by attaching to the foreground window's input queue with `AttachThreadInput`, which is what `WScript.Shell.AppActivate` does internally. See `commands/apps/windows.rs`.
 
 ## Listing an App's Windows on macOS
 
 `list_open_apps` in `commands/apps/macos.rs` reads `AXWindows` off each `NSRunningApplication` with a Regular activation policy, one row per titled window, and `focus_app` raises the chosen window with `AXRaise` before activating its process.
 
-It used to ask System Events for each process's Window menu instead. That failed three ways, all worth remembering:
-
-- Reading another app's menus through System Events requires the *calling* app to be allowed assistive access, not just System Events. Without it the read errors inside the script's own `try`, which swallowed it, and every app silently collapsed to a single titleless row - the exact symptom of the missing grant, with nothing in the log to say so. `list_open_apps` now logs when `AXIsProcessTrusted()` is false.
-- `repeat with p in (every process whose background only is false)` re-resolves the list on each step, so an app quitting mid-loop failed the whole script with `-1719 Invalid index`. The listing returned an error and the popup kept stale rows.
-- The subprocess cost about 1.8 s with a dozen apps open, against 3 ms for the in-process enumeration.
+It used to ask System Events for each process's Window menu instead, which is worth not going back to: that read needs the *calling* app to hold assistive access, and without it every app silently collapsed to one titleless row, so the listing now logs when `AXIsProcessTrusted()` is false. It also raced apps quitting mid-script, and cost about 1.8 s with a dozen apps open against 3 ms in-process.
 
 `AXRaise` is honored by Chromium and Electron windows (verified on Chrome and VS Code), so clicking the Window-menu entry is not needed for them. Two details it does need: a minimized window has to have `AXMinimized` cleared first, and window identity is the pid plus the position in `AXWindows`, because two windows of one app routinely share a title. Positions shift as windows are raised, so `focus_app` matches on the title first and uses the index only to break ties.
 
