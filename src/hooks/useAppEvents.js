@@ -83,6 +83,9 @@ export function useAppEvents({
           holdToSelect.disarm();
         }
 
+        // Focus survives hide/show; drop it before the apps search takes it.
+        document.activeElement?.blur();
+
         onSetMode(nextMode);
         onClearSearch();
         onLoadData();
@@ -129,6 +132,15 @@ export function useAppEvents({
   useEffect(() => {
     const onKey = async (e) => {
       if (e.key === "Escape") await getCurrentWindow().hide();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // The app has its own shortcuts; Tab must not move focus like a web page.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Tab") e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
