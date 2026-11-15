@@ -632,6 +632,14 @@ function OthersPanel({ s, set, checkRequested, onCheckConsumed }) {
         </div>
         <div className="meter-labels"><span>1</span><span>50</span></div>
       </div>
+      <label className="update-toggle">
+        <input
+          type="checkbox"
+          checked={s.autoPaste}
+          onChange={(e) => set("autoPaste", e.target.checked)}
+        />
+        <span>Paste the selected item into the active app</span>
+      </label>
       <div className="section-header">
         <h3>Updates</h3>
         <p>Check GitHub for a newer release.</p>
@@ -696,6 +704,7 @@ function Settings() {
     windowHeight: 700,
     theme: "dark",
     checkUpdatesOnStartup: true,
+    autoPaste: false,
   });
 
   const set = (k, v) => {
@@ -744,7 +753,7 @@ function Settings() {
         return fallback;
       }
     };
-    const [hotkey, openApps, activeAppWindows, cycleWindows, cycleWindowsOn, pinned, history, sessions, find, limit, width, height, theme, checkUpdates] = await Promise.all([
+    const [hotkey, openApps, activeAppWindows, cycleWindows, cycleWindowsOn, pinned, history, sessions, find, limit, width, height, theme, checkUpdates, autoPaste] = await Promise.all([
       safeGet("hotkey", "Option+Space"),
       safeGet("open_apps_hotkey", "Control+Option+Esc"),
       safeGet("active_app_windows_hotkey", ACTIVE_APP_WINDOWS_DEFAULT),
@@ -759,8 +768,9 @@ function Settings() {
       safeGet("window_height", 700, (v) => Number(v) || 700),
       safeGet("theme", "dark"),
       safeGet("check_updates_on_startup", true, (v) => v === "true"),
+      safeGet("auto_paste", false, (v) => v === "true"),
     ]);
-    setS({ hotkey, openAppsHotkey: openApps, activeAppWindowsHotkey: activeAppWindows, cycleWindowsHotkey: cycleWindows, cycleWindowsEnabled: cycleWindowsOn, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates });
+    setS({ hotkey, openAppsHotkey: openApps, activeAppWindowsHotkey: activeAppWindows, cycleWindowsHotkey: cycleWindows, cycleWindowsEnabled: cycleWindowsOn, tabShortcutPinned: pinned, tabShortcutHistory: history, tabShortcutSessions: sessions, tabShortcutFind: find, historyLimit: limit, windowWidth: width, windowHeight: height, theme, checkUpdatesOnStartup: checkUpdates, autoPaste });
   }, []);
 
   useEffect(() => {
@@ -807,6 +817,7 @@ function Settings() {
     await attempt(() => setSetting("window_height", String(s.windowHeight)));
     await attempt(() => setSetting("theme", s.theme));
     await attempt(() => setSetting("check_updates_on_startup", String(s.checkUpdatesOnStartup)));
+    await attempt(() => setSetting("auto_paste", String(s.autoPaste)));
 
     await attempt(() => applyWindowSize());
     await attempt(() => applyTheme());

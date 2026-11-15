@@ -119,6 +119,7 @@ pub fn run() {
             commands::pinned::reorder_pinned,
             commands::pinned::toggle_pinned_hidden,
             commands::clipboard::get_clipboard,
+            commands::paste::paste_into_active_app,
             commands::logging::log_frontend_error,
             commands::sessions::get_sessions,
             commands::sessions::create_session,

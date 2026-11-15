@@ -28,6 +28,9 @@ pub struct Settings {
     pub check_updates_on_startup: bool,
     #[serde(default)]
     pub dismissed_version: String,
+    /// Paste a History or Pinned selection into the app in front, not only copy it.
+    #[serde(default)]
+    pub auto_paste: bool,
 }
 
 fn default_theme() -> String {
@@ -87,6 +90,7 @@ impl Default for Settings {
             theme: default_theme(),
             check_updates_on_startup: true,
             dismissed_version: String::new(),
+            auto_paste: false,
         }
     }
 }
@@ -523,6 +527,7 @@ mod tests {
         );
         assert_eq!(loaded.cycle_windows_hotkey, default_cycle_windows_hotkey());
         assert_eq!(loaded.cycle_windows_enabled, default_cycle_windows_enabled());
+        assert!(!loaded.auto_paste);
 
         // Pre-existing values survive, i.e. the file parsed rather than being discarded.
         assert_eq!(loaded.theme, "light");
@@ -556,6 +561,7 @@ mod tests {
             theme: "dark".to_string(),
             check_updates_on_startup: true,
             dismissed_version: String::new(),
+            auto_paste: false,
         };
 
         s.validate();

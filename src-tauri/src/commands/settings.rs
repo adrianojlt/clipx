@@ -39,6 +39,11 @@ fn apply_field(s: &mut Settings, key: &str, value: &str) -> Result<(), AppError>
             })?;
         }
         "dismissed_version" => s.dismissed_version = value.to_string(),
+        "auto_paste" => {
+            s.auto_paste = value
+                .parse::<bool>()
+                .map_err(|_| AppError::Validation(format!("Invalid auto_paste: {value}")))?;
+        }
         _ => return Err(AppError::Settings(format!("Unknown setting: {key}"))),
     }
 
@@ -153,6 +158,16 @@ mod tests {
         assert!(!s.check_updates_on_startup);
         apply_field(&mut s, "dismissed_version", "0.1.29").unwrap();
         assert_eq!(s.dismissed_version, "0.1.29");
+    }
+
+    #[test]
+    fn apply_field_auto_paste() {
+        let mut s = Settings::default();
+        assert!(!s.auto_paste);
+        apply_field(&mut s, "auto_paste", "true").unwrap();
+        assert!(s.auto_paste);
+        assert!(matches!(apply_field(&mut s, "auto_paste", "yes"), Err(AppError::Validation(_))));
+        assert!(s.auto_paste);
     }
 
     // Switching the cycler off must not disturb the binding: Alt+Esc cannot be

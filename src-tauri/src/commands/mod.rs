@@ -2,6 +2,7 @@ pub mod apps;
 pub mod clipboard;
 pub mod cursor;
 pub mod logging;
+pub mod paste;
 pub mod pinned;
 pub mod sessions;
 pub mod settings;

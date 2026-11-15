@@ -8,6 +8,9 @@ export const getGlobalPinned = () => invoke("get_global_pinned");
 
 export const getClipboard = () => invoke("get_clipboard");
 
+// No-op unless the auto_paste setting is on.
+export const pasteIntoActiveApp = () => invoke("paste_into_active_app");
+
 export const getSetting = (key) => invoke("get_setting", { key });
 
 export const setSetting = (key, value) => invoke("set_setting", { key, value });

@@ -7,6 +7,7 @@ import {
   getGlobalPinned,
   getSessions,
   getClipboard,
+  pasteIntoActiveApp,
   getSetting,
   setSetting,
   activateSession,
@@ -181,8 +182,11 @@ function App() {
   const handleCopy = useCallback(async (text) => {
     await writeText(text);
     // Keep the window open when pinned; only auto-hide in the unpinned popup mode.
+    // Pasting is tied to the hide: in a pinned mode ClipX keeps focus, and the
+    // paste would land in ClipX itself.
     if (pinMode === "none") {
       await getCurrentWindow().hide();
+      await pasteIntoActiveApp();
     }
   }, [pinMode]);
 
